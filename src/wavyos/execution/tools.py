@@ -79,6 +79,7 @@ class Gateway:
         self.outputs: list[dict] = []
         self.checks: list[dict] = []
         self.awaiting: Optional[str] = None
+        self.flagged: list[dict] = []  # insights raised in this execution: {id, severity, title}
 
     # ---- trace
     def step(self, kind: str, name: str, *, status: str = "ok", input: Any = None, output: Any = None,
@@ -140,6 +141,7 @@ class Gateway:
             self.session, self.scope, area=area, title=title, summary=summary, severity=severity,
             evidence=[{"kind": "execution", "ref": f"execution:{self.ex.id}", "detail": evidence}],
             source_kind="agent", source_ref=f"execution:{self.ex.id}")
+        self.flagged.append({"id": ins.id, "severity": severity, "title": title})
         return f"insight {ins.id} {'recorded' if created else 'already open'}"
 
     def _propose_fact(self, area, component, key, title, body) -> str:

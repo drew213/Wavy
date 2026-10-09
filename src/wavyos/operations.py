@@ -113,7 +113,7 @@ def _decision_decided(session: Session, scope: Scope, ap: m.Approval, approved: 
 
 def create_task(session: Session, scope: Scope, *, title: str, area: str, owner_role: str, done_when: str,
                 checklist: list[str], decision_id: Optional[str] = None, job_run_id: Optional[str] = None,
-                due_date: Optional[date] = None, assignee_id: Optional[str] = None) -> m.Task:
+                due_date: Optional[date] = None, assignee_id: Optional[str] = None, phase: str = "") -> m.Task:
     scope.require_client()
     _need(session, scope, "task.manage")
     require_area(area)
@@ -131,7 +131,7 @@ def create_task(session: Session, scope: Scope, *, title: str, area: str, owner_
         raise ValueError("a task needs a quality checklist")
     t = m.Task(org_id=scope.org_id, client_id=scope.client_id, decision_id=decision_id, job_run_id=job_run_id,
                title=title, area=area, owner_role=owner_role, assignee_id=assignee_id, due_date=due_date,
-               done_when=done_when, created_by=scope.actor.ref,
+               done_when=done_when, created_by=scope.actor.ref, phase=phase.strip().lower(),
                checklist=[{"id": f"c{i + 1}", "text": text, "passed": False, "by": None} for i, text in enumerate(checklist)])
     session.add(t)
     events.record(session, scope, "task.created", t, title, {"decision": decision_id, "job_run": job_run_id})

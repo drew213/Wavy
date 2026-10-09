@@ -12,8 +12,8 @@ from wavyos.execution.tools import TOOLS  # noqa: E402
 from wavyos.taxonomy import AREAS  # noqa: E402
 
 parts = ["# Wavy OS agent skills: review bundle\n", (ROOT / "skills/FORMAT.md").read_text(),
-         "\n# Permission catalog\n\n| Action | Level | Approvers | Locked |\n|---|---|---|---|\n" +
-         "\n".join(f"| {a.key} | {a.level} | {', '.join(sorted(a.approvers)) or '-'} | {'yes' if a.floor == 'explicit_approval' else ''} |"
+         "\n# Permission catalog\n\n| Action | Level | Approvers | Locked | Human only |\n|---|---|---|---|---|\n" +
+         "\n".join(f"| {a.key} | {a.level} | {', '.join(sorted(a.approvers)) or '-'} | {'yes' if a.floor == 'explicit_approval' else ''} | {'yes (agents refused)' if a.human_only else ''} |"
                    for a in ACTIONS.values()),
          "\n\n# Agent tools\n\n" + "\n".join(f"- `{t.name}` ({', '.join(t.purposes)}): {t.description}" for t in TOOLS.values()),
          "\n\n# Operating areas\n\n" + "\n".join(f"- `{k}`: {v[1]}" for k, v in AREAS.items())]

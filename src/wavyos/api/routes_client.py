@@ -121,7 +121,8 @@ def list_tasks(session: SessionDep, scope: ClientScope, status: Optional[str] = 
 def create_task(body: s.TaskIn, session: SessionDep, scope: ClientScope):
     t = operations.create_task(session, scope, title=body.title, area=body.area, owner_role=body.owner_role,
                                done_when=body.done_when, checklist=body.checklist, decision_id=body.decision_id,
-                               job_run_id=body.job_run_id, due_date=body.due_date, assignee_id=body.assignee_id)
+                               job_run_id=body.job_run_id, due_date=body.due_date, assignee_id=body.assignee_id,
+                               phase=body.phase)
     session.flush()
     return s.TaskOut.model_validate(t)
 

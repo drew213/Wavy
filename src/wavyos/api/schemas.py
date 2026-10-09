@@ -233,6 +233,7 @@ class TaskIn(In):
     job_run_id: Optional[str] = None
     due_date: Optional[date] = None
     assignee_id: Optional[str] = None
+    phase: str = Field(default="", max_length=40)
 
 
 class TaskOut(Out):
@@ -245,6 +246,7 @@ class TaskOut(Out):
     assignee_id: Optional[str]
     due_date: Optional[date]
     done_when: str
+    phase: str = ""
     status: str
     checklist: list
     outputs: list

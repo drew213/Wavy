@@ -202,6 +202,9 @@ class Task(IdMixin, Base):
     assignee_id: Mapped[Optional[str]] = mapped_column(String(80))
     due_date: Mapped[Optional[date]] = mapped_column(Date)
     done_when: Mapped[str] = mapped_column(Text, default="")
+    # Fixed when the task is created (e.g. brief, copy, draft_build, preflight, release_verification,
+    # post_send_review, plan, readout). The executor produces only this phase; QA judges only this phase.
+    phase: Mapped[str] = mapped_column(String(40), default="")
     status: Mapped[str] = mapped_column(String(20), default="todo")
     checklist: Mapped[list] = mapped_column(default=list)   # [{id, text, passed, by}]
     outputs: Mapped[list] = mapped_column(default=list)     # [{kind, ref, label}]

@@ -36,7 +36,7 @@ def build(session: Session, scope: Scope, task: m.Task, purpose: str, *, agent_r
         # The full role skill (skills/roles/<role>.md) once `wavyos seed skills` has run.
         "role_skill": skills.role_skill(session, scope.org_id, agent_role),
         "client": {"id": task.client_id},
-        "task": {"id": task.id, "title": task.title, "area": task.area, "done_when": task.done_when,
+        "task": {"id": task.id, "title": task.title, "area": task.area, "phase": task.phase or None, "done_when": task.done_when,
                  "due_date": task.due_date.isoformat() if task.due_date else None,
                  "checklist": [{"id": i["id"], "text": i["text"]} for i in task.checklist]},
         "decision": ({"id": decision.id, "title": decision.title, "rationale": decision.rationale,

@@ -195,3 +195,34 @@ def test_anthropic_adapter_loop_with_stub_client(factory, session, world):
     assert req["model"] == "claude-opus-5-5" and req["fallbacks"] == "default"
     assert req["betas"] == ["server-side-fallback-2026-07-01"] and req["output_config"] == {"effort": "high"}
     assert all(tool["strict"] and tool["input_schema"]["additionalProperties"] is False for tool in req["tools"])
+
+
+def test_qa_flagged_blocker_stops_release_even_when_checks_pass(factory, session, world):
+    w = world
+    t = _setup(session, w)
+    engine.dispatch(session, w.agent("strategist"), t.id)
+    session.commit()
+
+    def qa_with_blocker(packet):
+        calls = qa({})(packet)
+        return [("flag_insight", {"area": "voice_copy", "title": "Unsubstantiated results claim in footer",
+                                  "summary": "Not covered by the checklist", "severity": "critical",
+                                  "evidence": "artifact footer line 2"})] + calls
+    done = engine.work(factory, {"anthropic": FakeAdapter(PRODUCE), "codex": FakeAdapter(qa_with_blocker, name="codex")})
+    assert done[-1].purpose == "qa" and done[-1].result["release_ready"] is False
+    with factory() as s:
+        task = s.get(m.Task, t.id)
+        assert task.status == "blocked" and all(i["passed"] for i in task.checklist)
+        assert s.query(m.Result).filter_by(task_id=t.id).count() == 0
+        last = s.query(m.Event).filter_by(object_id=t.id, action="task.status").order_by(m.Event.id.desc()).first()
+        assert last.summary.startswith("NOT RELEASE-READY")
+
+
+def test_task_phase_reaches_the_packet(session, world):
+    w = world
+    t = _setup(session, w)
+    t2 = operations.create_task(session, w.agent("strategist"), decision_id=t.decision_id, title="Preflight email 1",
+                                area="campaign_production", owner_role="creative", done_when="preflight evidence saved",
+                                checklist=["x"], phase="Preflight")
+    ex = engine.dispatch(session, w.agent("strategist"), t2.id)
+    assert ex.packet["task"]["phase"] == "preflight"

@@ -29,6 +29,7 @@ from .adapters import Adapter, AdapterResult, ExecutorUnavailable
 from .tools import Gateway, tools_for
 
 MAX_ATTEMPTS = 3
+RELEASE_BLOCKING = ("critical", "high")  # QA-flagged insight severities that block release
 DEFAULT_DAILY_BUDGET_USD = 10.0
 
 # (purpose, owner_role) -> (executor, model, effort). "*" matches any role.
@@ -201,6 +202,13 @@ def _settle(s: Session, scope: Scope, ex: m.Execution, task: m.Task, gw: Gateway
     s.flush()
     s.refresh(task)
     failed = [i for i in task.checklist if not i["passed"]]
+    blockers = [f for f in gw.flagged if f["severity"] in RELEASE_BLOCKING]
+    if blockers:
+        # A serious problem outside the checklist stops release even when every listed check passed.
+        ex.result = {**ex.result, "release_ready": False, "blockers": blockers}
+        lines = "; ".join(f"{b['severity']}: {b['title']} (insight {b['id']})" for b in blockers)
+        operations.set_task_status(s, scope, task.id, "blocked", f"NOT RELEASE-READY: unresolved blocker(s): {lines}")
+        return
     if not failed:
         owner = _agent_scope(s, scope, task.owner_role)
         operations.complete_task(s, owner, task.id, task.outputs)
