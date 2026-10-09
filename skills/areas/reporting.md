@@ -4,7 +4,7 @@ kind: area
 area: reporting
 title: Reporting and diagnosis
 owner_role: analyst
-version: 1
+version: 2
 reviewed: 2026-10-09
 review_every_days: 90
 ---
@@ -57,6 +57,7 @@ Call `get_context` for `reporting`, `data_infrastructure` and `economics`. If a 
 - If a cohort isn't fully mature, then it can't be the headline.
 - If a cohort has N < 100 or fewer than 20 repeaters, or a ranked asset has fewer than 20 orders, then flag it as small and show the interval or counts.
 - If a provider threshold is breached, or a Klaviyo rate is in "needs attention", then `flag_insight` severity high and add a deliverability priority. Unavailable provider data is Not verified, never a provider pass.
+- These ESP bands are the single ESP complaint-band contract that `deliverability` and `campaign_production` also apply; a rate between healthy and needs attention is reported as neither. ESP and provider rates are always reported on separate rows and never substitute for each other.
 - If attribution settings changed during the comparison window, then restate both periods or don't compare.
 - If a "stop" fact is missing, then `flag_insight`, save a draft and `finish`.
 
@@ -76,8 +77,7 @@ Call `get_context` for `reporting`, `data_infrastructure` and `economics`. If a 
 - [ ] The list-growth bridge uses mutually exclusive transitions per channel, counts an unsubscribe-plus-suppression once, and lists corrections separately.
 - [ ] Deliverability uses the ESP health bands with counts; provider rows cite provider evidence or say Not verified.
 - [ ] No sentence claims lift, causation or incrementality without a controlled test.
-- [ ] Every anomaly lists the checks run and the evidence.
-- [ ] At most three priorities, each with measure, owner, deadline and dependency.
+- [ ] Every anomaly lists the checks and evidence; the report ends with at most three priorities, each with measure, owner, deadline and dependency.
 
 ## Owner and approvals
 | Action | Level | Who decides |

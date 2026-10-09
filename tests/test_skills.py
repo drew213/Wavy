@@ -23,7 +23,7 @@ def test_every_area_has_all_ten_components_and_a_checklist():
     for area in AREAS:
         sk = loaded[f"area.{area}"]
         assert [h for h, _ in skills.AREA_SECTIONS] == list(sk.sections)
-        assert 5 <= len(sk.checklist) <= 12
+        assert 5 <= len(sk.checklist) <= 10
         assert sk.approvals
 
 

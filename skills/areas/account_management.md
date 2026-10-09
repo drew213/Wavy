@@ -4,7 +4,7 @@ kind: area
 area: account_management
 title: Client communication and account management
 owner_role: account_lead
-version: 1
+version: 2
 reviewed: 2026-10-09
 review_every_days: 90
 ---
@@ -24,7 +24,7 @@ Look each up with `get_context` (area `account_management`, and `onboarding` for
 - `relationship_history` – past issues, sensitivities, wins they value. Missing: none recorded; start the log.
 
 ## Inputs and sources
-- **Task system** – trusted for status, owners and due dates. Trap: a feedback entry or meeting note is not a task until it has an owner and date.
+- **Task system** – trusted for status, owners and due dates. Traps: a feedback entry or meeting note is not a task until it has an owner and date; a saved task-creation handoff is not a task until the system record (task ID) exists.
 - **Approval records** – trusted for what was approved, by whom, for which exact version. Trap: "looks good" in a thread is not an approval of the final payload; content changed after approval needs re-approval.
 - **Meeting notes and recaps** – trusted for agreed actions. Trap: separate observations, proposals and decisions.
 - **Client messages** – trusted as the client's words. Trap: tone in text is easy to misread; quote, don't paraphrase, when logging feedback.
@@ -33,14 +33,14 @@ Look each up with `get_context` (area `account_management`, and `onboarding` for
 
 ## SOP
 1. **Daily:** call `get_context` for `account_management`. List open client requests, pending approvals, tasks due in 5 business days, and blocked items.
-2. **Requests intake:** for each new request, record requester, date, exact ask (quoted), and classify it: in scope, scope change, question, or issue. In scope: create a task with owner, due date and done-when. Scope change: draft a change note (what, effort, price impact if known, what it displaces) for the account lead. Issue: `flag_insight` with severity. Draft an acknowledgement.
-3. **Feedback handling:** log each piece of feedback verbatim with the asset and version it refers to. Map it to a change, a question or a disagreement. Changes become tasks; disagreements with a standard (for example a claim or compliance rule) go to the account lead with the rule and a permitted alternative; a restriction is never waived on request. Confirm back what will change and when.
+2. **Requests intake:** for each new request, record requester, date, exact ask (quoted), and classify it: in scope, scope change, question, or issue. In scope: link the recorded task (system task ID) with owner, due date and done-when, or, when no task can be recorded in this execution, save a task-creation handoff with owner, due date, phase and done-when. A pending handoff is never described as a created task. Question: record the answer or the open question with its owner. Scope change: draft a change note (what, effort, price impact if known, what it displaces) for the account lead. Issue: `flag_insight` with severity. Draft an acknowledgement.
+3. **Feedback handling:** log each piece of feedback verbatim with the asset and version it refers to. Map it to a change, a question or a disagreement. Changes become recorded tasks or task-creation handoffs; disagreements with a standard (for example a claim or compliance rule) go to the account lead with the rule and a permitted alternative; a restriction is never waived on request. Confirm back what will change and when.
 4. **Approval reminders:** for each pending approval, check its due date against the release date. Draft a reminder at the Wavy default trigger (below) naming the item, the exact version, the deadline and what slips if it's missed.
 5. **Delays:** the moment a due date is at risk, draft a delay notice: what is late, why in one sentence, the new date, what the client needs to do (if anything), and the impact on dependent work. Never hide a delay inside a status update.
 6. **Weekly update:** draft a short written update: done this week (with links), in progress, needs your decision (with deadline), coming next, risks. Use finding-first sentences. Every number traces to a verified report.
 7. **Escalations:** for a live error, compliance risk or client complaint, `flag_insight` at high or critical severity immediately with evidence, and draft a holding message for the account lead. Do not fix live systems yourself, and never describe a fix as made without the executor's receipt.
 8. **Relationship health:** weekly, score the account on the signals below and save the note. Flag any red signal.
-9. Save every draft with `save_output` (kind `copy` for messages, `report` for the update). Saved outputs are internal. Call `request_approval` with `client.message.send` and the exact client-visible text for each client message, then `finish`. Sending is a later phase; never report a message as sent from this task.
+9. Save every artifact with `save_output` before any terminal call: the request log, task-creation handoffs, scope-change notes, internal evidence (`analysis` or `report`) and each client-visible draft as a separate kind `copy` artifact. Saved outputs are internal. Then call `request_approval` with `client.message.send` and the exact client-visible text for each client message, then `finish`; nothing is saved after it. Sending is a later phase; never report a message as sent from this task.
 
 ## Decision rules
 - If a request is not in `scope_of_work`, then do not start it; draft a scope-change note and wait for an approved decision.
@@ -60,7 +60,7 @@ Look each up with `get_context` (area `account_management`, and `onboarding` for
 "Hi! Just checking in on everything. Let us know if you have any thoughts on the stuff we sent. Also we went ahead and added a VIP flow since it seemed like a good idea." It asks nothing specific, gives no deadline, and announces unapproved out-of-scope work.
 
 ## Quality checklist
-- [ ] Every client request in the period has a classification and either a task with owner and date or a scope-change note.
+- [ ] Every request in the supplied period register has a classification and a linked recorded task, a task-creation handoff with owner/date/phase, a scope-change note, or an answered-question/issue record. Pending handoffs are not described as created tasks.
 - [ ] Feedback is logged verbatim against the asset and version it refers to.
 - [ ] Each approval reminder names the exact item, version, deadline and consequence.
 - [ ] Each delay notice states the new date and the impact on dependent work.
@@ -87,7 +87,7 @@ Look each up with `get_context` (area `account_management`, and `onboarding` for
 
 ## Outputs and destination
 Every saved output is internal by default. A client-visible version is a separate copy artifact, stripped of internal evidence, insight references and tooling, and reaches the client or Client Hub only through an approved `client.message.send` whose approval matches that exact version. Record the approved version and send receipt; a changed version needs new approval.
-- **Request log** (other): request, requester, classification, task or note link. Task output.
+- **Request log** (other): request, requester, classification, and a linked recorded task, task-creation handoff (owner, date, phase), scope-change note or answered-question/issue record. Task output.
 - **Acknowledgements, reminders, delay notices** (copy): client messages via `request_approval`.
 - **Weekly update** (report): Client Hub and client message after approval.
 - **Scope-change note** (brief): to the account lead; becomes a proposed decision.

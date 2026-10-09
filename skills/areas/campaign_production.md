@@ -4,7 +4,7 @@ kind: area
 area: campaign_production
 title: Campaign production and deployment
 owner_role: account_lead
-version: 1
+version: 2
 reviewed: 2026-10-09
 review_every_days: 90
 ---
@@ -60,7 +60,7 @@ Each step names its policy action and level. Each phase (brief, copy, design dir
 - If a dynamic block has no fallback, then QA fails.
 - **UTM convention, Wavy starting default:** `utm_source=<esp>`, `utm_medium=email` or `sms`, `utm_campaign=<YYYYMMDD>_<campaign-slug>`, `utm_content=<module>` on commerce links. Do not append UTMs to signed, unsubscribe, preference, payment, mailto or tel links without documented support.
 - If smart sending is off on a marketing send, then the approval summary must say so and why. Never ignore unsubscribes on a marketing send (CAN-SPAM requires honouring opt-outs within 10 business days).
-- **Release verification, Wavy starting defaults:** if the per-send ESP complaint rate exceeds 0.1% or bounces exceed 2%, then `flag_insight` (high) and `request_approval` to hold further sends to that audience. ESP rates are not provider rates: Gmail's daily Postmaster spam rate (below 0.1% recommended, never 0.3% or higher) and Yahoo's rate follow `deliverability`.
+- **Release verification:** use the same per-send ESP bands as `reporting`; an ESP complaint rate above 0.05% or bounce rate above 2% triggers a high-severity operational investigation and an approval request to hold further affected sends. Show counts, denominator and data age. Provider rates remain separate under `deliverability`; neither an early ESP rate nor absent provider data establishes provider health.
 - If clicks are not registering within the first hour while delivery is normal, then test a link from the received email and `flag_insight`.
 - **Post-send review timing:** provisional at 3 days (Wavy starting default), final only after `attribution_window` closes. Never call attributed revenue lift.
 - If an unsubscribe rate exceeds 0.5% on a send (Wavy starting default), then record it in the review and flag it for the calendar.
@@ -68,7 +68,7 @@ Each step names its policy action and level. Each phase (brief, copy, design dir
 
 ## Examples
 ### Good
-A preflight record for build v4: "Copy v4 matches build field by field. Received seed messages (receipt IDs) correct in Gmail app, Apple Mail, Outlook. 11 links: 8 commerce, all 200 on the live domain, max 1 redirect, UTMs present; unsubscribe and preference links untagged and working; 1 mailto; 2 social links on approved external domains. Two dynamic blocks tested with buyer, non-buyer and empty profiles. Recent purchasers excluded via exclusion segment; sale code tested at checkout with a full-price and an excluded item, value matches copy, does not stack with subscription. Decoded delivered HTML 74,100 bytes. Estimate 41,200 against brief 43,000 (within 20%). Approval requested for campaign.publish with this payload; not yet approved or scheduled."
+A preflight record for build v4: "Copy v4 matches build field by field. Received seed messages (receipt IDs) correct in Gmail app, Apple Mail, Outlook. 13 links: 8 commerce, all 200 on the live domain, max 1 redirect, UTMs present; unsubscribe and preference links untagged and working; 1 mailto; 2 social links on approved external domains. Two dynamic blocks tested with buyer, non-buyer and empty profiles. Recent purchasers excluded via exclusion segment; sale code tested at checkout with a full-price and an excluded item, value matches copy, does not stack with subscription. Decoded delivered HTML 74,100 bytes. Estimate 41,200 against brief 43,000 (within 20%). Approval requested for campaign.publish with this payload; not yet approved or scheduled."
 
 ### Not good
 "Built and scheduled for 9 AM, looks good in the preview." No approval was requested, the timezone is unstated, no test send or link check was recorded, the offer was never tested, and "looks good in the preview" is not a received-message test.
@@ -80,7 +80,7 @@ A preflight record for build v4: "Copy v4 matches build field by field. Received
 - [ ] A preflight output includes dated received-message/render, dynamic-data, classified-link and checkout-test evidence for the exact build; missing required evidence blocks release.
 - [ ] A preflight output includes current reach, consent/exclusion, stock and offer-expiry checks, or states the blocked release gate with owner.
 - [ ] A release-verification output contains both the human approval receipt and matching platform schedule/send receipt; a preflight approval request is not described as approval or scheduling.
-- [ ] A post-send output contains actual delivery/guardrail checks and either a mature, attribution-labelled review or a provisional result with its read date.
+- [ ] A release-verification or post-send output contains actual delivery/guardrail checks, scores ESP complaint and bounce rates on the shared `reporting` bands with counts, denominator and data age, keeps provider rates separate, and a post-send output contains either a mature, attribution-labelled review or a provisional result with its read date.
 - [ ] Any phase-specific item not applicable to this task is identified from the task's approved phase, with the required future evidence and handoff; an unperformed in-scope check never passes as verified.
 
 ## Owner and approvals

@@ -4,7 +4,7 @@ kind: area
 area: journey
 title: Lifecycle strategy and customer journey
 owner_role: strategist
-version: 1
+version: 2
 reviewed: 2026-10-09
 review_every_days: 90
 ---
@@ -55,7 +55,7 @@ Common exceptions: retailer or wholesale accounts follow their own operations, n
 - If a lever depends on a client action (DNS fix, offer decision, subscription data) and that gate is unmet, then its value is zero in the plan until the gate clears.
 - If the repeat cohort is immature, then report it as provisional and size no second-order value on it.
 - **The business model sets the second-order objective** (`revenue_model` and product data). Consumables: reorder timed from usage evidence, not repeat gaps alone. Durables: care, accessory, gifting, upgrade or referral; no reorder reminders. Subscriptions: renewal, retention and save, coordinated with the native tool. Assign each product to one pathway; an unknown pathway gets no timed reorder message.
-- **Email is the default marketing channel.** Use SMS only for high-intent, time-sensitive moments (checkout, the accepted welcome benefit, requested alerts) and only after verified SMS consent, provider coverage and cross-channel deduplication.
+- **Email is the default marketing channel.** Use SMS only for high-intent, time-sensitive moments (checkout, the accepted welcome benefit, requested alerts) and only after verified purpose-specific SMS permission (marketing consent for promotion; the requested alert's own permission for an alert-only route), provider coverage and cross-channel deduplication.
 - If an SMS follow-up depends on an email, then send it only when that email actually sent and the person neither purchased nor clicked it. Opens do not qualify: machine opens inflate them.
 - **Contact cap (Wavy starting default, used only when `contact_cap_policy` is missing):** at most 2 discretionary promotional contacts per rolling 24 hours and 5 per rolling 7 days across email and SMS; SMS at most 1 per 24 hours and 2 per 7 days. Promotional welcome messages count; only genuine non-promotional service messages don't.
 - If two journeys compete for one person, then use this priority: service and customer requests, checkout, cart, accepted welcome benefit, browse, product-use help, requested refill, winback, discovery, advocacy, general campaigns. A purchase ends open recovery and acquisition episodes.
@@ -66,7 +66,7 @@ Common exceptions: retailer or wholesale accounts follow their own operations, n
 
 ## Examples
 ### Good
-"Second order is the leak. Of buyers whose first order is at least 120 days old, 14% (n/N shown) ordered again within 120 days. Among those who repeated, the median gap was 52 days and p25 38 days (conditional on repeating; usage guidance for the hero consumable says one unit lasts about 30 days). The first post-purchase email after the thank-you sends at day 75. Priority 1: test one reorder reminder at day 30–38, email first, for one-time buyers with no active subscription. Gate: subscription status must be known. Measure: mature 60-day second-order rate against a held-out group. Owner: strategist. Done when: draft flow approved and QA'd."
+"Second order is the leak. Of buyers whose first order is at least 120 days old, 14% (n/N shown) ordered again within 120 days. Among those who repeated, the median gap was 52 days and p25 38 days (conditional on repeating; usage guidance for the hero consumable says one unit lasts about 30 days). The first post-purchase email after the thank-you sends at day 75. Priority 1: test one reorder reminder timed from the usage guidance (around day 24–30 after delivery; the repeat gaps are supporting context, not the timing basis), email first, for one-time buyers with no active subscription. Gate: subscription status must be known. Measure: mature 60-day second-order rate against a held-out group. Owner: strategist. Done when: draft flow approved and QA'd."
 ### Not good
 "Add more SMS, launch a VIP program and refresh all creative to grow retention 30%." It fails because it cites no account data, sums attributed revenue across channels, ignores consent and gates, and gives no owner, measure or order of work.
 

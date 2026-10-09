@@ -4,7 +4,7 @@ kind: area
 area: product_customer
 title: Product and customer intelligence
 owner_role: strategist
-version: 1
+version: 2
 reviewed: 2026-10-09
 review_every_days: 90
 ---

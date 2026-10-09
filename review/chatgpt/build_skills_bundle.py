@@ -15,6 +15,9 @@ parts = ["# Wavy OS agent skills: review bundle\n", (ROOT / "skills/FORMAT.md").
          "\n# Permission catalog\n\n| Action | Level | Approvers | Locked | Human only |\n|---|---|---|---|---|\n" +
          "\n".join(f"| {a.key} | {a.level} | {', '.join(sorted(a.approvers)) or '-'} | {'yes' if a.floor == 'explicit_approval' else ''} | {'yes (agents refused)' if a.human_only else ''} |"
                    for a in ACTIONS.values()),
+         "\n\nConsent exception: native application and synchronization of a verified opt-out are automatic "
+         "protections, not discretionary `profile.suppress_delete` actions, and never wait for approval. "
+         "Discretionary suppression, deletion and bulk cleanup still need explicit approval.",
          "\n\n# Agent tools\n\n" + "\n".join(f"- `{t.name}` ({', '.join(t.purposes)}): {t.description}" for t in TOOLS.values()),
          "\n\n# Operating areas\n\n" + "\n".join(f"- `{k}`: {v[1]}" for k, v in AREAS.items())]
 for sub in ("roles", "areas"):

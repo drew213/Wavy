@@ -4,7 +4,7 @@ kind: area
 area: segmentation
 title: Segmentation and audience architecture
 owner_role: analyst
-version: 1
+version: 2
 reviewed: 2026-10-09
 review_every_days: 90
 ---
@@ -52,7 +52,7 @@ Use the supplied exports below; `get_context` supplies standards and approved fa
 6. Validate (see Decision rules). Record counts with the as-of time.
 7. Compute sendable reach per channel: consented, not suppressed, deduplicated.
 8. Save the architecture as `draft_spec` and validation as `analysis`. `build_draft` does not create segments. Hand off creation under an approved `audience.prepare` decision to a named authorized executor and require a platform receipt. Editing any segment or list already referenced by a live or scheduled send is not non-live preparation and needs a separately authorized live-change path.
-9. `request_approval` for anything that moves profiles in or out of sends. `finish`.
+9. `request_approval` for any discretionary change that moves profiles in or out of sends. Verified opt-outs are applied natively and need no approval; without a consent tool, record the evidence and hand off to the responsible owner, never claiming consent was changed. `finish`.
 
 ## Decision rules
 - **Naming (Wavy starting default):** `<CHANNEL> | <STAGE> | <RULE> | <WINDOW>`, for example `EM | Engaged | click or site | 0-90d` or `ALL | Suppress | service case open | live`. No client initials, agency prefixes or dates in names. A prefix in a name never proves who owns it.
@@ -64,7 +64,7 @@ Use the supplied exports below; `get_context` supplies standards and approved fa
 - **Validation tests:** disjoint tiers sum exactly to their parent; counts reconcile to the order metric within the as-of window; 20 random members per segment (pseudonymous IDs only) match the rule by hand; suppressed profiles appear in zero send audiences; no segment depends on a dormant metric.
 - `audience.prepare` covers only new or detached audiences. If an audience is used by a live flow or a scheduled send, then a change to it is a live change: request `flow.change_live` (live flow) or a fresh `campaign.publish` approval (scheduled send), never a plan-level preparation.
 - **Recipient state:** every state audience (open shopping episode, open service case, recent purchaser, contacted in window) names its state owner (platform-native, subscription or SMS provider, or external system), the event that updates it, its expiry and the episode identity it keys on. If a segment refreshes on a lag, then it can't enforce a same-hour exit or a cross-channel cap; mark the exclusion best-effort and route enforcement to flow filters or a person-level contact ledger. Validate with synthetic fixtures for simultaneous cart, checkout, purchase and service events.
-- If a change would suppress, delete or bulk-unsubscribe profiles, then it needs `profile.suppress_delete` explicit approval. Never do it under a plan.
+- Discretionary suppression, deletion and bulk cleanup require `profile.suppress_delete` explicit approval; a plan cannot authorize them. Native application and synchronization of a verified opt-out remain automatic and must not wait for this approval. The agent records a handoff when it has no consent-management tool.
 - If an import lacks consent source and date, then don't add it to any marketing audience; escalate to the account lead.
 - An older consent import must never overwrite a newer opt-out.
 - Never copy emails, phones, names or raw profile IDs into outputs. Use aggregates.
@@ -82,7 +82,7 @@ Use the supplied exports below; `get_context` supplies standards and approved fa
 - [ ] Engagement uses clicks, site activity or orders; opens never qualify on their own.
 - [ ] Reach figures are consented, suppressed and deduplicated; list sizes are labelled as membership.
 - [ ] Unknown subscription state is a separate group excluded from replenishment and winback.
-- [ ] Standing suppressions and exclusions are listed with which sends each applies to.
+- [ ] Standing suppressions and exclusions are listed with which sends each applies to; discretionary suppressions carry a `profile.suppress_delete` request, while verified opt-outs are shown as applied automatically or handed off, never held for approval.
 - [ ] Validation results are recorded per segment with pass or fail.
 - [ ] Every state-based exclusion names its state owner, update event, expiry and enforcement point; no live or scheduled audience is changed under `audience.prepare`.
 - [ ] No personal data appears in the output.
@@ -99,7 +99,7 @@ Use the supplied exports below; `get_context` supplies standards and approved fa
 | audience.prepare | approved_plan | Covered by a decision approved by org admin, account lead, or client owner/approver; new or detached audiences only |
 | flow.change_live | explicit_approval | Org admin, account lead, or client owner/approver (audiences used by live flows) |
 | fact.approve | explicit_approval | Org admin, account lead, or client owner/approver |
-| profile.suppress_delete | explicit_approval (locked) | Org admin or client owner |
+| profile.suppress_delete | explicit_approval (locked) | Org admin or client owner; discretionary suppression, deletion and bulk cleanup only, not native application of verified opt-outs |
 | account.settings_change | explicit_approval (locked) | Org admin or client owner |
 
 ## Outputs and destination

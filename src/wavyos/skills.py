@@ -110,8 +110,8 @@ def parse(path: Path) -> tuple[Optional[Skill], list[str]]:
     skill = Skill(meta.get("key", ""), kind, meta, sections, where)
     if kind == "area":
         skill.checklist = [re.sub(r"\s+", " ", x).strip() for x in re.findall(r"^- \[ \] (.+)$", sections.get("Quality checklist", ""), re.M)]
-        if not 5 <= len(skill.checklist) <= 12:
-            errs.append(f"{where}: quality checklist needs 5–12 '- [ ]' items (found {len(skill.checklist)})")
+        if not 5 <= len(skill.checklist) <= 10:
+            errs.append(f"{where}: quality checklist needs 5–10 '- [ ]' items (found {len(skill.checklist)})")
         for row in re.findall(r"^\|(.+)\|\s*$", sections.get("Owner and approvals", ""), re.M):
             cells = [c.strip().strip("`") for c in row.split("|")]
             if len(cells) < 3 or cells[0].lower() in ("action", "") or set(cells[0]) <= set("-: "):

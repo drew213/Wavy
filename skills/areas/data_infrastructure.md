@@ -4,7 +4,7 @@ kind: area
 area: data_infrastructure
 title: Account and data infrastructure
 owner_role: analyst
-version: 1
+version: 2
 reviewed: 2026-10-09
 review_every_days: 90
 ---

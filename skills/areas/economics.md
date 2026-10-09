@@ -4,7 +4,7 @@ kind: area
 area: economics
 title: Business model and economics
 owner_role: strategist
-version: 1
+version: 2
 reviewed: 2026-10-09
 review_every_days: 90
 ---
@@ -40,7 +40,7 @@ Look each up with `get_context` (area `economics`). Margins, costs and offer rul
 2. List each fact above as approved, proposed or missing. Record missing ones as unavailable, never zero.
 3. From the pinned order metric, compute observed AOV (eligible net sales ÷ eligible orders), median order value separately, orders per customer and median days between first and second order over a stated window, in the account timezone. Use first-observed purchase if lifetime history is unproven, and say so.
 4. Build the unit-economics sheet: per hero product, price, gross margin (if given), contribution per order (if given), shipping cost against threshold, and typical days to repurchase.
-5. Model each offer using the checkout-tested discount calculation in `offers`. Compute contribution after all variable costs. Let C0 be contribution per baseline order and C1 contribution per promoted order: if C1 > 0, break-even order ratio = C0 ÷ C1 and required relative order lift = C0 ÷ C1 − 1, assuming the same basket and cost mix and that the promotion applies to all affected orders. If C1 ≤ 0, there is no finite positive order-volume break-even under that model. State cannibalization, refund and basket assumptions; never call a scenario a measured lift. Mark every offer that has not passed a checkout test.
+5. Model offers using the verified mechanics in `offers`, or a clearly labelled proposal scenario before implementation. Define C0 and C1 as baseline and promoted contribution per order on the same cost/refund basis. For C0 > 0 and C1 > 0, break-even order ratio = C0/C1 and required relative lift = C0/C1 - 1, assuming a constant basket/cost mix and that the promotion applies to all affected orders. For C0 > 0 and C1 <= 0, added volume cannot recover the positive baseline contribution. For C0 <= 0, flag unprofitable baseline economics and do not present the ratio as a growth target. State cannibalization, returns and messaging costs once, with any separately budgeted campaign cost; scenarios are not measured lift. Mark every offer that has not passed a checkout test.
 6. Map seasonality and inventory: monthly order index from history, known peaks, freeze windows, and constrained SKUs with dates.
 7. Write the economic guardrails other areas must follow: max discount depth, offers never allowed, SKUs not to push, the free-shipping lever if approved, and the valuation basis (contribution or labelled gross).
 8. `flag_insight` for each risk with evidence, such as an offer below break-even, a stacking leak, or a hero SKU out of stock in a planned window.
@@ -51,7 +51,8 @@ Look each up with `get_context` (area `economics`). Margins, costs and offer rul
 - If contribution margin is missing, then value every lever in gross revenue, label it gross on every figure, and do not rank levers by profit.
 - If an offer's discount exceeds the approved maximum depth, or its margin after discount is negative, then do not recommend it; flag it to the account lead.
 - If discounts combine at checkout and the combined depth (from the verified discount classes, bases and application order in `offers`) exceeds the approved maximum, then flag as high severity and hold any copy that promotes the offer. Unknown mechanics block any combined-saving figure.
-- If C1 ≤ 0, then the offer has no finite break-even; don't recommend it without a stated strategic reason the account lead approves.
+- If C0 > 0 and C1 ≤ 0, then added volume cannot recover the baseline contribution: don't recommend the offer. A strategic subsidy (for example acquisition or clearance) may be proposed only with an explicit, approved budget for the expected contribution loss and the authorized approvals (`decision.approve` for the budget, `discount.change` for the offer); account-lead agreement alone is not enough.
+- If C0 ≤ 0, then flag the unprofitable baseline economics to the account lead with `flag_insight`, show no break-even ratio as a growth target, and recommend no volume-seeking offer until the baseline is resolved.
 - **Value retention by business model** (`revenue_model`): consumables by reorder from usage evidence; durables by accessory, care, gifting or upgrade, never a reorder rate; subscriptions by renewal and save, with automatic renewals kept separate from discretionary repeat orders.
 - If a SKU is constrained in the send window, then exclude it from promotions and recovery pushes for that window and say why.
 - If subscription status is unknown for a customer group, then treat them as possibly subscribed: no subscription pitch and no refill reminder.
@@ -61,7 +62,7 @@ Look each up with `get_context` (area `economics`). Margins, costs and offer rul
 
 ## Examples
 ### Good
-Synthetic example, not client data. "Baseline net price $100; combined variable costs $60 (client finance email); C0 = $40. A checkout-tested 20% discount leaves net price $80 and C1 = $20. Break-even requires 40 ÷ 20 = 2 times as many orders, a 100% lift, before fixed campaign costs. Assumes the same basket and cost mix. Recommendation: don't run it as a broad offer; test a smaller incentive. Missing cost inputs would mean: profitability unverified."
+Synthetic example, not client data. "Baseline net price $100; combined variable costs $60 (client finance email); C0 = $40. A checkout-tested 20% discount leaves net price $80 and C1 = $20. C0 > 0 and C1 > 0, so the ratio applies: break-even requires 40 ÷ 20 = 2 times as many orders, a 100% lift, before fixed campaign costs. Assumes the same basket and cost mix. Recommendation: don't run it as a broad offer; test a smaller incentive. Missing cost inputs would mean: profitability unverified."
 ### Not good
 "Margins are probably around 70% for this category, so a 30% offer is safe and should add $40k." It infers a margin, ignores stacking, uses attributed-style certainty and states a number with no formula or source.
 
@@ -70,7 +71,7 @@ Synthetic example, not client data. "Baseline net price $100; combined variable 
 - [ ] Gross revenue and contribution are labelled on every value; none are mixed.
 - [ ] No margin, cost or CAC appears without a written client source.
 - [ ] Missing facts are shown as unavailable with what they block, never as zero.
-- [ ] Each offer shows depth, C0, C1, break-even order ratio and required lift (or "no finite break-even" when C1 ≤ 0), its assumptions and checkout-test status.
+- [ ] Each offer shows depth, C0, C1 and its case: break-even ratio and required lift only when C0 > 0 and C1 > 0; "volume cannot recover baseline contribution" when C0 > 0 and C1 ≤ 0; "unprofitable baseline, no ratio" when C0 ≤ 0; plus assumptions, checkout-test or proposal-scenario status, and any strategic subsidy's approved budget.
 - [ ] Combined discounts follow the checkout-tested calculation in `offers` (discount classes, bases, application order); no universal multiplication or addition.
 - [ ] AOV is eligible net sales ÷ eligible orders with median order value separate, and no shipping promise appears without a configured, approved threshold.
 - [ ] Constrained SKUs and freeze windows are listed with dates.

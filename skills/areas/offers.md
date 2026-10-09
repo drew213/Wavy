@@ -4,7 +4,7 @@ kind: area
 area: offers
 title: Offers and merchandising
 owner_role: strategist
-version: 1
+version: 2
 reviewed: 2026-10-09
 review_every_days: 90
 ---
@@ -42,15 +42,15 @@ Common exceptions: marketplace orders and retail partners have their own pricing
 1. Trigger: a calendar row or flow that needs an incentive. Run `get_context` for `offers` and `economics`.
 2. Name the job: first order, threshold lift, clear stock, launch, winback, subscription start. If the job can be done without an offer (education, early access, social proof), propose that first.
 3. Pick the mechanism from `approved_offer_types` that fits the job: threshold or gift to lift order value; bundle to move a slow item with a fast one; early access to reward without margin; subscription incentive only for eligible repeat buyers.
-4. Compute discount depth from the verified discount classes, eligible bases and application order in the store's combination settings, never from arithmetic alone. Some setups apply only the best discount. Sequential discounts use different bases: 25% then 15% gives 1 − (0.75 × 0.85) = 36.25%. Two combinable Shopify percentage order discounts on the same subtotal can total 40%. Use checkout evidence for the actual basket, including excluded items, amount-off, shipping and gift effects. Unknown mechanics block a combined-saving claim. `propose_fact` the tested result as an update to `discount_combinability`.
+4. Compute discount depth from the verified discount classes, eligible bases and application order in the store's combination settings, never from arithmetic alone. Some setups apply only the best discount. Sequential discounts use different bases: 25% then 15% gives 1 − (0.75 × 0.85) = 36.25%. Two combinable Shopify percentage order discounts on the same subtotal can total 40%. Use checkout evidence for the actual basket, including excluded items, amount-off, shipping and gift effects. Unknown mechanics block a combined-saving claim. In the verification phase, `propose_fact` the tested result as an update to `discount_combinability`.
 5. Compute contribution per order: net price after all discounts − unit cost − fulfilment − payment fees − shipping subsidy − gift cost. Show the inputs. If any input is missing, write "gross only".
 6. Check against `max_discount_depth`, the margin floor and `promo_frequency_limit`.
 7. Define eligibility and exclusions: who qualifies, which products are excluded, expiry, code type (unique single-use for welcome and winback; shared only for public sales).
 8. Write the offer spec: mechanism, value, effective depth, eligibility, exclusions, start and true expiry, code type, stacking behaviour, contribution, and the exact customer-facing terms line.
-9. `save_output` (kind `brief`, label "Offer spec: <name>").
-10. `request_approval` with action `discount.change` and the offer spec as payload. `finish`. Never create or edit a discount yourself.
-11. Creation and checkout testing happen in a later phase and a new execution. In this one, save a handoff request naming the discount owner, the authorized checkout tester, the test baskets and the release gate. A later execution records the supplied receipt: code applies, value matches copy, exclusions hold, combination matches spec, expiry is real. Never describe an untested offer as tested.
-12. After the send window closes, `save_output` (kind `analysis`) with redemptions, effective depth realized, contribution and full-price conversion during the window.
+9. Proposal phase: save the offer spec and a separate handoff naming the discount owner, checkout tester, required baskets, expected results and blocked release gate. Intended mechanics are proposed, not checkout-verified.
+10. For a new or changed offer, call `request_approval` with `discount.change` and the exact spec; then `finish`. All proposal artifacts and handoffs must already be saved. Never create or edit the discount.
+11. Verification phase, new execution: inspect supplied implementation and checkout receipts for the approved version. Record applied value, eligibility, exclusions, combination and expiry; save the verification artifact and `finish`. Missing receipts leave the release blocked.
+12. Review phase, new execution after the outcome window closes: save actual redemptions, realized depth, contribution or its unavailable inputs, and full-price conversion. Do not request the original discount approval again merely to review its results; `finish`.
 
 ## Decision rules
 - If an offer is not in `approved_offer_types` or exceeds `max_discount_depth`, then do not propose it as ready. Present it as an option needing a client decision.
@@ -68,7 +68,7 @@ Common exceptions: marketplace orders and retail partners have their own pricing
 
 ## Examples
 ### Good
-"Job: lift order value for repeat buyers. Mechanism: gift with purchase above a threshold set 20% over median order value; gift unit cost and inventory from the client's sheet. Effective discount: none on product price. Contribution: shown per order at threshold, gross of returns. Eligibility: purchased at least once, marketing consent. Exclusions: subscriptions, gift cards. Expiry: real, 23:59 recipient timezone on the stated date. Code: automatic, no code. Stacking: does not combine with the welcome code (store setting confirmed). Terms line drafted. Status: awaiting discount.change approval."
+"Job: lift order value for repeat buyers. Mechanism: gift with purchase above a threshold set 20% over median order value; gift unit cost and inventory from the client's sheet. Effective discount: none on product price. Contribution: shown per order at threshold, gross of returns. Eligibility: purchased at least once, marketing consent. Exclusions: subscriptions, gift cards. Expiry: real, 23:59 recipient timezone on the stated date. Code: automatic, no code. Stacking: intended not to combine with the welcome code, per the supplied store-settings record; checkout-unverified. Terms line drafted. Saved before the approval request: offer spec and a checkout-test handoff (discount owner, tester, baskets with and without the welcome code, expected totals, release blocked until the receipt). Status: awaiting discount.change approval."
 
 ### Not good
 "Add an extra 15% to the sale for VIPs, it'll stack, so they get 40% off. Ends tonight!" The total is asserted, not computed: depending on the discount classes it is 36.25% (sequential), 40% (two order discounts on the same subtotal) or the larger one alone. The depth may break the margin floor, combination is asserted not tested, "ends tonight" is false if the offer recurs, and nobody approved it.
@@ -77,10 +77,10 @@ Common exceptions: marketplace orders and retail partners have their own pricing
 - [ ] The offer spec names the job, mechanism, value and the effective depth of every possible combination, computed from the verified discount classes, bases and application order; unknown mechanics carry no combined-saving claim.
 - [ ] Contribution per order is shown with inputs, or the spec says "gross only, profitability unverified".
 - [ ] Eligibility, exclusions, code type, start and a real expiry are all stated.
-- [ ] Stacking behaviour is stated and matches the store's combinability settings.
+- [ ] Stacking behaviour is stated and matches the store's combinability settings; in a proposal it is labelled intended, not checkout-verified.
 - [ ] The mechanism is in the client's approved offer types and within the approved depth, or it is clearly marked as a client decision.
-- [ ] A `discount.change` approval was requested for any new or changed offer; the agent created no discount.
-- [ ] A supplied checkout-test receipt for the actual basket is attached, or the offer is marked untested with the tester, handoff and blocked release gate named.
+- [ ] Proposal phase: the spec and checkout-test handoff were saved before a `discount.change` approval was requested for any new or changed offer; the agent created no discount.
+- [ ] Verification phase: a supplied checkout-test receipt for the approved version and actual baskets is attached; otherwise, in any phase, the offer is marked untested with the tester, handoff and blocked release gate named.
 - [ ] Customer-facing terms match the spec word for word (value, eligibility, expiry).
 - [ ] No fake urgency, escalating flow offer or unsupported reference price.
 
@@ -100,7 +100,7 @@ Common exceptions: marketplace orders and retail partners have their own pricing
 
 ## Outputs and destination
 - **Offer spec** (kind `brief`): the fields in SOP step 8. Goes to the task output and is the payload of the `discount.change` approval.
-- **Checkout test handoff and record**: the test request (owner, tester, baskets, gate); later, the supplied receipt per offer (code, basket, result) attached to the production task.
+- **Checkout test handoff and record**: the test request (owner, tester, baskets, expected results, gate), saved in the proposal phase before the approval request; in the verification phase, the supplied receipt per offer (code, basket, result) and the verification artifact attached to the production task.
 - **Offer review** (kind `analysis`) after the window closes: redemptions, realized depth, contribution, full-price conversion, fatigue signals.
 - Approved offers appear in the Client Hub; clients see an offer only through approved copy or an approved client message.
 

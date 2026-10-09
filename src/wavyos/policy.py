@@ -84,7 +84,9 @@ ACTIONS: dict[str, Action] = {a.key: a for a in [
     _a("flow.change_live", "explicit_approval", "Activate, pause or change a live flow", approvers=LEADS | CLIENT_DECIDERS),
     _a("discount.change", "explicit_approval", "Create or change a discount or offer",
        approvers=frozenset({"org_admin"}) | CLIENT_DECIDERS, floor="explicit_approval"),
-    _a("profile.suppress_delete", "explicit_approval", "Suppress or delete profiles",
+    _a("profile.suppress_delete", "explicit_approval",
+       "Discretionary suppression, deletion or bulk cleanup of profiles. Verified opt-outs are applied "
+       "automatically by the platform and never wait for this approval",
        approvers=frozenset({"org_admin", "client_owner"}), floor="explicit_approval"),
     _a("account.settings_change", "explicit_approval", "Change platform account settings",
        approvers=frozenset({"org_admin", "client_owner"}), floor="explicit_approval"),

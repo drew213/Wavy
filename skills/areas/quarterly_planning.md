@@ -4,7 +4,7 @@ kind: area
 area: quarterly_planning
 title: Quarterly planning and growth roadmap
 owner_role: strategist
-version: 1
+version: 2
 reviewed: 2026-10-09
 review_every_days: 90
 ---
@@ -53,7 +53,7 @@ Call `get_context` for `quarterly_planning`, `economics`, `reporting` and `journ
 - If foundations (sending authentication, canonical events, consent, broken promises) are failing, then they come before any expansion, whatever their sized value.
 - If total build-days exceed capacity, then cut from the bottom of the value ÷ effort ranking. Don't compress estimates.
 - If a lever needs a new offer, then gate it on `discount.change` approval and margin.
-- Compare the target with the baseline forecast plus additional non-overlapping feasible lever value, on the same revenue basis and period, and show any remaining gap. Never compare an absolute revenue target with incremental levers alone. If the gap exceeds the combined high case, then say so in the QBR and ask the client to confirm or revise the target.
+- For each scenario s, compute forecast_s = baseline_s + sum(non-overlapping feasible lever values_s), then gap_s = target - forecast_s, on the same basis and period. If gap_high > 0, state that even the high case misses by gap_high and ask for a target, scope or dependency decision. Do not compare an already-netted gap with the lever high case again. Never compare an absolute revenue target with incremental levers alone.
 - If no holdout is possible, then the plan's success measures are observed change. Don't promise incremental revenue.
 - If a launch falls inside a freeze window or peak week, then move it or get an explicit client decision.
 
@@ -67,7 +67,7 @@ Call `get_context` for `quarterly_planning`, `economics`, `reporting` and `journ
 - [ ] Goal review compares target and actual on the same basis, timezone and definitions.
 - [ ] Every stage has a maturity score with an evidence reference.
 - [ ] Every sized lever shows cohort definition and dates, absolute H-day rate change, value per incremental conversion, costs and displacement with sources, as separate low, base and high; no H-day effect is multiplied by months.
-- [ ] The target is compared with baseline forecast plus non-overlapping lever value on the same basis and period, with the remaining gap shown.
+- [ ] For low, base and high, forecast_s = baseline_s + non-overlapping lever value_s and gap_s = target − forecast_s are shown on the same basis and period; a positive high-case gap is stated once with a target, scope or dependency decision requested.
 - [ ] No customer or order pool is assigned to more than one lever.
 - [ ] Every lever lists its gates with owner and due date, and states that a failed gate sets it to zero.
 - [ ] Levers are ranked by value ÷ build-days and the plan fits stated capacity.
@@ -90,7 +90,7 @@ Call `get_context` for `quarterly_planning`, `economics`, `reporting` and `journ
 | `client.message.send` | explicit_approval | Account lead or org admin |
 
 ## Outputs and destination
-- **Opportunity sizing table** (analysis): baseline forecast; per lever, cohort and dates, assumptions, low/base/high inside the quarter and measured later, overlap assignment, gates, build-days, rank; the gap to target. Task output.
+- **Opportunity sizing table** (analysis): baseline forecast; per lever, cohort and dates, assumptions, low/base/high inside the quarter and measured later, overlap assignment, gates, build-days, rank; forecast and gap to target per scenario (low, base, high). Task output.
 - **Lifecycle maturity assessment** (analysis): stage, score, evidence, gap. Task output; feeds `journey`.
 - **30/60/90-day roadmap and decision proposals** (brief): initiatives with owners, dates, dependencies and measurement. Decisions after approval.
 - **QBR deck** (report): goal review, maturity, learnings, plan, decisions needed. Client Hub and client message after approval.

@@ -140,11 +140,13 @@ Run `wavyos schedule` on a timer (every 15 minutes is plenty) to queue the alway
 
 `skills/roles/*.md` (5) and `skills/areas/*.md` (23), validated by `wavyos skills-check` and loaded as versioned standards by `wavyos seed skills`.
 
-Each area skill follows the founder's ten-part template: **Purpose · Client facts and rules · Inputs and sources · SOP · Decision rules · Examples · Quality checklist · Owner and approvals · Outputs and destination · Maintenance**. The validator rejects a file with missing or out-of-order sections, a thin section, a checklist outside 5–12 items, or an approvals row whose action or level doesn't match the permission engine.
+Each area skill follows the founder's ten-part template: **Purpose · Client facts and rules · Inputs and sources · SOP · Decision rules · Examples · Quality checklist · Owner and approvals · Outputs and destination · Maintenance**. The validator rejects a file with missing or out-of-order sections, a thin section, a checklist outside 5–10 items, or an approvals row whose action or level doesn't match the permission engine.
 
 Areas: onboarding, economics, product and customer intelligence, account and data infrastructure, journey, segmentation, deliverability, list growth, flow audit, flow architecture, campaign calendar, offers, voice and copy, design system, campaign production, SMS, CRO and onsite, reporting, experimentation, client meetings, account management, quarterly planning, knowledge maintenance.
 
 Skills never contain client specifics. They say what to look up in the client's approved knowledge.
+
+The skills are written by Claude and reviewed independently by ChatGPT Pro. Two review rounds took the verdict from rework to fix-then-ready, and every remaining fix was then applied. The skills are at version 2. Findings and changes are in [docs/REVIEW-LOG.md](docs/REVIEW-LOG.md).
 
 ### Executors and routing
 
@@ -309,7 +311,7 @@ src/wavyos/
   console/           ops API and the console page
   cli.py, demo.py, config.py, seed.py
 skills/              5 role skills, 23 area skills, FORMAT.md
-docs/                ARCHITECTURE.md, CLIENT-HUB-INTEGRATION.md
+docs/                ARCHITECTURE.md, CLIENT-HUB-INTEGRATION.md, REVIEW-LOG.md
 tests/               unit, service, API, console and audit tests
 ```
 

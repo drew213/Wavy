@@ -4,7 +4,7 @@ kind: area
 area: flow_audit
 title: Flow audit
 owner_role: analyst
-version: 1
+version: 2
 reviewed: 2026-10-09
 review_every_days: 90
 ---
@@ -43,7 +43,7 @@ The audit is read-only. No flow edits, sends, list changes or setting changes, e
 4. **Trigger validation (DAT-02).** For each live flow, confirm its trigger metric had events in each of the last 2 full months and comes from the current integration. Check profile filters that reference order metrics too.
 5. **Coverage.** Score FLW-01 welcome, FLW-02 checkout, FLW-03 cart, FLW-04 browse, FLW-05 post-purchase, FLW-06 winback, FLW-07 sunset, RET-03 and RET-04 subscription, SMS-02 and SMS-05 where SMS exists. Note journeys covered by another platform as covered externally, with evidence.
 6. **Filters and exclusions.** Score FLW-09 (intent flows exit on canonical purchase) and FLW-10 (Smart Sending, no transactional flag on marketing, no drafts in live core flows). Check cart excludes checkout starters and browse has a re-entry limit.
-7. **Timing.** Compare post-purchase, replenishment and winback delays with the account's p25 and median repeat gaps (RET-02, FLW-06).
+7. **Timing.** Compare post-purchase, replenishment and winback delays with the account's p25 and median repeat gaps (RET-02, FLW-06). Repeat gaps are descriptive; a replenishment delay is judged against approved usage/unit-duration evidence or a customer-requested date where supplied, and its absence is reported as unknown basis, not a timing pass.
 8. **Message performance.** Per message: delivered, click rate, placed-order rate, revenue per recipient, unsubscribe and complaint rate. Keep historical revenue from messages now in draft, and from flow IDs missing from today's inventory, with a "history" label.
 9. **Offer logic.** Read every offer stated in flows. Score CRV-05 from supplied checkout-test receipts; without one, CRV-05 is unknown and a test request goes to the owner.
 10. **Content quality.** Review received renders: brand name, current products, claims, mobile and dark mode, image-only (CRV-02), clipping (CRV-01).
@@ -77,7 +77,7 @@ All are **Wavy starting defaults** from the check library: welcome live with at 
 - [ ] DAT-01, DAT-02 and DAT-05 are scored before any revenue finding.
 - [ ] The inventory includes archived flows and counts live and draft messages separately.
 - [ ] Every scored check has its definition version, a verdict, a value and an evidence path; unknown and n/a carry reasons.
-- [ ] The area status follows the rule: any unknown mandatory critical check gives "Not verified", with scoped, checked, unknown and n/a counts shown.
+- [ ] Area status follows Decision-rule precedence: Failed, then Needs action, then Not verified, then Passed. Any unknown mandatory critical check prevents Passed; show coverage as Not verified even when a verified defect sets the headline to Failed or Needs action. Include scoped/checked/unknown/n/a counts.
 - [ ] Coverage claims about SMS or subscription service state the platform checked, or say unknown.
 - [ ] Offer and link findings cite supplied checkout-test and link-test receipts, with each link classified; untaggable links are not counted against CRV-04.
 - [ ] Send-date and event-time figures are never added together, and each states its basis and window.

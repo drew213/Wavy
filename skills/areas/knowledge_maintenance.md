@@ -4,7 +4,7 @@ kind: area
 area: knowledge_maintenance
 title: Knowledge maintenance and offboarding
 owner_role: account_lead
-version: 1
+version: 2
 reviewed: 2026-10-09
 review_every_days: 90
 ---
@@ -41,12 +41,13 @@ Look each up with `get_context` (area `knowledge_maintenance`, plus every area w
 6. Quarterly, run the access review: every connection's scope, grantor, last use, and whether it is still needed. Flag unused or write-scoped access for revocation.
 
 **Offboarding (on notice of end)**
-7. Confirm `contract_end_terms` with the account lead. Create internal tasks for each checklist item with owners and dates.
+7. Offboarding plan phase: confirm `contract_end_terms` with the account lead. For each checklist item, link a recorded task (system task ID) or save a task-creation handoff with owner, date and phase; a pending handoff is never described as a created task.
 8. List outstanding commitments: open tasks, pending approvals, scheduled campaigns, live tests and experiments, flows in draft, client inputs owed. For each, propose finish, hand over or cancel; scheduled sends and live flows after the end date need the client's explicit decision.
 9. Build the asset handoff: inventory, location, format, and handoff method per item, following contract ownership. Export the final reports and the decision log for the client.
-10. Draft the client offboarding message and handoff summary; `request_approval` with `client.message.send`.
-11. **Key revocation:** list every API key, integration and agency seat to revoke on the platform and remove from the vault. A verified human with `connection.manage` does this; agents cannot. Record each executor's receipt (key no longer works, date); until a receipt exists, mark the item unverified. A key the client wants kept alive is recorded with its owner and that decision.
-12. Draft the retention/disposal manifest for the authorized data owner: data class, location, permitted purpose, contractual/legal retention, disposal date, legal-hold check and executor. Do not delete consent/opt-out evidence or suppression protections under a blanket scratch-data rule. With the listed tools, save the manifest and request a handoff; mark archiving, deletion and workspace closure unverified until independent receipts exist. `save_output` the offboarding record (kind `report`) and `finish`.
+10. **Key revocation list:** list every API key, integration and agency seat to revoke on the platform and remove from the vault, each with its human executor. A verified human with `connection.manage` does this; agents cannot. A key the client wants kept alive is recorded with its owner and that decision.
+11. Draft the retention/disposal manifest for the authorized data owner: data class, location, permitted purpose, contractual/legal retention, disposal date, legal-hold check and executor. Do not delete consent/opt-out evidence or suppression protections under a blanket scratch-data rule.
+12. Save every plan artifact before any terminal call: `save_output` the offboarding plan (kind `report`: commitments, asset handoff, revocation list, manifest and the handoffs requesting revocation, archiving and disposal receipts) and the client handoff summary as a separate kind `copy` artifact. Then `request_approval` with `client.message.send` for the exact summary text, then `finish`. Nothing is saved after the approval request.
+13. Offboarding verification phase, new execution: inspect supplied executor receipts for each key and seat (key no longer works, date), archiving, disposal and workspace closure. Record each as verified, kept by an owner's decision, or unverified with owner and release gate. `save_output` the offboarding record (kind `report`) and `finish`. Never mark revocation, archiving or deletion done without its receipt.
 
 ## Decision rules
 - Treat facts as a typed registry: key, canonical owner area, value type, scope (market, channel, product), precedence, effective and review dates, and approved aliases. If two approved facts conflict for the same scope and no precedence is recorded, then block dependent work and flag; never pick one.
@@ -67,16 +68,16 @@ Look each up with `get_context` (area `knowledge_maintenance`, plus every area w
 "Add to standards: brand X's 15% offer converts best, use it for everyone." It copies a client offer into a standard, generalizes from one account, has no method and skips review.
 
 ## Quality checklist
-- [ ] Every reviewed fact is confirmed or re-proposed with a dated source; none is silently changed.
-- [ ] Each decision-log entry links evidence, approver, tasks and a result with window and method.
-- [ ] Learnings are only logged after their window closed and are labelled observed or controlled.
-- [ ] Promotion drafts contain no client name, number, offer, product or quote.
-- [ ] The access review lists every connection with scope, grantor and keep/revoke.
-- [ ] The offboarding checklist shows every outstanding commitment with a finish, hand over or cancel decision.
-- [ ] The output declares its phase (maintenance review, promotion draft, offboarding plan or offboarding verification); a plan never reports revocation, archiving or deletion as done.
-- [ ] Every key and seat shows a human executor's revocation receipt and date, an owner who decided to keep it, or is marked unverified with owner and release gate.
-- [ ] The retention/disposal manifest states data class, location, purpose, retention term, disposal date, legal-hold check and executor, and keeps consent/opt-out evidence and suppressions.
-- [ ] Proposed skill changes attach a regression-fixture comparison against the current version.
+- [ ] The output declares its phase (maintenance review, decision log, promotion draft, skill change, access review, offboarding plan or offboarding verification); each phase-named item below applies only in that phase, and a plan never reports revocation, archiving or deletion as done.
+- [ ] Maintenance review: every reviewed fact is confirmed or re-proposed with a dated source; none is silently changed.
+- [ ] Decision log: each entry links evidence, approver, tasks and a result with window and method; learnings are logged only after their window closed and are labelled observed or controlled.
+- [ ] Promotion draft: it contains no client name, number, offer, product or quote, and a one-client result is proposed only as a hypothesis.
+- [ ] Skill change: the proposed change attaches a regression-fixture comparison against the current version.
+- [ ] Access review: every connection is listed with scope, grantor, last use and keep/revoke.
+- [ ] Offboarding plan: every outstanding commitment has a finish, hand over or cancel decision, and each checklist item links a recorded task or a pending task-creation handoff, never described as created.
+- [ ] Offboarding plan: the retention/disposal manifest states data class, location, purpose, retention term, disposal date, legal-hold check and executor, keeps consent/opt-out evidence and suppressions, and was saved with the revocation list before the client-message approval request.
+- [ ] Offboarding verification: every key and seat shows a human executor's revocation receipt and date, an owner who decided to keep it, or is marked unverified with owner and release gate; archiving and disposal follow the same rule.
+- [ ] Client handoff text is a separate copy artifact submitted through `request_approval` and described as pending, not sent.
 
 ## Owner and approvals
 | Action | Level | Who decides |
@@ -101,7 +102,8 @@ All outputs are internal by default; only the approved handoff summary is client
 - **Decision-log entries** (analysis): one per closed decision. Client knowledge.
 - **Promotion drafts** (draft_spec): client-free proposed standards. To org admin.
 - **Access review** (report): quarterly, internal.
-- **Offboarding record** (report): commitments, asset handoff, revocation receipts or unverified items, retention/disposal manifest. Internal, with a client-facing handoff summary (copy) via `request_approval`.
+- **Offboarding plan** (report): commitments, asset handoff, revocation list, retention/disposal manifest and receipt handoffs, saved before the approval request; with a separate client-facing handoff summary (copy) via `request_approval`.
+- **Offboarding record** (report): verification phase; revocation, archiving and disposal receipts, or unverified items with owner and release gate. Internal.
 Wavy starting defaults: fact review every 90 days, or 30 days for offers, stock and dates; access review quarterly; revoke audit keys within 24 hours of delivery and all keys by the contract end date; keep the archive (reports, decision log, approvals, aggregate evidence) for the contract's retention term; the data owner disposes of scratch copies and personal data at offboarding per the manifest, never consent/opt-out evidence or suppressions that must be retained.
 
 ## Maintenance
