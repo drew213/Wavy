@@ -138,9 +138,12 @@ def claim(factory: sessionmaker[Session], executors: Optional[set[str]] = None) 
         return None
 
 
-def run(factory: sessionmaker[Session], execution_id: str, adapters: dict[str, Adapter]) -> m.Execution:
+def run(factory: sessionmaker[Session], execution_id: str, adapters) -> m.Execution:
+    """adapters: {executor: Adapter}, or a callable org_id -> that dict (one key set per org)."""
     with factory() as s:
         ex = s.get(m.Execution, execution_id)
+        if callable(adapters):
+            adapters = adapters(ex.org_id)
         task = s.get(m.Task, ex.task_id)
         base = scope_for_agent(s, _agent_by_role(s, ex.org_id, ex.agent_role), ex.client_id)
         gw = Gateway(s, base, ex, task)
@@ -227,10 +230,10 @@ def _execution_decided(session: Session, scope: Scope, ap: m.Approval, approved:
         operations.set_task_status(session, owner, task.id, "blocked", f"approval rejected: {ap.note or ap.summary}")
 
 
-def work(factory: sessionmaker[Session], adapters: dict[str, Adapter], limit: int = 20) -> list[m.Execution]:
+def work(factory: sessionmaker[Session], adapters, limit: int = 20) -> list[m.Execution]:
     done = []
     for _ in range(limit):
-        ex_id = claim(factory, set(adapters))
+        ex_id = claim(factory, None if callable(adapters) else set(adapters))
         if ex_id is None:
             break
         done.append(run(factory, ex_id, adapters))
