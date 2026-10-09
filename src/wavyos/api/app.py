@@ -67,7 +67,7 @@ def create_app(factory: Optional[sessionmaker[Session]] = None, services: Option
     settings: Settings = services.setdefault("settings", load_settings())
     if factory is None:
         factory = make_sessionmaker(make_engine(settings.database_url))
-    app = FastAPI(title="Wavy OS", version="0.1.0",
+    app = FastAPI(title="Wavy OS", version="0.2.0",
                   description="Lifecycle Client Operating System: agency standards, client knowledge and the "
                               "insight -> decision -> task -> result chain.")
     app.state.factory = factory
