@@ -1,0 +1,32 @@
+{
+ "account": {
+  "timezone": "UTC"
+ },
+ "history": [
+  {
+   "ranAt": "2026-10-02T12:00:00Z",
+   "steps": [
+    {
+     "code": 0,
+     "file": "24-fetch-account-audit-api.js",
+     "ok": true
+    },
+    {
+     "code": 0,
+     "file": "34-fetch-performance-cross-review.js",
+     "ok": true
+    },
+    {
+     "code": 0,
+     "file": "37-audit-live-template-weight.js",
+     "ok": true
+    },
+    {
+     "code": 0,
+     "file": "38-fetch-account-totals.js",
+     "ok": true
+    }
+   ]
+  }
+ ]
+}

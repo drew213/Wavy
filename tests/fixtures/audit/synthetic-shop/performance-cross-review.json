@@ -1,0 +1,1337 @@
+{
+ "capturedAt": "2026-10-02T12:00:00Z",
+ "conversionMetric": {
+  "id": "PO1"
+ },
+ "placedOrderCandidates": [
+  {
+   "id": "PO1"
+  }
+ ],
+ "reports": {
+  "campaign365": {
+   "ok": true,
+   "value": {
+    "data": {
+     "attributes": {
+      "results": [
+       {
+        "groupings": {
+         "campaign_id": "CMP00",
+         "campaign_message_id": "CMP00-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP01",
+         "campaign_message_id": "CMP01-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP02",
+         "campaign_message_id": "CMP02-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP03",
+         "campaign_message_id": "CMP03-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP04",
+         "campaign_message_id": "CMP04-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP05",
+         "campaign_message_id": "CMP05-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP06",
+         "campaign_message_id": "CMP06-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP07",
+         "campaign_message_id": "CMP07-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP08",
+         "campaign_message_id": "CMP08-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP09",
+         "campaign_message_id": "CMP09-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP10",
+         "campaign_message_id": "CMP10-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP11",
+         "campaign_message_id": "CMP11-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP12",
+         "campaign_message_id": "CMP12-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP13",
+         "campaign_message_id": "CMP13-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP14",
+         "campaign_message_id": "CMP14-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP15",
+         "campaign_message_id": "CMP15-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP16",
+         "campaign_message_id": "CMP16-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP17",
+         "campaign_message_id": "CMP17-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP18",
+         "campaign_message_id": "CMP18-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP19",
+         "campaign_message_id": "CMP19-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP20",
+         "campaign_message_id": "CMP20-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP21",
+         "campaign_message_id": "CMP21-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP22",
+         "campaign_message_id": "CMP22-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP23",
+         "campaign_message_id": "CMP23-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP24",
+         "campaign_message_id": "CMP24-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP25",
+         "campaign_message_id": "CMP25-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP26",
+         "campaign_message_id": "CMP26-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP27",
+         "campaign_message_id": "CMP27-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP28",
+         "campaign_message_id": "CMP28-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP29",
+         "campaign_message_id": "CMP29-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP30",
+         "campaign_message_id": "CMP30-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP31",
+         "campaign_message_id": "CMP31-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP32",
+         "campaign_message_id": "CMP32-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP33",
+         "campaign_message_id": "CMP33-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP34",
+         "campaign_message_id": "CMP34-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP35",
+         "campaign_message_id": "CMP35-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP36",
+         "campaign_message_id": "CMP36-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP37",
+         "campaign_message_id": "CMP37-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP38",
+         "campaign_message_id": "CMP38-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP39",
+         "campaign_message_id": "CMP39-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       }
+      ]
+     }
+    },
+    "links": {
+     "next": null
+    }
+   }
+  },
+  "campaign90": {
+   "ok": true,
+   "value": {
+    "data": {
+     "attributes": {
+      "results": [
+       {
+        "groupings": {
+         "campaign_id": "CMP16",
+         "campaign_message_id": "CMP16-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP17",
+         "campaign_message_id": "CMP17-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP18",
+         "campaign_message_id": "CMP18-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP19",
+         "campaign_message_id": "CMP19-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP20",
+         "campaign_message_id": "CMP20-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP21",
+         "campaign_message_id": "CMP21-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP22",
+         "campaign_message_id": "CMP22-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP23",
+         "campaign_message_id": "CMP23-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP24",
+         "campaign_message_id": "CMP24-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP25",
+         "campaign_message_id": "CMP25-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP26",
+         "campaign_message_id": "CMP26-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP27",
+         "campaign_message_id": "CMP27-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP28",
+         "campaign_message_id": "CMP28-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP29",
+         "campaign_message_id": "CMP29-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP30",
+         "campaign_message_id": "CMP30-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP31",
+         "campaign_message_id": "CMP31-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP32",
+         "campaign_message_id": "CMP32-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP33",
+         "campaign_message_id": "CMP33-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP34",
+         "campaign_message_id": "CMP34-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP35",
+         "campaign_message_id": "CMP35-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP36",
+         "campaign_message_id": "CMP36-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP37",
+         "campaign_message_id": "CMP37-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP38",
+         "campaign_message_id": "CMP38-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       },
+       {
+        "groupings": {
+         "campaign_id": "CMP39",
+         "campaign_message_id": "CMP39-m",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "bounce_rate": 0.003,
+         "conversion_value": 250.0,
+         "delivered": 990,
+         "recipients": 1000,
+         "spam_complaint_rate": 0.0001,
+         "unsubscribe_rate": 0.001
+        }
+       }
+      ]
+     }
+    },
+    "links": {
+     "next": null
+    }
+   }
+  },
+  "flow365": {
+   "ok": true,
+   "value": {
+    "data": {
+     "attributes": {
+      "results": [
+       {
+        "groupings": {
+         "flow_id": "F_WEL",
+         "flow_message_id": "w1-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 812.5,
+         "recipients": 1600
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_WEL",
+         "flow_message_id": "w2-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 812.5,
+         "recipients": 1600
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_WEL",
+         "flow_message_id": "w3-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 812.5,
+         "recipients": 1600
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_CHK",
+         "flow_message_id": "c1-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 812.5,
+         "recipients": 1600
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_CHK",
+         "flow_message_id": "c2-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 812.5,
+         "recipients": 1600
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_CART",
+         "flow_message_id": "a1-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 812.5,
+         "recipients": 1600
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_CART",
+         "flow_message_id": "a2-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 812.5,
+         "recipients": 1600
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_BRW",
+         "flow_message_id": "b1-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 812.5,
+         "recipients": 1600
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_PP",
+         "flow_message_id": "p1-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 812.5,
+         "recipients": 1600
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_PP",
+         "flow_message_id": "p2-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 812.5,
+         "recipients": 1600
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_PP",
+         "flow_message_id": "p3-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 812.5,
+         "recipients": 1600
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_WB",
+         "flow_message_id": "wb1-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 812.5,
+         "recipients": 1600
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_WB",
+         "flow_message_id": "wb2-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 812.5,
+         "recipients": 1600
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_SUN",
+         "flow_message_id": "s1-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 812.5,
+         "recipients": 1600
+        }
+       }
+      ]
+     }
+    },
+    "links": {
+     "next": null
+    }
+   }
+  },
+  "flow90": {
+   "ok": true,
+   "value": {
+    "data": {
+     "attributes": {
+      "results": [
+       {
+        "groupings": {
+         "flow_id": "F_WEL",
+         "flow_message_id": "w1-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 500.0,
+         "recipients": 400
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_WEL",
+         "flow_message_id": "w2-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 500.0,
+         "recipients": 400
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_WEL",
+         "flow_message_id": "w3-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 500.0,
+         "recipients": 400
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_CHK",
+         "flow_message_id": "c1-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 500.0,
+         "recipients": 400
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_CHK",
+         "flow_message_id": "c2-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 500.0,
+         "recipients": 400
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_CART",
+         "flow_message_id": "a1-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 500.0,
+         "recipients": 400
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_CART",
+         "flow_message_id": "a2-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 500.0,
+         "recipients": 400
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_BRW",
+         "flow_message_id": "b1-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 500.0,
+         "recipients": 400
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_PP",
+         "flow_message_id": "p1-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 500.0,
+         "recipients": 400
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_PP",
+         "flow_message_id": "p2-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 500.0,
+         "recipients": 400
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_PP",
+         "flow_message_id": "p3-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 500.0,
+         "recipients": 400
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_WB",
+         "flow_message_id": "wb1-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 500.0,
+         "recipients": 400
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_WB",
+         "flow_message_id": "wb2-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 500.0,
+         "recipients": 400
+        }
+       },
+       {
+        "groupings": {
+         "flow_id": "F_SUN",
+         "flow_message_id": "s1-msg",
+         "send_channel": "email"
+        },
+        "statistics": {
+         "conversion_value": 500.0,
+         "recipients": 400
+        }
+       }
+      ]
+     }
+    },
+    "links": {
+     "next": null
+    }
+   }
+  }
+ }
+}

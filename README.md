@@ -18,8 +18,8 @@ export WAVYOS_DATABASE_URL="sqlite:///$PWD/var/demo.db" WAVYOS_MASTER_KEY_FILE="
 ```bash
 .venv/bin/wavyos init-db
 .venv/bin/wavyos bootstrap --org-name "Wavy Studios" --org-slug wavy --admin-email you@wavystudios.com --admin-name "You"
-.venv/bin/wavyos client create --as you@wavystudios.com --name "Budpop" --slug budpop --timezone America/Los_Angeles
-.venv/bin/wavyos client allow budpop --providers anthropic,codex --budget 10 --as you@wavystudios.com
+.venv/bin/wavyos client create --as you@wavystudios.com --name "Acme Skincare" --slug acme --timezone America/Los_Angeles
+.venv/bin/wavyos client allow acme --providers anthropic,codex --budget 10 --as you@wavystudios.com
 .venv/bin/wavyos provider add anthropic --as you@wavystudios.com   # hidden prompt; sealed in the vault
 .venv/bin/wavyos seed standards --as you@wavystudios.com           # Audit OS SOPs + check library
 .venv/bin/wavyos schedule && .venv/bin/wavyos work --loop          # the always-on loop

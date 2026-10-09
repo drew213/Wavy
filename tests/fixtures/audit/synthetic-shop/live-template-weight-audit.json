@@ -1,0 +1,189 @@
+{
+ "capturedAt": "2026-10-02T12:00:00Z",
+ "errors": 0,
+ "overGmailClipThreshold": 0,
+ "templates": [
+  {
+   "htmlBytes": 50000,
+   "imageCount": 2,
+   "linkCount": 5,
+   "messages": [
+    {
+     "flowId": "F_WEL",
+     "messageId": "w1-msg"
+    }
+   ],
+   "templateId": "TF_WEL",
+   "textChars": 1200
+  },
+  {
+   "htmlBytes": 50000,
+   "imageCount": 2,
+   "linkCount": 5,
+   "messages": [
+    {
+     "flowId": "F_WEL",
+     "messageId": "w2-msg"
+    }
+   ],
+   "templateId": "TF_WEL",
+   "textChars": 1200
+  },
+  {
+   "htmlBytes": 50000,
+   "imageCount": 2,
+   "linkCount": 5,
+   "messages": [
+    {
+     "flowId": "F_WEL",
+     "messageId": "w3-msg"
+    }
+   ],
+   "templateId": "TF_WEL",
+   "textChars": 1200
+  },
+  {
+   "htmlBytes": 50000,
+   "imageCount": 2,
+   "linkCount": 5,
+   "messages": [
+    {
+     "flowId": "F_CHK",
+     "messageId": "c1-msg"
+    }
+   ],
+   "templateId": "TF_CHK",
+   "textChars": 1200
+  },
+  {
+   "htmlBytes": 50000,
+   "imageCount": 2,
+   "linkCount": 5,
+   "messages": [
+    {
+     "flowId": "F_CHK",
+     "messageId": "c2-msg"
+    }
+   ],
+   "templateId": "TF_CHK",
+   "textChars": 1200
+  },
+  {
+   "htmlBytes": 50000,
+   "imageCount": 2,
+   "linkCount": 5,
+   "messages": [
+    {
+     "flowId": "F_CART",
+     "messageId": "a1-msg"
+    }
+   ],
+   "templateId": "TF_CART",
+   "textChars": 1200
+  },
+  {
+   "htmlBytes": 50000,
+   "imageCount": 2,
+   "linkCount": 5,
+   "messages": [
+    {
+     "flowId": "F_CART",
+     "messageId": "a2-msg"
+    }
+   ],
+   "templateId": "TF_CART",
+   "textChars": 1200
+  },
+  {
+   "htmlBytes": 50000,
+   "imageCount": 2,
+   "linkCount": 5,
+   "messages": [
+    {
+     "flowId": "F_BRW",
+     "messageId": "b1-msg"
+    }
+   ],
+   "templateId": "TF_BRW",
+   "textChars": 1200
+  },
+  {
+   "htmlBytes": 50000,
+   "imageCount": 2,
+   "linkCount": 5,
+   "messages": [
+    {
+     "flowId": "F_PP",
+     "messageId": "p1-msg"
+    }
+   ],
+   "templateId": "TF_PP",
+   "textChars": 1200
+  },
+  {
+   "htmlBytes": 50000,
+   "imageCount": 2,
+   "linkCount": 5,
+   "messages": [
+    {
+     "flowId": "F_PP",
+     "messageId": "p2-msg"
+    }
+   ],
+   "templateId": "TF_PP",
+   "textChars": 1200
+  },
+  {
+   "htmlBytes": 50000,
+   "imageCount": 2,
+   "linkCount": 5,
+   "messages": [
+    {
+     "flowId": "F_PP",
+     "messageId": "p3-msg"
+    }
+   ],
+   "templateId": "TF_PP",
+   "textChars": 1200
+  },
+  {
+   "htmlBytes": 50000,
+   "imageCount": 2,
+   "linkCount": 5,
+   "messages": [
+    {
+     "flowId": "F_WB",
+     "messageId": "wb1-msg"
+    }
+   ],
+   "templateId": "TF_WB",
+   "textChars": 1200
+  },
+  {
+   "htmlBytes": 50000,
+   "imageCount": 2,
+   "linkCount": 5,
+   "messages": [
+    {
+     "flowId": "F_WB",
+     "messageId": "wb2-msg"
+    }
+   ],
+   "templateId": "TF_WB",
+   "textChars": 1200
+  },
+  {
+   "htmlBytes": 50000,
+   "imageCount": 2,
+   "linkCount": 5,
+   "messages": [
+    {
+     "flowId": "F_SUN",
+     "messageId": "s1-msg"
+    }
+   ],
+   "templateId": "TF_SUN",
+   "textChars": 1200
+  }
+ ]
+}

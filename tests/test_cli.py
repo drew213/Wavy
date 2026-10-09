@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 import re
 from pathlib import Path
 
@@ -10,7 +12,7 @@ from wavyos import models as m
 from wavyos import tenancy
 from wavyos.db import make_engine, make_sessionmaker
 
-AUDIT_OS = Path("/Users/andrewlauchner/Wavy Studios/audit-os")
+AUDIT_OS = Path(os.environ.get("WAVYOS_TEST_AUDIT_OS_ROOT", "var/audit-os"))
 
 
 @pytest.fixture()

@@ -1,0 +1,844 @@
+{
+ "account": {
+  "items": [
+   {
+    "attributes": {
+     "timezone": "UTC"
+    }
+   }
+  ],
+  "ok": true
+ },
+ "campaigns": {
+  "truncated": false
+ },
+ "capturedAt": "2026-10-02T12:00:00Z",
+ "flows": {
+  "details": [
+   {
+    "actionFetch": {
+     "ok": true
+    },
+    "definition": {
+     "actions": [
+      {
+       "data": {
+        "message": {
+         "add_tracking_params": true,
+         "id": "w1-msg",
+         "smart_sending_enabled": true,
+         "transactional": false
+        },
+        "status": "live"
+       },
+       "id": "w1",
+       "links": {
+        "next": "wd1"
+       },
+       "type": "send-email"
+      },
+      {
+       "data": {
+        "unit": "days",
+        "value": 1
+       },
+       "id": "wd1",
+       "links": {
+        "next": "w2"
+       },
+       "type": "time-delay"
+      },
+      {
+       "data": {
+        "message": {
+         "add_tracking_params": true,
+         "id": "w2-msg",
+         "smart_sending_enabled": true,
+         "transactional": false
+        },
+        "status": "live"
+       },
+       "id": "w2",
+       "links": {
+        "next": "wd2"
+       },
+       "type": "send-email"
+      },
+      {
+       "data": {
+        "unit": "days",
+        "value": 2
+       },
+       "id": "wd2",
+       "links": {
+        "next": "w3"
+       },
+       "type": "time-delay"
+      },
+      {
+       "data": {
+        "message": {
+         "add_tracking_params": true,
+         "id": "w3-msg",
+         "smart_sending_enabled": true,
+         "transactional": false
+        },
+        "status": "live"
+       },
+       "id": "w3",
+       "links": {
+        "next": null
+       },
+       "type": "send-email"
+      }
+     ],
+     "entry_action_id": "w1",
+     "profile_filter": {
+      "condition_groups": [
+       {
+        "conditions": [
+         {
+          "measurement": "count",
+          "measurement_filter": {
+           "operator": "equals",
+           "type": "numeric",
+           "value": 0
+          },
+          "metric_id": "PO1",
+          "timeframe_filter": {
+           "operator": "flow-start",
+           "type": "date"
+          },
+          "type": "profile-metric"
+         }
+        ]
+       }
+      ]
+     },
+     "triggers": [
+      {
+       "id": "L1",
+       "type": "list"
+      }
+     ]
+    },
+    "errors": [],
+    "flow": {
+     "attributes": {
+      "archived": false,
+      "name": "Welcome",
+      "status": "live"
+     },
+     "id": "F_WEL"
+    }
+   },
+   {
+    "actionFetch": {
+     "ok": true
+    },
+    "definition": {
+     "actions": [
+      {
+       "data": {
+        "message": {
+         "add_tracking_params": true,
+         "id": "c1-msg",
+         "smart_sending_enabled": true,
+         "transactional": false
+        },
+        "status": "live"
+       },
+       "id": "c1",
+       "links": {
+        "next": "cd1"
+       },
+       "type": "send-email"
+      },
+      {
+       "data": {
+        "unit": "days",
+        "value": 1
+       },
+       "id": "cd1",
+       "links": {
+        "next": "c2"
+       },
+       "type": "time-delay"
+      },
+      {
+       "data": {
+        "message": {
+         "add_tracking_params": true,
+         "id": "c2-msg",
+         "smart_sending_enabled": true,
+         "transactional": false
+        },
+        "status": "live"
+       },
+       "id": "c2",
+       "links": {
+        "next": null
+       },
+       "type": "send-email"
+      }
+     ],
+     "entry_action_id": "c1",
+     "profile_filter": {
+      "condition_groups": [
+       {
+        "conditions": [
+         {
+          "measurement": "count",
+          "measurement_filter": {
+           "operator": "equals",
+           "type": "numeric",
+           "value": 0
+          },
+          "metric_id": "PO1",
+          "timeframe_filter": {
+           "operator": "flow-start",
+           "type": "date"
+          },
+          "type": "profile-metric"
+         }
+        ]
+       }
+      ]
+     },
+     "reentry_criteria": {
+      "duration": 7,
+      "unit": "day"
+     },
+     "triggers": [
+      {
+       "id": "SC1",
+       "type": "metric"
+      }
+     ]
+    },
+    "errors": [],
+    "flow": {
+     "attributes": {
+      "archived": false,
+      "name": "Checkout",
+      "status": "live"
+     },
+     "id": "F_CHK"
+    }
+   },
+   {
+    "actionFetch": {
+     "ok": true
+    },
+    "definition": {
+     "actions": [
+      {
+       "data": {
+        "message": {
+         "add_tracking_params": true,
+         "id": "b1-msg",
+         "smart_sending_enabled": true,
+         "transactional": false
+        },
+        "status": "live"
+       },
+       "id": "b1",
+       "links": {
+        "next": null
+       },
+       "type": "send-email"
+      }
+     ],
+     "entry_action_id": "b1",
+     "profile_filter": {
+      "condition_groups": [
+       {
+        "conditions": [
+         {
+          "measurement": "count",
+          "measurement_filter": {
+           "operator": "equals",
+           "type": "numeric",
+           "value": 0
+          },
+          "metric_id": "PO1",
+          "timeframe_filter": {
+           "operator": "flow-start",
+           "type": "date"
+          },
+          "type": "profile-metric"
+         },
+         {
+          "measurement": "count",
+          "measurement_filter": {
+           "operator": "equals",
+           "type": "numeric",
+           "value": 0
+          },
+          "metric_id": "ATC1",
+          "timeframe_filter": {
+           "operator": "flow-start",
+           "type": "date"
+          },
+          "type": "profile-metric"
+         }
+        ]
+       }
+      ]
+     },
+     "reentry_criteria": {
+      "duration": 14,
+      "unit": "day"
+     },
+     "triggers": [
+      {
+       "id": "VP1",
+       "type": "metric"
+      }
+     ]
+    },
+    "errors": [],
+    "flow": {
+     "attributes": {
+      "archived": false,
+      "name": "Browse",
+      "status": "live"
+     },
+     "id": "F_BRW"
+    }
+   },
+   {
+    "actionFetch": {
+     "ok": true
+    },
+    "definition": {
+     "actions": [
+      {
+       "data": {
+        "profile_filter": {
+         "condition_groups": [
+          {
+           "conditions": [
+            {
+             "measurement": "count",
+             "measurement_filter": {
+              "operator": "equals",
+              "type": "numeric",
+              "value": 1
+             },
+             "metric_id": "PO1",
+             "timeframe_filter": {
+              "operator": "alltime",
+              "type": "date"
+             },
+             "type": "profile-metric"
+            }
+           ]
+          }
+         ]
+        }
+       },
+       "id": "ps",
+       "links": {
+        "next_if_false": "p3",
+        "next_if_true": "p1"
+       },
+       "type": "conditional-split"
+      },
+      {
+       "data": {
+        "message": {
+         "add_tracking_params": true,
+         "id": "p1-msg",
+         "smart_sending_enabled": true,
+         "transactional": false
+        },
+        "status": "live"
+       },
+       "id": "p1",
+       "links": {
+        "next": "pd1"
+       },
+       "type": "send-email"
+      },
+      {
+       "data": {
+        "unit": "days",
+        "value": 35
+       },
+       "id": "pd1",
+       "links": {
+        "next": "p2"
+       },
+       "type": "time-delay"
+      },
+      {
+       "data": {
+        "message": {
+         "add_tracking_params": true,
+         "id": "p2-msg",
+         "smart_sending_enabled": true,
+         "transactional": false
+        },
+        "status": "live"
+       },
+       "id": "p2",
+       "links": {
+        "next": null
+       },
+       "type": "send-email"
+      },
+      {
+       "data": {
+        "message": {
+         "add_tracking_params": true,
+         "id": "p3-msg",
+         "smart_sending_enabled": true,
+         "transactional": false
+        },
+        "status": "live"
+       },
+       "id": "p3",
+       "links": {
+        "next": null
+       },
+       "type": "send-email"
+      }
+     ],
+     "entry_action_id": "ps",
+     "triggers": [
+      {
+       "id": "PO1",
+       "type": "metric"
+      }
+     ]
+    },
+    "errors": [],
+    "flow": {
+     "attributes": {
+      "archived": false,
+      "name": "Post purchase",
+      "status": "live"
+     },
+     "id": "F_PP"
+    }
+   },
+   {
+    "actionFetch": {
+     "ok": true
+    },
+    "definition": {
+     "actions": [
+      {
+       "data": {
+        "unit": "days",
+        "value": 70
+       },
+       "id": "wbd",
+       "links": {
+        "next": "wb1"
+       },
+       "type": "time-delay"
+      },
+      {
+       "data": {
+        "message": {
+         "add_tracking_params": true,
+         "id": "wb1-msg",
+         "smart_sending_enabled": true,
+         "transactional": false
+        },
+        "status": "live"
+       },
+       "id": "wb1",
+       "links": {
+        "next": "wbd2"
+       },
+       "type": "send-email"
+      },
+      {
+       "data": {
+        "unit": "days",
+        "value": 7
+       },
+       "id": "wbd2",
+       "links": {
+        "next": "wb2"
+       },
+       "type": "time-delay"
+      },
+      {
+       "data": {
+        "message": {
+         "add_tracking_params": true,
+         "id": "wb2-msg",
+         "smart_sending_enabled": true,
+         "transactional": false
+        },
+        "status": "live"
+       },
+       "id": "wb2",
+       "links": {
+        "next": null
+       },
+       "type": "send-email"
+      }
+     ],
+     "entry_action_id": "wbd",
+     "triggers": [
+      {
+       "id": "PO1",
+       "type": "metric"
+      }
+     ]
+    },
+    "errors": [],
+    "flow": {
+     "attributes": {
+      "archived": false,
+      "name": "Winback",
+      "status": "live"
+     },
+     "id": "F_WB"
+    }
+   },
+   {
+    "actionFetch": {
+     "ok": true
+    },
+    "definition": {
+     "actions": [
+      {
+       "data": {
+        "message": {
+         "add_tracking_params": true,
+         "id": "s1-msg",
+         "smart_sending_enabled": true,
+         "transactional": false
+        },
+        "status": "live"
+       },
+       "id": "s1",
+       "links": {
+        "next": "sup"
+       },
+       "type": "send-email"
+      },
+      {
+       "data": {
+        "status": "live"
+       },
+       "id": "sup",
+       "links": {},
+       "type": "update-profile"
+      }
+     ],
+     "entry_action_id": "s1",
+     "triggers": [
+      {
+       "id": "SEG_UNENG",
+       "type": "segment"
+      }
+     ]
+    },
+    "errors": [],
+    "flow": {
+     "attributes": {
+      "archived": false,
+      "name": "Sunset",
+      "status": "live"
+     },
+     "id": "F_SUN"
+    }
+   }
+  ],
+  "items": [
+   {
+    "attributes": {
+     "archived": false,
+     "name": "Welcome",
+     "status": "live"
+    },
+    "id": "F_WEL",
+    "type": "flow"
+   },
+   {
+    "attributes": {
+     "archived": false,
+     "name": "Checkout",
+     "status": "live"
+    },
+    "id": "F_CHK",
+    "type": "flow"
+   },
+   {
+    "attributes": {
+     "archived": false,
+     "name": "Browse",
+     "status": "live"
+    },
+    "id": "F_BRW",
+    "type": "flow"
+   },
+   {
+    "attributes": {
+     "archived": false,
+     "name": "Post purchase",
+     "status": "live"
+    },
+    "id": "F_PP",
+    "type": "flow"
+   },
+   {
+    "attributes": {
+     "archived": false,
+     "name": "Winback",
+     "status": "live"
+    },
+    "id": "F_WB",
+    "type": "flow"
+   },
+   {
+    "attributes": {
+     "archived": false,
+     "name": "Sunset",
+     "status": "live"
+    },
+    "id": "F_SUN",
+    "type": "flow"
+   }
+  ],
+  "messageCapHit": false,
+  "truncated": false
+ },
+ "forms": {
+  "items": [
+   {
+    "attributes": {
+     "status": "live"
+    },
+    "id": "FORM1"
+   },
+   {
+    "attributes": {
+     "status": "draft"
+    },
+    "id": "FORM2"
+   }
+  ],
+  "ok": true,
+  "truncated": false
+ },
+ "lists": {
+  "items": [
+   {
+    "attributes": {},
+    "id": "L1"
+   }
+  ],
+  "ok": true,
+  "truncated": false
+ },
+ "metrics": {
+  "items": [
+   {
+    "attributes": {
+     "integration": {
+      "name": "Shopify"
+     },
+     "name": "Placed Order"
+    },
+    "id": "PO1"
+   },
+   {
+    "attributes": {
+     "integration": {
+      "name": "Shopify"
+     },
+     "name": "Started Checkout"
+    },
+    "id": "SC1"
+   },
+   {
+    "attributes": {
+     "integration": {
+      "name": "Shopify"
+     },
+     "name": "Added to Cart"
+    },
+    "id": "ATC1"
+   },
+   {
+    "attributes": {
+     "integration": {
+      "name": "Shopify"
+     },
+     "name": "Viewed Product"
+    },
+    "id": "VP1"
+   },
+   {
+    "attributes": {
+     "integration": {
+      "name": "Klaviyo"
+     },
+     "name": "Opened Email"
+    },
+    "id": "OE1"
+   },
+   {
+    "attributes": {
+     "integration": {
+      "name": "Klaviyo"
+     },
+     "name": "Clicked Email"
+    },
+    "id": "CE1"
+   },
+   {
+    "attributes": {
+     "integration": {
+      "name": "Shopify"
+     },
+     "name": "Active on Site"
+    },
+    "id": "AOS1"
+   }
+  ],
+  "ok": true,
+  "truncated": false
+ },
+ "profilesSample": {
+  "items": [],
+  "ok": true,
+  "truncated": true
+ },
+ "segments": {
+  "items": [
+   {
+    "attributes": {
+     "definition": {
+      "condition_groups": [
+       {
+        "conditions": [
+         {
+          "measurement": "count",
+          "measurement_filter": {
+           "operator": "greater-than",
+           "type": "numeric",
+           "value": 0
+          },
+          "metric_id": "OE1",
+          "timeframe_filter": {
+           "operator": "in-the-last",
+           "quantity": 90,
+           "type": "date",
+           "unit": "day"
+          },
+          "type": "profile-metric"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "id": "SEG_ENG"
+   },
+   {
+    "attributes": {
+     "definition": {
+      "condition_groups": [
+       {
+        "conditions": [
+         {
+          "measurement": "count",
+          "measurement_filter": {
+           "operator": "equals",
+           "type": "numeric",
+           "value": 0
+          },
+          "metric_id": "OE1",
+          "timeframe_filter": {
+           "operator": "in-the-last",
+           "quantity": 180,
+           "type": "date",
+           "unit": "day"
+          },
+          "type": "profile-metric"
+         },
+         {
+          "measurement": "count",
+          "measurement_filter": {
+           "operator": "equals",
+           "type": "numeric",
+           "value": 0
+          },
+          "metric_id": "CE1",
+          "timeframe_filter": {
+           "operator": "in-the-last",
+           "quantity": 180,
+           "type": "date",
+           "unit": "day"
+          },
+          "type": "profile-metric"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "id": "SEG_UNENG"
+   },
+   {
+    "attributes": {
+     "definition": {
+      "condition_groups": [
+       {
+        "conditions": [
+         {
+          "measurement": "count",
+          "measurement_filter": {
+           "operator": "greater-than",
+           "type": "numeric",
+           "value": 0
+          },
+          "metric_id": "PO1",
+          "timeframe_filter": {
+           "operator": "alltime",
+           "type": "date"
+          },
+          "type": "profile-metric"
+         },
+         {
+          "measurement": "count",
+          "measurement_filter": {
+           "operator": "equals",
+           "type": "numeric",
+           "value": 0
+          },
+          "metric_id": "PO1",
+          "timeframe_filter": {
+           "operator": "in-the-last",
+           "quantity": 90,
+           "type": "date",
+           "unit": "day"
+          },
+          "type": "profile-metric"
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "id": "SEG_LAPSED"
+   }
+  ],
+  "ok": true,
+  "truncated": false
+ },
+ "templates": {
+  "items": [],
+  "ok": true,
+  "truncated": false
+ }
+}

@@ -12,8 +12,8 @@ from typing import Mapping, Optional
 
 DEFAULT_DATABASE_URL = "sqlite:///var/wavyos.db"
 DEFAULT_MASTER_KEY_FILE = "var/master.key"
-DEFAULT_AUDIT_OUTPUT_ROOT = "/Users/andrewlauchner/Wavy Studios/klaviyo-audit/output"
-DEFAULT_AUDIT_OS_ROOT = "/Users/andrewlauchner/Wavy Studios/audit-os"
+DEFAULT_AUDIT_OUTPUT_ROOT = "var/audit-output"
+DEFAULT_AUDIT_OS_ROOT = "var/audit-os"
 
 
 @dataclass(frozen=True)

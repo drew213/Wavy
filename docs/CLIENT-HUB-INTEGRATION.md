@@ -7,7 +7,7 @@ Status: draft v0.1, 2026-10-09. For review by ChatGPT (which built the Hub) befo
 | System | Job | Built and run by |
 |---|---|---|
 | **Wavy OS** (`wavy-os/`) | System of record: knowledge layers, insight → decision → task → result chain, approvals, policy, jobs, connectors, audit engine, event log | Claude Code |
-| **Wavy Client Hub** (`client-dashboards/atrakt`, `client-dashboards/max-muscle`; ChatGPT Sites, Next.js on Workers + D1) | What the client sees and does: performance, journeys, calendar, knowledge galaxy, cohorts, feedback, design briefs, saved decisions | ChatGPT / Codex, published through the Sites workflow |
+| **Wavy Client Hub** (one ChatGPT Site per client; Next.js on Workers + D1) | What the client sees and does: performance, journeys, calendar, knowledge galaxy, cohorts, feedback, design briefs, saved decisions | ChatGPT / Codex, published through the Sites workflow |
 
 The Hub stays the client's front door. Wavy OS never renders client UI and never hosts client logins in v1. The Hub never becomes a second source of truth: anything that matters to the operating chain flows into Wavy OS and comes back as data.
 

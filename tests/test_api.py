@@ -16,7 +16,7 @@ from wavyos.db import create_all, make_engine, make_sessionmaker, utcnow
 from wavyos.scope import scope_for_agent, scope_for_user
 from wavyos.vault import LocalKeyProvider, Vault
 
-AUDIT_OS = Path("/Users/andrewlauchner/Wavy Studios/audit-os")
+AUDIT_OS = Path(os.environ.get("WAVYOS_TEST_AUDIT_OS_ROOT", "var/audit-os"))
 EVIDENCE = [{"kind": "check", "ref": "scorecard:1#FLW-01", "detail": "welcome flow is draft"}]
 
 

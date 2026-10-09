@@ -8,7 +8,7 @@ The design follows one principle from the founder's spec: **every insight connec
 
 ```
 Organization (an agency, e.g. Wavy Studios)
- └── Client workspace (a brand, e.g. Budpop)
+ └── Client workspace (a brand)
       ├── Client knowledge        (layer 2)
       ├── Live operating state    (layer 3)
       ├── Connections             (Klaviyo, Shopify; encrypted credentials)
@@ -18,7 +18,7 @@ Organization
 ```
 
 - Every row that belongs to a client carries `org_id` and `client_id`. Every query goes through a `Scope(org_id, client_id, actor)` object; services refuse a query without one. One client's data can't leak into another's results by a missing filter.
-- Sister brands (Exhale, Budpop) are separate client workspaces. Nothing joins across clients.
+- Sister brands are separate client workspaces. Nothing joins across clients.
 - We sell it two ways with the same backend: Wavy operates it for retainer clients (client stakeholders get read and approve access), and later other agencies get their own organization.
 
 ## 2. The three knowledge layers
@@ -64,7 +64,7 @@ Every action an actor can take is registered in the **action catalog** with a pe
 | `approved_plan` | Allowed only inside an approved decision whose scope covers it | Build draft campaigns and flows, prepare audience changes, implement agreed work in a non-live state |
 | `explicit_approval` | Each instance needs its own approval from an authorized person | Send client communications, publish campaigns, change live flows, change discounts, suppress or delete profiles, change account settings |
 
-`policy.authorize(actor, action, scope, context)` returns **allow**, **needs_plan** or **needs_approval**, with the reason. The decision is logged either way. Policies can be narrowed per client and per action (e.g. "post-send reports for Budpop are autonomous after 10 clean runs"), but nothing can be widened past what the organization allows, and three actions can never become autonomous: deleting profiles, changing account settings and moving money or discounts.
+`policy.authorize(actor, action, scope, context)` returns **allow**, **needs_plan** or **needs_approval**, with the reason. The decision is logged either way. Policies can be narrowed per client and per action (e.g. "post-send reports for this client are autonomous after 10 clean runs"), but nothing can be widened past what the organization allows, and three actions can never become autonomous: deleting profiles, changing account settings and moving money or discounts.
 
 Connectors enforce the same thing a second time: a connector method declares its action, and the connector refuses to run it without an authorization token from the policy engine. In v0.1 every Klaviyo method is read-only.
 

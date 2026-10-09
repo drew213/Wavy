@@ -1,0 +1,2244 @@
+{
+ "account": {
+  "currency": "USD",
+  "timezone": "UTC"
+ },
+ "aggregates": {
+  "added_to_cart": {
+   "current": {
+    "dates": [
+     "2025-11-01T00:00:00+00:00",
+     "2025-12-01T00:00:00+00:00",
+     "2026-01-01T00:00:00+00:00",
+     "2026-02-01T00:00:00+00:00",
+     "2026-03-01T00:00:00+00:00",
+     "2026-04-01T00:00:00+00:00",
+     "2026-05-01T00:00:00+00:00",
+     "2026-06-01T00:00:00+00:00",
+     "2026-07-01T00:00:00+00:00",
+     "2026-08-01T00:00:00+00:00",
+     "2026-09-01T00:00:00+00:00",
+     "2026-10-01T00:00:00+00:00"
+    ],
+    "rows": [
+     {
+      "dimensions": [],
+      "measurements": {
+       "count": [
+        900,
+        900,
+        900,
+        900,
+        900,
+        900,
+        900,
+        900,
+        900,
+        900,
+        900,
+        900
+       ],
+       "unique": [
+        800,
+        800,
+        800,
+        800,
+        800,
+        800,
+        800,
+        800,
+        800,
+        800,
+        800,
+        800
+       ]
+      }
+     }
+    ],
+    "window": {
+     "end": "2026-10-02T12:00:00Z",
+     "start": "2025-11-01T00:00:00"
+    }
+   },
+   "metricId": "X"
+  },
+  "bounced_email": {
+   "current": {
+    "dates": [
+     "2025-11-01T00:00:00+00:00",
+     "2025-12-01T00:00:00+00:00",
+     "2026-01-01T00:00:00+00:00",
+     "2026-02-01T00:00:00+00:00",
+     "2026-03-01T00:00:00+00:00",
+     "2026-04-01T00:00:00+00:00",
+     "2026-05-01T00:00:00+00:00",
+     "2026-06-01T00:00:00+00:00",
+     "2026-07-01T00:00:00+00:00",
+     "2026-08-01T00:00:00+00:00",
+     "2026-09-01T00:00:00+00:00",
+     "2026-10-01T00:00:00+00:00"
+    ],
+    "rows": [
+     {
+      "dimensions": [],
+      "measurements": {
+       "count": [
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300
+       ],
+       "unique": [
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300
+       ]
+      }
+     }
+    ],
+    "window": {
+     "end": "2026-10-02T12:00:00Z",
+     "start": "2025-11-01T00:00:00"
+    }
+   },
+   "metricId": "X"
+  },
+  "bounced_email_by_type": {
+   "current": {
+    "dates": [
+     "2025-11-01T00:00:00+00:00",
+     "2025-12-01T00:00:00+00:00",
+     "2026-01-01T00:00:00+00:00",
+     "2026-02-01T00:00:00+00:00",
+     "2026-03-01T00:00:00+00:00",
+     "2026-04-01T00:00:00+00:00",
+     "2026-05-01T00:00:00+00:00",
+     "2026-06-01T00:00:00+00:00",
+     "2026-07-01T00:00:00+00:00",
+     "2026-08-01T00:00:00+00:00",
+     "2026-09-01T00:00:00+00:00",
+     "2026-10-01T00:00:00+00:00"
+    ],
+    "rows": [
+     {
+      "dimensions": [
+       "Hard"
+      ],
+      "measurements": {
+       "count": [
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100
+       ]
+      }
+     },
+     {
+      "dimensions": [
+       "Soft"
+      ],
+      "measurements": {
+       "count": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200
+       ]
+      }
+     }
+    ],
+    "window": {
+     "end": "2026-10-02T12:00:00Z",
+     "start": "2025-11-01T00:00:00"
+    }
+   },
+   "metricId": "X"
+  },
+  "dropped_email": {
+   "current": {
+    "dates": [
+     "2025-11-01T00:00:00+00:00",
+     "2025-12-01T00:00:00+00:00",
+     "2026-01-01T00:00:00+00:00",
+     "2026-02-01T00:00:00+00:00",
+     "2026-03-01T00:00:00+00:00",
+     "2026-04-01T00:00:00+00:00",
+     "2026-05-01T00:00:00+00:00",
+     "2026-06-01T00:00:00+00:00",
+     "2026-07-01T00:00:00+00:00",
+     "2026-08-01T00:00:00+00:00",
+     "2026-09-01T00:00:00+00:00",
+     "2026-10-01T00:00:00+00:00"
+    ],
+    "rows": [
+     {
+      "dimensions": [],
+      "measurements": {
+       "count": [
+        50,
+        50,
+        50,
+        50,
+        50,
+        50,
+        50,
+        50,
+        50,
+        50,
+        50,
+        50
+       ]
+      }
+     }
+    ],
+    "window": {
+     "end": "2026-10-02T12:00:00Z",
+     "start": "2025-11-01T00:00:00"
+    }
+   },
+   "metricId": "X"
+  },
+  "marked_spam": {
+   "current": {
+    "dates": [
+     "2025-11-01T00:00:00+00:00",
+     "2025-12-01T00:00:00+00:00",
+     "2026-01-01T00:00:00+00:00",
+     "2026-02-01T00:00:00+00:00",
+     "2026-03-01T00:00:00+00:00",
+     "2026-04-01T00:00:00+00:00",
+     "2026-05-01T00:00:00+00:00",
+     "2026-06-01T00:00:00+00:00",
+     "2026-07-01T00:00:00+00:00",
+     "2026-08-01T00:00:00+00:00",
+     "2026-09-01T00:00:00+00:00",
+     "2026-10-01T00:00:00+00:00"
+    ],
+    "rows": [
+     {
+      "dimensions": [],
+      "measurements": {
+       "count": [
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20
+       ]
+      }
+     }
+    ],
+    "window": {
+     "end": "2026-10-02T12:00:00Z",
+     "start": "2025-11-01T00:00:00"
+    }
+   },
+   "metricId": "X"
+  },
+  "opened_email_by_inbox": {
+   "current": {
+    "dates": [
+     "2025-11-01T00:00:00+00:00",
+     "2025-12-01T00:00:00+00:00",
+     "2026-01-01T00:00:00+00:00",
+     "2026-02-01T00:00:00+00:00",
+     "2026-03-01T00:00:00+00:00",
+     "2026-04-01T00:00:00+00:00",
+     "2026-05-01T00:00:00+00:00",
+     "2026-06-01T00:00:00+00:00",
+     "2026-07-01T00:00:00+00:00",
+     "2026-08-01T00:00:00+00:00",
+     "2026-09-01T00:00:00+00:00",
+     "2026-10-01T00:00:00+00:00"
+    ],
+    "rows": [
+     {
+      "dimensions": [
+       "Gmail"
+      ],
+      "measurements": {
+       "unique": [
+        12000,
+        12000,
+        12000,
+        12000,
+        12000,
+        12000,
+        12000,
+        12000,
+        12000,
+        12000,
+        12000,
+        12000
+       ]
+      }
+     },
+     {
+      "dimensions": [
+       "Hotmail / Outlook"
+      ],
+      "measurements": {
+       "unique": [
+        4000,
+        4000,
+        4000,
+        4000,
+        4000,
+        4000,
+        4000,
+        4000,
+        4000,
+        4000,
+        4000,
+        4000
+       ]
+      }
+     },
+     {
+      "dimensions": [
+       "Apple"
+      ],
+      "measurements": {
+       "unique": [
+        9000,
+        9000,
+        9000,
+        9000,
+        9000,
+        9000,
+        9000,
+        9000,
+        9000,
+        9000,
+        9000,
+        9000
+       ]
+      }
+     },
+     {
+      "dimensions": [
+       "Yahoo"
+      ],
+      "measurements": {
+       "unique": [
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000
+       ]
+      }
+     }
+    ],
+    "window": {
+     "end": "2026-10-02T12:00:00Z",
+     "start": "2025-11-01T00:00:00"
+    }
+   },
+   "metricId": "X"
+  },
+  "placed_order": {
+   "current": {
+    "dates": [
+     "2025-11-01T00:00:00+00:00",
+     "2025-12-01T00:00:00+00:00",
+     "2026-01-01T00:00:00+00:00",
+     "2026-02-01T00:00:00+00:00",
+     "2026-03-01T00:00:00+00:00",
+     "2026-04-01T00:00:00+00:00",
+     "2026-05-01T00:00:00+00:00",
+     "2026-06-01T00:00:00+00:00",
+     "2026-07-01T00:00:00+00:00",
+     "2026-08-01T00:00:00+00:00",
+     "2026-09-01T00:00:00+00:00",
+     "2026-10-01T00:00:00+00:00"
+    ],
+    "rows": [
+     {
+      "dimensions": [],
+      "measurements": {
+       "count": [
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100
+       ],
+       "sum_value": [
+        10000.0,
+        10000.0,
+        10000.0,
+        10000.0,
+        10000.0,
+        10000.0,
+        10000.0,
+        10000.0,
+        10000.0,
+        10000.0,
+        10000.0,
+        10000.0
+       ],
+       "unique": [
+        90,
+        90,
+        90,
+        90,
+        90,
+        90,
+        90,
+        90,
+        90,
+        90,
+        90,
+        90
+       ]
+      }
+     }
+    ],
+    "window": {
+     "end": "2026-10-02T12:00:00Z",
+     "start": "2025-11-01T00:00:00"
+    }
+   },
+   "metricId": "X",
+   "prior": {
+    "dates": [
+     "2024-11-01T00:00:00+00:00",
+     "2024-12-01T00:00:00+00:00",
+     "2025-01-01T00:00:00+00:00",
+     "2025-02-01T00:00:00+00:00",
+     "2025-03-01T00:00:00+00:00",
+     "2025-04-01T00:00:00+00:00",
+     "2025-05-01T00:00:00+00:00",
+     "2025-06-01T00:00:00+00:00",
+     "2025-07-01T00:00:00+00:00",
+     "2025-08-01T00:00:00+00:00",
+     "2025-09-01T00:00:00+00:00",
+     "2025-10-01T00:00:00+00:00"
+    ],
+    "rows": [
+     {
+      "dimensions": [],
+      "measurements": {
+       "count": [
+        90,
+        90,
+        90,
+        90,
+        90,
+        90,
+        90,
+        90,
+        90,
+        90,
+        90,
+        90
+       ],
+       "sum_value": [
+        9000.0,
+        9000.0,
+        9000.0,
+        9000.0,
+        9000.0,
+        9000.0,
+        9000.0,
+        9000.0,
+        9000.0,
+        9000.0,
+        9000.0,
+        9000.0
+       ]
+      }
+     }
+    ],
+    "window": {
+     "end": "2025-11-01T00:00:00",
+     "start": "2024-11-01T00:00:00"
+    }
+   }
+  },
+  "placed_order_by_channel": {
+   "current": {
+    "dates": [
+     "2025-11-01T00:00:00+00:00",
+     "2025-12-01T00:00:00+00:00",
+     "2026-01-01T00:00:00+00:00",
+     "2026-02-01T00:00:00+00:00",
+     "2026-03-01T00:00:00+00:00",
+     "2026-04-01T00:00:00+00:00",
+     "2026-05-01T00:00:00+00:00",
+     "2026-06-01T00:00:00+00:00",
+     "2026-07-01T00:00:00+00:00",
+     "2026-08-01T00:00:00+00:00",
+     "2026-09-01T00:00:00+00:00",
+     "2026-10-01T00:00:00+00:00"
+    ],
+    "rows": [
+     {
+      "dimensions": [
+       "$email_channel"
+      ],
+      "measurements": {
+       "count": [
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30,
+        30
+       ],
+       "sum_value": [
+        3000.0,
+        3000.0,
+        3000.0,
+        3000.0,
+        3000.0,
+        3000.0,
+        3000.0,
+        3000.0,
+        3000.0,
+        3000.0,
+        3000.0,
+        3000.0
+       ]
+      }
+     }
+    ],
+    "window": {
+     "end": "2026-10-02T12:00:00Z",
+     "start": "2025-11-01T00:00:00"
+    }
+   },
+   "metricId": "X"
+  },
+  "placed_order_by_flow": {
+   "current": {
+    "dates": [
+     "2025-11-01T00:00:00+00:00",
+     "2025-12-01T00:00:00+00:00",
+     "2026-01-01T00:00:00+00:00",
+     "2026-02-01T00:00:00+00:00",
+     "2026-03-01T00:00:00+00:00",
+     "2026-04-01T00:00:00+00:00",
+     "2026-05-01T00:00:00+00:00",
+     "2026-06-01T00:00:00+00:00",
+     "2026-07-01T00:00:00+00:00",
+     "2026-08-01T00:00:00+00:00",
+     "2026-09-01T00:00:00+00:00",
+     "2026-10-01T00:00:00+00:00"
+    ],
+    "rows": [
+     {
+      "dimensions": [
+       "F_CHK"
+      ],
+      "measurements": {
+       "count": [
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10,
+        10
+       ],
+       "sum_value": [
+        1000.0,
+        1000.0,
+        1000.0,
+        1000.0,
+        1000.0,
+        1000.0,
+        1000.0,
+        1000.0,
+        1000.0,
+        1000.0,
+        1000.0,
+        1000.0
+       ]
+      }
+     }
+    ],
+    "window": {
+     "end": "2026-10-02T12:00:00Z",
+     "start": "2025-11-01T00:00:00"
+    }
+   },
+   "metricId": "X"
+  },
+  "received_email": {
+   "current": {
+    "dates": [
+     "2025-11-01T00:00:00+00:00",
+     "2025-12-01T00:00:00+00:00",
+     "2026-01-01T00:00:00+00:00",
+     "2026-02-01T00:00:00+00:00",
+     "2026-03-01T00:00:00+00:00",
+     "2026-04-01T00:00:00+00:00",
+     "2026-05-01T00:00:00+00:00",
+     "2026-06-01T00:00:00+00:00",
+     "2026-07-01T00:00:00+00:00",
+     "2026-08-01T00:00:00+00:00",
+     "2026-09-01T00:00:00+00:00",
+     "2026-10-01T00:00:00+00:00"
+    ],
+    "rows": [
+     {
+      "dimensions": [],
+      "measurements": {
+       "count": [
+        100000,
+        100000,
+        100000,
+        100000,
+        100000,
+        100000,
+        100000,
+        100000,
+        100000,
+        100000,
+        100000,
+        100000
+       ],
+       "unique": [
+        50000,
+        50000,
+        50000,
+        50000,
+        50000,
+        50000,
+        50000,
+        50000,
+        50000,
+        50000,
+        50000,
+        50000
+       ]
+      }
+     }
+    ],
+    "window": {
+     "end": "2026-10-02T12:00:00Z",
+     "start": "2025-11-01T00:00:00"
+    }
+   },
+   "metricId": "X"
+  },
+  "received_email_by_inbox": {
+   "current": {
+    "dates": [
+     "2025-11-01T00:00:00+00:00",
+     "2025-12-01T00:00:00+00:00",
+     "2026-01-01T00:00:00+00:00",
+     "2026-02-01T00:00:00+00:00",
+     "2026-03-01T00:00:00+00:00",
+     "2026-04-01T00:00:00+00:00",
+     "2026-05-01T00:00:00+00:00",
+     "2026-06-01T00:00:00+00:00",
+     "2026-07-01T00:00:00+00:00",
+     "2026-08-01T00:00:00+00:00",
+     "2026-09-01T00:00:00+00:00",
+     "2026-10-01T00:00:00+00:00"
+    ],
+    "rows": [
+     {
+      "dimensions": [
+       "Gmail"
+      ],
+      "measurements": {
+       "count": [
+        60000,
+        60000,
+        60000,
+        60000,
+        60000,
+        60000,
+        60000,
+        60000,
+        60000,
+        60000,
+        60000,
+        60000
+       ]
+      }
+     },
+     {
+      "dimensions": [
+       "Hotmail / Outlook"
+      ],
+      "measurements": {
+       "count": [
+        20000,
+        20000,
+        20000,
+        20000,
+        20000,
+        20000,
+        20000,
+        20000,
+        20000,
+        20000,
+        20000,
+        20000
+       ]
+      }
+     },
+     {
+      "dimensions": [
+       "Apple"
+      ],
+      "measurements": {
+       "count": [
+        15000,
+        15000,
+        15000,
+        15000,
+        15000,
+        15000,
+        15000,
+        15000,
+        15000,
+        15000,
+        15000,
+        15000
+       ]
+      }
+     },
+     {
+      "dimensions": [
+       "Yahoo"
+      ],
+      "measurements": {
+       "count": [
+        5000,
+        5000,
+        5000,
+        5000,
+        5000,
+        5000,
+        5000,
+        5000,
+        5000,
+        5000,
+        5000,
+        5000
+       ]
+      }
+     }
+    ],
+    "window": {
+     "end": "2026-10-02T12:00:00Z",
+     "start": "2025-11-01T00:00:00"
+    }
+   },
+   "metricId": "X"
+  },
+  "received_sms": {
+   "notFound": true
+  },
+  "started_checkout": {
+   "current": {
+    "dates": [
+     "2025-11-01T00:00:00+00:00",
+     "2025-12-01T00:00:00+00:00",
+     "2026-01-01T00:00:00+00:00",
+     "2026-02-01T00:00:00+00:00",
+     "2026-03-01T00:00:00+00:00",
+     "2026-04-01T00:00:00+00:00",
+     "2026-05-01T00:00:00+00:00",
+     "2026-06-01T00:00:00+00:00",
+     "2026-07-01T00:00:00+00:00",
+     "2026-08-01T00:00:00+00:00",
+     "2026-09-01T00:00:00+00:00",
+     "2026-10-01T00:00:00+00:00"
+    ],
+    "rows": [
+     {
+      "dimensions": [],
+      "measurements": {
+       "count": [
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500
+       ],
+       "unique": [
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400
+       ]
+      }
+     }
+    ],
+    "window": {
+     "end": "2026-10-02T12:00:00Z",
+     "start": "2025-11-01T00:00:00"
+    }
+   },
+   "metricId": "X"
+  },
+  "subscribed_email": {
+   "current": {
+    "dates": [
+     "2025-11-01T00:00:00+00:00",
+     "2025-12-01T00:00:00+00:00",
+     "2026-01-01T00:00:00+00:00",
+     "2026-02-01T00:00:00+00:00",
+     "2026-03-01T00:00:00+00:00",
+     "2026-04-01T00:00:00+00:00",
+     "2026-05-01T00:00:00+00:00",
+     "2026-06-01T00:00:00+00:00",
+     "2026-07-01T00:00:00+00:00",
+     "2026-08-01T00:00:00+00:00",
+     "2026-09-01T00:00:00+00:00",
+     "2026-10-01T00:00:00+00:00"
+    ],
+    "rows": [
+     {
+      "dimensions": [],
+      "measurements": {
+       "count": [
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000
+       ],
+       "unique": [
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000
+       ]
+      }
+     }
+    ],
+    "window": {
+     "end": "2026-10-02T12:00:00Z",
+     "start": "2025-11-01T00:00:00"
+    }
+   },
+   "metricId": "X",
+   "prior": {
+    "dates": [
+     "2024-11-01T00:00:00+00:00",
+     "2024-12-01T00:00:00+00:00",
+     "2025-01-01T00:00:00+00:00",
+     "2025-02-01T00:00:00+00:00",
+     "2025-03-01T00:00:00+00:00",
+     "2025-04-01T00:00:00+00:00",
+     "2025-05-01T00:00:00+00:00",
+     "2025-06-01T00:00:00+00:00",
+     "2025-07-01T00:00:00+00:00",
+     "2025-08-01T00:00:00+00:00",
+     "2025-09-01T00:00:00+00:00",
+     "2025-10-01T00:00:00+00:00"
+    ],
+    "rows": [
+     {
+      "dimensions": [],
+      "measurements": {
+       "count": [
+        900,
+        900,
+        900,
+        900,
+        900,
+        900,
+        900,
+        900,
+        900,
+        900,
+        900,
+        900
+       ],
+       "unique": [
+        900,
+        900,
+        900,
+        900,
+        900,
+        900,
+        900,
+        900,
+        900,
+        900,
+        900,
+        900
+       ]
+      }
+     }
+    ],
+    "window": {
+     "end": "2025-11-01T00:00:00",
+     "start": "2024-11-01T00:00:00"
+    }
+   }
+  },
+  "unsubscribed_email": {
+   "current": {
+    "dates": [
+     "2025-11-01T00:00:00+00:00",
+     "2025-12-01T00:00:00+00:00",
+     "2026-01-01T00:00:00+00:00",
+     "2026-02-01T00:00:00+00:00",
+     "2026-03-01T00:00:00+00:00",
+     "2026-04-01T00:00:00+00:00",
+     "2026-05-01T00:00:00+00:00",
+     "2026-06-01T00:00:00+00:00",
+     "2026-07-01T00:00:00+00:00",
+     "2026-08-01T00:00:00+00:00",
+     "2026-09-01T00:00:00+00:00",
+     "2026-10-01T00:00:00+00:00"
+    ],
+    "rows": [
+     {
+      "dimensions": [],
+      "measurements": {
+       "count": [
+        150,
+        150,
+        150,
+        150,
+        150,
+        150,
+        150,
+        150,
+        150,
+        150,
+        150,
+        150
+       ],
+       "unique": [
+        140,
+        140,
+        140,
+        140,
+        140,
+        140,
+        140,
+        140,
+        140,
+        140,
+        140,
+        140
+       ]
+      }
+     }
+    ],
+    "window": {
+     "end": "2026-10-02T12:00:00Z",
+     "start": "2025-11-01T00:00:00"
+    }
+   },
+   "metricId": "X"
+  },
+  "viewed_product": {
+   "current": {
+    "dates": [
+     "2025-11-01T00:00:00+00:00",
+     "2025-12-01T00:00:00+00:00",
+     "2026-01-01T00:00:00+00:00",
+     "2026-02-01T00:00:00+00:00",
+     "2026-03-01T00:00:00+00:00",
+     "2026-04-01T00:00:00+00:00",
+     "2026-05-01T00:00:00+00:00",
+     "2026-06-01T00:00:00+00:00",
+     "2026-07-01T00:00:00+00:00",
+     "2026-08-01T00:00:00+00:00",
+     "2026-09-01T00:00:00+00:00",
+     "2026-10-01T00:00:00+00:00"
+    ],
+    "rows": [
+     {
+      "dimensions": [],
+      "measurements": {
+       "count": [
+        5000,
+        5000,
+        5000,
+        5000,
+        5000,
+        5000,
+        5000,
+        5000,
+        5000,
+        5000,
+        5000,
+        5000
+       ],
+       "unique": [
+        3000,
+        3000,
+        3000,
+        3000,
+        3000,
+        3000,
+        3000,
+        3000,
+        3000,
+        3000,
+        3000,
+        3000
+       ]
+      }
+     }
+    ],
+    "window": {
+     "end": "2026-10-02T12:00:00Z",
+     "start": "2025-11-01T00:00:00"
+    }
+   },
+   "metricId": "X"
+  }
+ },
+ "campaigns": {
+  "email": {
+   "items": [
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 0",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-05-11T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP00"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 1",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-05-14T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP01"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 2",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-05-18T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP02"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 3",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-05-21T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP03"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 4",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-05-25T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP04"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 5",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-05-28T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP05"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 6",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-06-01T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP06"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 7",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-06-04T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP07"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 8",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-06-08T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP08"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 9",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-06-11T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP09"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 10",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-06-15T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP10"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 11",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-06-18T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP11"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 12",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-06-22T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP12"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 13",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-06-25T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP13"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 14",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-06-29T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP14"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 15",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-07-02T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP15"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 16",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-07-06T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP16"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 17",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-07-09T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP17"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 18",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-07-13T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP18"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 19",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-07-16T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP19"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 20",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-07-20T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP20"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 21",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-07-23T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP21"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 22",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-07-27T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP22"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 23",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-07-30T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP23"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 24",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-08-03T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP24"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 25",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-08-06T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP25"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 26",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-08-10T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP26"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 27",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-08-13T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP27"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 28",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-08-17T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP28"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 29",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-08-20T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP29"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 30",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-08-24T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP30"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 31",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-08-27T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP31"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 32",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-08-31T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP32"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 33",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-09-03T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP33"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 34",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-09-07T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP34"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 35",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-09-10T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP35"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 36",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-09-14T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP36"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 37",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-09-17T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP37"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 38",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-09-21T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP38"
+    },
+    {
+     "attributes": {
+      "archived": false,
+      "audiences": {
+       "excluded": [
+        "SEG_UNENG"
+       ],
+       "included": [
+        "SEG_ENG"
+       ]
+      },
+      "name": "Synthetic campaign 39",
+      "send_options": {
+       "ignore_unsubscribes": false,
+       "use_smart_sending": true
+      },
+      "send_time": "2026-09-24T15:00:00+00:00",
+      "status": "Sent",
+      "tracking_options": {
+       "add_tracking_params": true,
+       "is_tracking_clicks": true,
+       "is_tracking_opens": true
+      }
+     },
+     "id": "CMP39"
+    }
+   ],
+   "truncated": false
+  },
+  "sms": {
+   "count": 0,
+   "items": [],
+   "truncated": false
+  }
+ },
+ "capturedAt": "2026-10-02T12:00:00Z",
+ "catalog": {
+  "truncated": false
+ },
+ "coupons": {
+  "truncated": false
+ },
+ "errors": [],
+ "metricChoices": {
+  "added_to_cart": {
+   "otherCandidates": [],
+   "used": {
+    "id": "ATC1",
+    "integration": "Shopify",
+    "name": "Added to Cart"
+   }
+  },
+  "placed_order": {
+   "otherCandidates": [],
+   "used": {
+    "id": "PO1",
+    "integration": "Shopify",
+    "name": "Placed Order"
+   }
+  },
+  "received_sms": {
+   "otherCandidates": [],
+   "used": null
+  },
+  "started_checkout": {
+   "otherCandidates": [],
+   "used": {
+    "id": "SC1",
+    "integration": "Shopify",
+    "name": "Started Checkout"
+   }
+  },
+  "viewed_product": {
+   "otherCandidates": [],
+   "used": {
+    "id": "VP1",
+    "integration": "Shopify",
+    "name": "Viewed Product"
+   }
+  }
+ },
+ "orders": {
+  "error": null,
+  "truncated": false
+ },
+ "reports": {
+  "formValues365": {
+   "data": {
+    "attributes": {
+     "results": [
+      {
+       "groupings": {
+        "form_id": "FORM1",
+        "form_version_id": "1"
+       },
+       "statistics": {
+        "submits": 300,
+        "viewed_form_uniques": 6000
+       }
+      },
+      {
+       "groupings": {
+        "form_id": "FORM1",
+        "form_version_id": "2"
+       },
+       "statistics": {
+        "submits": 200,
+        "viewed_form_uniques": 4000
+       }
+      },
+      {
+       "groupings": {
+        "form_id": "FORM2",
+        "form_version_id": "3"
+       },
+       "statistics": {
+        "submits": 9,
+        "viewed_form_uniques": 9000
+       }
+      }
+     ]
+    }
+   }
+  }
+ },
+ "windows": {
+  "current": {
+   "end": "2026-10-02T12:00:00Z",
+   "start": "2025-11-01T00:00:00"
+  },
+  "prior": {
+   "end": "2025-11-01T00:00:00",
+   "start": "2024-11-01T00:00:00"
+  }
+ }
+}
