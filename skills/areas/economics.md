@@ -17,13 +17,13 @@ Look each up with `get_context` (area `economics`). Margins, costs and offer rul
 - `revenue_model` – channel mix (DTC, subscription, marketplace, wholesale) and which channels retention can influence. Missing: report DTC only and label it.
 - `gross_margin_by_product` – gross margin per product or category. Missing: label all value as gross revenue; do not rank offers by profit.
 - `contribution_margin_per_order` – net sales after discounts and refunds, less product cost, variable fulfillment, payment costs and messaging cost. Missing: size in gross revenue, labelled.
-- `aov_source` – which order metric and window AOV comes from. Missing: take it from the pinned order metric in `data_infrastructure`; if not pinned, stop.
+- `aov_source` – which order metric and window AOV comes from. AOV = eligible net sales ÷ eligible order count; median order value is reported separately. Missing: take it from the pinned order metric in `data_infrastructure`; if not pinned, stop.
 - `acquisition_cost` – blended or paid CAC, and its source. Missing: do not state payback or LTV:CAC.
 - `purchase_frequency` – typical days between orders, and how long one unit lasts per hero product. Missing: no replenishment timing; flag to `product_customer`.
 - `subscription_terms` – price, discount, cadence, skip/cancel rules and the platform. Missing: subscription status is unknown; exclude unknowns from subscription pitches and refill messages.
 - `seasonality` – peak periods, freeze windows, and last year's peak dates. Missing: use the account's own order history by month, labelled observed.
 - `inventory_constraints` – stock limits, low-stock SKUs, lead times, fulfillment capacity. Missing: no volume recommendations for constrained SKUs; flag.
-- `shipping_threshold` – free-shipping threshold and average shipping cost per order. Missing: do not use shipping as an offer.
+- `free_shipping_threshold` – the threshold and market eligibility from current shipping configuration and client approval, plus average shipping cost per order. Missing threshold: no shipping promise or offer. Missing order data: no order-value estimate.
 - `discount_rules` – offers allowed, offers never allowed, max depth, stacking behavior at checkout, and who approves. Missing: no offer of any kind.
 - `business_goals` – the period's goal with metric, number and date. Missing: record "no numeric goal".
 
@@ -38,9 +38,9 @@ Look each up with `get_context` (area `economics`). Margins, costs and offer rul
 ## SOP
 1. Call `get_context` for `economics` and `data_infrastructure`. Confirm the order metric is pinned and note the account timezone and currency.
 2. List each fact above as approved, proposed or missing. Record missing ones as unavailable, never zero.
-3. From the pinned order metric, compute observed AOV, orders per customer and median days between first and second order over a stated window, in the account timezone. Use first-observed purchase if lifetime history is unproven, and say so.
+3. From the pinned order metric, compute observed AOV (eligible net sales ÷ eligible orders), median order value separately, orders per customer and median days between first and second order over a stated window, in the account timezone. Use first-observed purchase if lifetime history is unproven, and say so.
 4. Build the unit-economics sheet: per hero product, price, gross margin (if given), contribution per order (if given), shipping cost against threshold, and typical days to repurchase.
-5. Model discount economics for each approved or proposed offer: margin after discount, break-even lift (the extra orders needed to cover the margin given away to buyers who would have bought anyway), and stacking. Stacked percentage discounts multiply: 20% then 10% is 28% off, not 30%. Mark every offer that has not passed a checkout test.
+5. Model each offer using the checkout-tested discount calculation in `offers`. Compute contribution after all variable costs. Let C0 be contribution per baseline order and C1 contribution per promoted order: if C1 > 0, break-even order ratio = C0 ÷ C1 and required relative order lift = C0 ÷ C1 − 1, assuming the same basket and cost mix and that the promotion applies to all affected orders. If C1 ≤ 0, there is no finite positive order-volume break-even under that model. State cannibalization, refund and basket assumptions; never call a scenario a measured lift. Mark every offer that has not passed a checkout test.
 6. Map seasonality and inventory: monthly order index from history, known peaks, freeze windows, and constrained SKUs with dates.
 7. Write the economic guardrails other areas must follow: max discount depth, offers never allowed, SKUs not to push, the free-shipping lever if approved, and the valuation basis (contribution or labelled gross).
 8. `flag_insight` for each risk with evidence, such as an offer below break-even, a stacking leak, or a hero SKU out of stock in a planned window.
@@ -50,7 +50,9 @@ Look each up with `get_context` (area `economics`). Margins, costs and offer rul
 ## Decision rules
 - If contribution margin is missing, then value every lever in gross revenue, label it gross on every figure, and do not rank levers by profit.
 - If an offer's discount exceeds the approved maximum depth, or its margin after discount is negative, then do not recommend it; flag it to the account lead.
-- If discounts stack at checkout and the stacked depth exceeds the approved maximum, then flag as high severity and hold any copy that promotes the offer.
+- If discounts combine at checkout and the combined depth (from the verified discount classes, bases and application order in `offers`) exceeds the approved maximum, then flag as high severity and hold any copy that promotes the offer. Unknown mechanics block any combined-saving figure.
+- If C1 ≤ 0, then the offer has no finite break-even; don't recommend it without a stated strategic reason the account lead approves.
+- **Value retention by business model** (`revenue_model`): consumables by reorder from usage evidence; durables by accessory, care, gifting or upgrade, never a reorder rate; subscriptions by renewal and save, with automatic renewals kept separate from discretionary repeat orders.
 - If a SKU is constrained in the send window, then exclude it from promotions and recovery pushes for that window and say why.
 - If subscription status is unknown for a customer group, then treat them as possibly subscribed: no subscription pitch and no refill reminder.
 - If you only have attributed revenue, then never call it incremental, profit or ROI.
@@ -59,7 +61,7 @@ Look each up with `get_context` (area `economics`). Margins, costs and offer rul
 
 ## Examples
 ### Good
-"Offer check: the proposed first-order discount at the approved depth leaves a gross margin of the stated percentage on the hero product (client margin, finance email). It stacks with the site-wide code at checkout (tested), producing a deeper combined discount than the approved maximum. Break-even: it needs a stated number of additional first orders per 100 who would have bought anyway. Recommendation: block stacking before launch; value the welcome flow in contribution once the client confirms fulfillment cost."
+Synthetic example, not client data. "Baseline net price $100; combined variable costs $60 (client finance email); C0 = $40. A checkout-tested 20% discount leaves net price $80 and C1 = $20. Break-even requires 40 ÷ 20 = 2 times as many orders, a 100% lift, before fixed campaign costs. Assumes the same basket and cost mix. Recommendation: don't run it as a broad offer; test a smaller incentive. Missing cost inputs would mean: profitability unverified."
 ### Not good
 "Margins are probably around 70% for this category, so a 30% offer is safe and should add $40k." It infers a margin, ignores stacking, uses attributed-style certainty and states a number with no formula or source.
 
@@ -68,8 +70,9 @@ Look each up with `get_context` (area `economics`). Margins, costs and offer rul
 - [ ] Gross revenue and contribution are labelled on every value; none are mixed.
 - [ ] No margin, cost or CAC appears without a written client source.
 - [ ] Missing facts are shown as unavailable with what they block, never as zero.
-- [ ] Each offer shows depth, margin after discount, break-even lift, stacking result and checkout-test status.
-- [ ] Stacked discounts are computed multiplicatively.
+- [ ] Each offer shows depth, C0, C1, break-even order ratio and required lift (or "no finite break-even" when C1 ≤ 0), its assumptions and checkout-test status.
+- [ ] Combined discounts follow the checkout-tested calculation in `offers` (discount classes, bases, application order); no universal multiplication or addition.
+- [ ] AOV is eligible net sales ÷ eligible orders with median order value separate, and no shipping promise appears without a configured, approved threshold.
 - [ ] Constrained SKUs and freeze windows are listed with dates.
 - [ ] Attributed revenue is never described as incremental or profit.
 - [ ] Any offer change is a `discount.change` approval request, not a direct edit.
@@ -89,7 +92,7 @@ Look each up with `get_context` (area `economics`). Margins, costs and offer rul
 
 ## Outputs and destination
 - **Unit-economics sheet** (analysis): per hero product price, margin, contribution, shipping against threshold, repurchase interval; observed AOV and frequency with window. Task output, then Client Hub after account-lead review.
-- **Discount economics table** (analysis): each offer with depth, margin after discount, break-even lift, stacking and test status. Task output.
+- **Discount economics table** (analysis): each offer with depth, C0, C1, break-even ratio and required lift, assumptions, combination basis and test status. Task output.
 - **Seasonality and inventory calendar** (analysis): monthly index, peaks, freeze windows, constrained SKUs. Feeds `campaign_calendar` and `offers`.
 - **Economic guardrails** (other): the rules other areas apply. Proposed facts until approved.
 Thresholds in this area are Wavy starting defaults: re-request margin and cost facts every 90 days or when prices change; treat any offer whose margin after discount falls below the client's stated floor as blocked.

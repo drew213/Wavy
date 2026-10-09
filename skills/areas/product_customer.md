@@ -25,6 +25,7 @@ Look each up with `get_context` (area `product_customer`). If a fact is missing,
 - `customer_personas` – segments the client recognizes, with evidence. Missing: build observed segments from data and label them hypotheses.
 - `purchase_motivations` and `buying_barriers` – from surveys, reviews, support tickets. Missing: list as research gaps.
 - `competitive_positioning` – the competitors the client names and the claimed difference. Missing: no comparative copy.
+- `subscription_terms` – plans, skip, pause, swap and cadence options, cancellation path, which renewal notices the subscription platform sends natively, and any approved save offer with its eligibility. Missing: no subscription retention content.
 - `brand_name_and_lineup` – the current brand name, sub-brands and retired names or lines. Missing: flag; old brand language in live messages is a common critical finding.
 
 ## Inputs and sources
@@ -39,19 +40,21 @@ Look each up with `get_context` (area `product_customer`). If a fact is missing,
 ## SOP
 1. Call `get_context` for `product_customer`, `economics` and `voice_copy`. List each fact as approved, proposed or missing.
 2. Build the product sheet: per product, family, status, use case, unit duration, hero flag, approved benefits, approved claims, prohibited words, and the source of each field.
-3. From order line items, compute observed attach pairs, first-product-to-second-product paths and median repurchase interval per product family, over a stated window. Show n per figure.
+3. From order line items, compute observed attach pairs, first-product-to-second-product paths and median repurchase interval per product family, over a stated window. Show n per figure. Label repurchase intervals as conditional on repeating, not depletion times.
 4. From reviews, support, returns and surveys, code motivations and barriers with a written coding rule. Report counts and n, and quote at most short phrases as customer language, never as brand claims.
 5. Draft personas as observed segments: a defining behavior, size from deduplicated profiles, top motivations and barriers, and the products they buy. Label anything not client-confirmed as a hypothesis.
 6. Draft the objection bank: each objection, its evidence count, and a proposed answer using only approved facts.
 7. Write competitive positioning only from client-named competitors and saved evidence with its date and evidence level.
-8. Run a claims sweep of live messages and pages: flag any claim not in `approved_claims`, any prohibited word, any retired brand name or product, and any cross-sell of a product the recipient already bought. Use `flag_insight` with severity high or critical and the exact location.
-9. Save the product sheet, personas and objection bank with `save_output` (kind `analysis`). `propose_fact` for each new client-sourced item.
-10. `finish`, listing open questions for the client with owners.
+8. If the client sells subscriptions, map from supplied subscription-platform data: skip, pause and swap usage; cancellation reasons coded with a written rule; renewal-notice content, timing and owner; save-offer eligibility (new incentives go to `offers` for `discount.change`). Hand the map to `flow_architecture`.
+9. Run a claims sweep of the supplied exports of live messages and pages: flag any claim not in `approved_claims`, any prohibited word, any retired brand name or product, and any cross-sell of a product the recipient already bought. Use `flag_insight` with severity high or critical and the exact location.
+10. Save the product sheet, personas, subscription map and objection bank with `save_output` (kind `analysis`). `propose_fact` for each new client-sourced item.
+11. `finish`, listing open questions for the client with owners.
 
 ## Decision rules
-- If a claim is not word-for-word in `approved_claims`, then it does not ship; propose it for client approval with its substantiation.
-- If the category is regulated (supplements, CBD/THC, cosmetics with drug-like claims), then follow the published rule: health claims need competent and reliable scientific evidence (FTC Health Products Compliance Guidance, 2022), and dietary-supplement structure/function claims carry the required FDA disclaimer (DSHEA). When unsure, escalate to the account lead; never decide legal sufficiency.
-- If a review request offers an incentive or only asks happy customers, then stop: review gating and undisclosed incentives breach the FTC Endorsement Guides and the FTC rule on consumer reviews (2024).
+- If a claim is not word-for-word in `approved_claims` with its substantiation reference and applicable product, market and channel, then it does not ship; propose it for client approval with its substantiation. Client approval does not legalize a prohibited claim: supplement disease-treatment, cure or prevention claims stay blocked unless qualified legal review establishes a lawful product-specific basis. Keep approved, substantiated benefits; don't strip them to generic ingredient copy.
+- If the category is regulated (supplements, CBD/THC, cosmetics with drug-like claims), then follow the published rule: health claims need competent and reliable scientific evidence (FTC Health Products Compliance Guidance, 2022), and dietary-supplement structure/function claims carry the FDA disclaimer their product and labeling context requires (DSHEA, 21 CFR 101.93). When unsure, escalate to the account lead; never decide legal sufficiency.
+- Block sentiment-conditioned review incentives and review gating. A neutral incentive is not categorically banned by the FTC rule on consumer reviews (2024): require the review platform to allow it, clear disclosure, and eligibility that does not depend on a positive rating or wording. Send the same neutral review opportunity regardless of satisfaction; escalate deceptive suppression or incentive mechanics.
+- If a subscription customer skips, pauses, swaps or cancels, then follow the native platform's notices first; never duplicate or contradict a required renewal or cancellation notice, and offer a save incentive only where approved and eligibility is defined.
 - If a live message names a retired brand, product or claim, then flag it critical; it outranks new work.
 - If order events lack line items, then do not build product-level segments or refill timing; flag to `data_infrastructure`.
 - If a persona rests on fewer than 100 customers (Wavy starting default), then label it directional and do not build a dedicated flow on it.
@@ -60,18 +63,19 @@ Look each up with `get_context` (area `product_customer`). If a fact is missing,
 
 ## Examples
 ### Good
-"Product sheet, hero product A: family A (all flavors), one unit lasts about the stated serving count (client label photo, approved). Approved benefit: the client's approved line, verbatim. Prohibited: 'clinical', 'cure'. Observed: median 41 days first to second order (n=312 repeat buyers, 12 months to as-of, account timezone). Top barrier in returns: taste (coded 38 of 120 reasons). Proposed answer for client review: flavor guide plus the existing approved exchange policy."
+"Product sheet, hero product A: family A (all flavors), one unit lasts about the stated serving count (client label photo, approved). Approved benefit: the client's approved line, verbatim. Prohibited: 'clinical', 'cure'. Observed: median 41 days first to second order among repeat buyers, conditional on repeating (n=312, 12 months to as-of, account timezone). Top barrier in returns: taste (coded 38 of 120 reasons). Proposed answer for client review: flavor guide plus the existing approved exchange policy."
 ### Not good
 "This ingredient is clinically proven to boost energy, so lead the welcome email with that." It invents a claim, uses a prohibited word, has no source and would put the client at regulatory risk.
 
 ## Quality checklist
-- [ ] Every benefit or claim in the output matches `approved_claims` verbatim or is marked "proposed, needs client approval".
+- [ ] Every benefit or claim in the output matches `approved_claims` verbatim with its substantiation reference, or is marked "proposed, needs client approval"; no supplement disease claim appears without a recorded legal basis.
 - [ ] No prohibited word, retired brand name or retired product appears in proposed copy.
 - [ ] Every observed figure shows window, timezone and n.
 - [ ] Personas are labelled confirmed or hypothesis, with size from deduplicated profiles.
 - [ ] Customer review language is labelled as customer evidence, not brand copy.
 - [ ] Competitor statements carry a date and evidence level.
 - [ ] The claims sweep lists each finding with its exact location and severity.
+- [ ] Any review-request mechanic is identical regardless of satisfaction, and any incentive is neutral, disclosed and allowed by the platform.
 - [ ] Open questions have an owner and due date.
 
 ## Owner and approvals
@@ -89,6 +93,7 @@ Look each up with `get_context` (area `product_customer`). If a fact is missing,
 ## Outputs and destination
 - **Product sheet** (analysis): one row per product with sources. Task output; approved fields become client facts used by `voice_copy`, `offers` and `segmentation`.
 - **Claims register** (other): approved, prohibited and pending claims with substantiation owner. Proposed facts until the client approves.
+- **Subscription map** (analysis, when applicable): skip/pause/swap use, coded cancellation reasons, renewal-notice owner and save eligibility. Feeds `flow_architecture`.
 - **Personas and motivations** (analysis): segments with evidence and n. Task output, then Client Hub after review.
 - **Objection bank** (copy): objection, evidence, proposed answer. Task output for client approval.
 - **Claims sweep findings** (report): insights with location and severity, routed to the account lead.

@@ -23,7 +23,7 @@ Look up each fact with `get_context` for `voice_copy`, then `product_customer` a
 - `claims_approver` – who signs off claim language. Missing: stop before any new claim.
 - `product_facts` – directions, servings, sizes, ingredients, verified against the physical label. Missing or conflicting: use a placeholder and `flag_insight`.
 - `regulated_category` – supplement, cosmetic, CBD/THC, alcohol or none. Missing: treat as regulated until confirmed.
-- `required_disclaimers` – for example the FDA structure/function disclaimer. Missing: `propose_fact` if the category needs one.
+- `required_disclaimers` – the disclaimer each product, market and channel requires, from its labeling context (for example the dietary-supplement structure/function disclaimer). Missing: `propose_fact` if the category may need one; hold claim copy.
 - `review_source` – the review platform and whether quotes may be used. Missing: no customer quotes.
 - `personalization_fields` – available profile fields, fill rates and approved fallbacks. Missing: no personalization.
 - `founder_voice_permission` – whether a founder may sign, with their approved samples. Missing: no founder-signed copy.
@@ -42,18 +42,18 @@ Common exceptions: transactional and service messages carry no promotion; retail
 1. Trigger: an approved brief for a campaign, flow message or text. Run `get_context` for `voice_copy`, `product_customer` and `offers`.
 2. Check the brief has audience, job, approved facts, offer key (or "none"), CTA and destination. If a blocking fact is missing, `flag_insight` and `finish`. Use a visible placeholder like [CONFIRM: serving size] for a nonblocking one.
 3. Pull 3–5 distinct approved examples for the same job and channel.
-4. Write the messaging hierarchy: one main message, one proof, one action. Everything else is cut or demoted.
+4. Write the messaging hierarchy: one main message, one proof, one action. Demote secondary points, but keep the brief's approved high-value proof (Decision rules).
 5. Draft 3 subject lines with distinct angles (benefit, curiosity, specificity), each with a preview line that adds information rather than repeating the subject.
 6. Draft the body: the main message in the first two lines; short paragraphs; concrete nouns; one primary CTA written as verb plus object; the CTA may repeat once lower down to the same destination.
 7. Add personalization only from `personalization_fields`, each with its fallback written out.
 8. Run the claims review: list every claim and every number in the draft, map each to `approved_claims`, `product_facts` or the brief, and mark anything unmapped. Remove or rewrite unmapped claims.
-9. Verify every customer quote verbatim against `review_source`, recording the source ID and confirming it is publicly displayed.
+9. Verify every customer quote verbatim against the supplied review export or approved quote record from `review_source`, recording the source ID and its public-display status. Without that evidence, cut the quote.
 10. Run the prohibited-language and offer-consistency checks: the offer value, eligibility and expiry are identical in subject, preview, body, image text and terms.
-11. `save_output` (kind `copy`, label "<message> copy v<n>") with customer-facing copy first, then editor notes: source IDs, claims map, placeholders, open questions.
+11. `save_output` (kind `copy`, label "<message> copy v<n>") with customer-facing copy first, then editor notes: source IDs, claims map, preservation log (approved proof kept, transformations, removals with defect and source), placeholders, open questions.
 12. If a claim needs sign-off, `flag_insight` to the `claims_approver` and mark the copy "claims pending". `finish`.
 
 ## Decision rules
-- **No unapproved health or clinical claims (supplement and health brands).** Never write disease claims (treat, cure, prevent, heal, diagnose, or naming a disease), "clinically proven/studied/tested", "science-backed", "doctor-recommended", percentages, study results, guaranteed outcomes or timelines unless the exact wording is in `approved_claims` with substantiation on file. Structure/function claims need the FDA disclaimer (21 CFR 101.93) where the client's category requires it. FTC rules require substantiation for health claims and truthful endorsements (16 CFR Part 255).
+- **Health and results claims.** Use a health, efficacy, comparative or results claim ("clinically proven", "science-backed", "doctor-recommended", percentages, study results, outcomes, timelines) only with the exact approved wording, its substantiation reference, the applicable product, market and channel, and any required disclaimer. Approval does not legalize a prohibited claim: for supplements, disease claims (treat, cure, prevent, mitigate, diagnose, or naming a disease) are blocked unless qualified legal review establishes a lawful product-specific basis. Apply the disclaimer the product's labeling context requires (for dietary-supplement structure/function claims, 21 CFR 101.93), not a universal footer. FTC rules require substantiation for health claims and truthful endorsements (16 CFR Part 255). Keep approved, substantiated benefits; never swap them for generic ingredient copy.
 - **Review quotes:** verbatim only, from a publicly displayed review, with the source ID kept in editor notes. Never edit a quote, never use one that asserts a health result the brand cannot claim, never imply typical results, and disclose incentives if the reviewer was rewarded.
 - **Wavy stop-list (default when the client has none):** detox, cleanse (as a health claim), fat-burning, miracle, cure, guaranteed, risk-free, "you need this", shaming language about bodies, fake scarcity.
 - **Subject lines, Wavy starting default:** 30–50 characters; the key word in the first 35 characters (mobile truncation); at most one emoji, and only if the voice guide allows it; no all-caps words beyond brand style; never deceptive about content (CAN-SPAM requires subject lines that are not misleading).
@@ -64,17 +64,18 @@ Common exceptions: transactional and service messages carry no promotion; retail
 - **Old copy:** if a phrase comes from an archive email, then keep the rhythm and drop its facts. Never reuse a whole old email with a new product name.
 - If two approved sources disagree on a fact, then use neither; `flag_insight` and use a placeholder.
 - SMS copy follows the `sms` skill (prefix, encoding, length, compliance).
+- **Preserve approved proof.** Keep a brief's approved high-value proof, price framing, customer phrasing and relationship commitments unless a specific factual, legal or voice defect requires a change. State the defect and source in editor notes. Acceptable transformations shorten or reorder without changing meaning; never replace distinctive approved language with generic product description. Example, synthetic: approved "$30 for 30 daily servings" may support "about a dollar a day"; do not replace it with "30 servings" merely to sound safer.
 
 ## Examples
 ### Good
-Subject: "The 2-minute morning routine" · Preview: "Where it fits between coffee and the commute." Body opens with the approved usage direction from the label, adds one verbatim review line about the experience with its source ID in notes, and ends with "Shop the routine" to the product page. Editor notes map every claim to the register and flag one placeholder: [CONFIRM: water amount, label and listing disagree].
+Subject: "The 2-minute morning routine" · Preview: "Where it fits between coffee and the commute." Body opens with the approved usage direction from the label, adds one verbatim review line about the experience with its source ID in notes, and ends with "Shop the routine" to the product page. Editor notes map every claim to the register, log the brief's approved price framing as kept verbatim, and flag one placeholder: [CONFIRM: water amount, label and listing disagree].
 
 ### Not good
 Subject: "Clinically proven to flatten your stomach in 7 days 🔥🔥" It makes an unapproved clinical claim, a body-outcome promise and a timeline, uses two emojis, and would expose a supplement client to FTC and FDA risk. A "customer quote" in the body was paraphrased from a review, which makes it a fabricated quote.
 
 ## Quality checklist
 - [ ] Every claim and number in the copy maps to the approved claim register, verified product facts or the brief, and the map is in the editor notes.
-- [ ] No disease, clinical, timeline or guaranteed-result language appears unless it is in the approved claims with substantiation.
+- [ ] Every health, clinical, timeline or results claim uses exact approved wording with substantiation reference, applicable scope and required disclaimer; no supplement disease claim appears without a recorded legal basis.
 - [ ] Every customer quote is verbatim, from a public review, with its source ID recorded.
 - [ ] The offer (or "no offer") is identical across subject, preview, body, image text and terms.
 - [ ] Three subject lines with distinct angles are provided, each paired with preview text that does not repeat it.
@@ -82,6 +83,7 @@ Subject: "Clinically proven to flatten your stomach in 7 days 🔥🔥" It makes
 - [ ] Every personalization token has a written fallback.
 - [ ] No word from the client's prohibited list or the Wavy stop-list appears.
 - [ ] Placeholders for missing facts are visible and listed; none are disguised as facts.
+- [ ] The brief's approved proof, price framing, customer phrasing and commitments are retained, or each removal names its defect and source in the preservation log.
 
 ## Owner and approvals
 | Action | Level | Who decides |

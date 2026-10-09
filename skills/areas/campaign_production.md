@@ -17,7 +17,7 @@ Look up each fact with `get_context` for `campaign_production`, then `campaign_c
 - `approved_calendar_entry` – the approved row this campaign comes from, with its decision. Missing: stop. No production without an approved row.
 - `sending_identity` – sender name, from address, reply-to and the authenticated sending domain. Missing: stop; `flag_insight` to `deliverability`.
 - `utm_convention` – source, medium, campaign and content values. Missing: use the Wavy starting default below and `propose_fact`.
-- `store_domain` – the current live domain for links. Missing: stop; old-domain links are a known failure.
+- `store_domain`, `approved_external_domains` – the live store domain for commerce links and any approved off-store destinations. Missing: stop; old-domain links are a known failure.
 - `exclusion_segments` – suppressed, unengaged, recent purchasers (where relevant), open service cases, wholesale or retailer, other brands, internal test segments. Missing: stop audience setup.
 - `seed_list` – internal test recipients across Gmail, Apple Mail and Outlook. Missing: `flag_insight`; test sends cannot pass.
 - `send_timezone_rule` – account timezone or recipient local time. Missing: account timezone, stated in the schedule.
@@ -32,56 +32,56 @@ Common exceptions: transactional or service announcements may skip smart sending
 - **Offer spec and checkout test**: the only proof an offer works.
 - **Copy (version-bound) and design direction**: what gets built, exactly.
 - **Platform recipient estimate**: trusted as an estimate of reach after exclusions. Trap: list or segment size is not sendable reach.
-- **Test sends to the seed list**: the only proof of render, links and footer. Trap: a preview pane is not a received message.
+- **Received seed-list messages, link-test and checkout-test receipts**: supplied evidence, the only proof of render, links, footer and offer behavior. Traps: a preview pane is not a received message; an author's description of a link is not a link test.
 - **Send report**: trusted for delivery, bounce, click, unsubscribe and spam complaint counts. Traps: opens are inflated by machine opens; attributed revenue is not incremental.
 
 ## SOP
-Each step names its policy action and level.
+Each step names its policy action and level. Each phase (brief, copy, design direction, draft build, preflight, release verification, post-send review) is its own execution with a fixed `task.phase`; do that phase's steps only and mark later evidence pending.
 
 1. **Approved calendar entry** (`decision.approve`, explicit_approval, done before this task). Run `get_context` for all areas above. If the row or its decision is missing, `flag_insight` and `finish`.
 2. **Brief** (`draft.create`, autonomous). `save_output` kind `brief`: objective, audience include and exclude, offer key, products with stock read and date, key message, CTA and destination, deadlines, owner, approver.
 3. **Research** (`data.read`, `analysis.run`, autonomous). Past sends on this theme with n, current stock, live flows that will hit the same people.
 4. **Copy** (`draft.create`, autonomous). Follow the `voice_copy` skill. `save_output` kind `copy`.
 5. **Design direction** (`draft.create`, autonomous). Follow the `design_system` skill. `save_output` kind `design_direction`.
-6. **Audience setup** (`audience.prepare`, approved_plan). Include and exclude segments by name, without applying them to any live send.
-7. **Platform build in draft** (`campaign.build_draft`, approved_plan). Call `build_draft` with kind `campaign` and a spec covering: copy version, template, dynamic blocks with fallbacks, links with UTMs, audiences, sender, smart sending, send time and timezone. Never schedule.
-8. **QA** (`analysis.run`, autonomous; QA records each item with `record_check`). Run the checks in the Quality checklist plus: every link resolves 2xx on `store_domain` in at most 2 redirects; every dynamic block tested with a profile for each branch and with an empty profile; the offer works at checkout as the spec says; test send to the seed list received with correct subject, preview, sender, footer and a working unsubscribe.
-9. **Approval request** (`approval.request`, autonomous, for `campaign.publish`, explicit_approval). `request_approval` with action `campaign.publish`, a summary, and the exact payload: campaign ID, copy version, audience include and exclude, recipient estimate, send time and timezone, offer key. `finish`. The approval binds to that payload; any change invalidates it.
-10. **Scheduled send** (`campaign.publish`, explicit_approval). Only after approval, and only the approved payload.
-11. **Launch verification** (`data.read`, autonomous). Within 1 hour of the send: recipients against estimate, bounces, spam complaints, clicks registering, first orders or code redemptions.
-12. **Post-send review** (`analysis.run`; `result.record` once the attribution window closes). `save_output` kind `report`: delivered, click rate, unsubscribe rate, spam complaint rate, revenue per recipient (attributed, labelled), offer redemptions, comparison with the account's median for the same job, and one lesson.
+6. **Audience setup** (`audience.prepare`, approved_plan). Include and exclude segments by name and ID. `build_draft` does not create segments: hand new segments to an authorized executor and require a platform receipt. Never edit a segment a live or scheduled send uses.
+7. **Platform build in draft** (`campaign.build_draft`, approved_plan). Call `build_draft` with kind `campaign` and a spec covering: copy version, template, dynamic blocks with fallbacks, classified links (UTMs on commerce links only), audiences, sender, smart sending, send time and timezone. Never schedule.
+8. **Preflight** (`analysis.run`, autonomous; QA records each item with `record_check`). From supplied receipts for the exact build: links classified and tested (Decision rules); every dynamic block tested per branch and with an empty profile; the offer tested at checkout; a seed-list message received with correct subject, preview, sender, footer and working unsubscribe. Missing receipts block release; save a test request naming owner and evidence.
+9. **Approval request** (`approval.request`, autonomous, for `campaign.publish`, explicit_approval). `request_approval` with action `campaign.publish`, a summary, and the exact payload: campaign ID, copy version, audience include and exclude, recipient estimate, send time and timezone, offer key. `finish`. The approval binds to that payload; any change invalidates it. A pending request is not approval or scheduling.
+10. **Scheduled send** (`campaign.publish`, explicit_approval). Only after a human approval, only the approved payload, by an authorized executor; record the platform schedule receipt.
+11. **Release verification** (`data.read`, autonomous, new execution). Within 1 hour of the send: recipients against estimate, bounces, spam complaints, clicks registering, first orders or code redemptions.
+12. **Post-send review** (new execution; `analysis.run`; `result.record` once the attribution window closes). `save_output` kind `report`: delivered, click rate, unsubscribe rate, spam complaint rate, revenue per recipient (attributed, labelled), offer redemptions, comparison with the account's median for the same job, and one lesson.
 
 ## Decision rules
 - If any step's approval or decision is missing, then stop at that step. Never skip ahead to a later step.
 - If the copy, audience, offer, send time or destination changes after `campaign.publish` was requested, then request it again with the new payload.
 - If a recipient estimate differs from the brief by more than 20% (Wavy starting default), then check exclusions before requesting approval.
-- If any link returns 4xx or 5xx, points to an old domain, or takes more than 2 redirects, then QA fails.
+- **Links:** classify each as commerce, account/service, preference/unsubscribe, approved external, tracking wrapper or non-HTTP. Verify the intended safe destination and user action. Record redirects and final destination; more than two redirects is a diagnostic warning unless a declared limit or the journey fails. A 4xx/5xx, an old-domain commerce link or an unapproved external destination fails QA.
 - If an offer fails the checkout test, then QA fails and the send stops; `flag_insight` (critical).
 - If a dynamic block has no fallback, then QA fails.
-- **UTM convention, Wavy starting default:** `utm_source=<esp>`, `utm_medium=email` or `sms`, `utm_campaign=<YYYYMMDD>_<campaign-slug>`, `utm_content=<module>`; tracking on for every link.
+- **UTM convention, Wavy starting default:** `utm_source=<esp>`, `utm_medium=email` or `sms`, `utm_campaign=<YYYYMMDD>_<campaign-slug>`, `utm_content=<module>` on commerce links. Do not append UTMs to signed, unsubscribe, preference, payment, mailto or tel links without documented support.
 - If smart sending is off on a marketing send, then the approval summary must say so and why. Never ignore unsubscribes on a marketing send (CAN-SPAM requires honouring opt-outs within 10 business days).
-- **Launch verification, Wavy starting defaults:** if the spam complaint rate exceeds 0.1% or the bounce rate exceeds 2%, then `flag_insight` (high) and pause further sends to that audience pending review. Gmail and Yahoo bulk-sender rules require staying below 0.3% spam complaints and supporting one-click unsubscribe.
+- **Release verification, Wavy starting defaults:** if the per-send ESP complaint rate exceeds 0.1% or bounces exceed 2%, then `flag_insight` (high) and `request_approval` to hold further sends to that audience. ESP rates are not provider rates: Gmail's daily Postmaster spam rate (below 0.1% recommended, never 0.3% or higher) and Yahoo's rate follow `deliverability`.
 - If clicks are not registering within the first hour while delivery is normal, then test a link from the received email and `flag_insight`.
 - **Post-send review timing:** provisional at 3 days (Wavy starting default), final only after `attribution_window` closes. Never call attributed revenue lift.
 - If an unsubscribe rate exceeds 0.5% on a send (Wavy starting default), then record it in the review and flag it for the calendar.
+- **Migrations and release cutovers** (new platform, template, sender or replacement send): state who already received the old version, deduplicate against it, give the cutover order, rollback step, owner and verification receipt. Never run old and new versions to the same people.
 
 ## Examples
 ### Good
-A QA record: "Copy v4 matches build. Subject and preview correct in Gmail app, Apple Mail, Outlook. 11 links, all 200 on the live domain, max 1 redirect, UTMs present. Two dynamic blocks tested with buyer, non-buyer and empty profiles. Recent purchasers excluded via exclusion segment; sale code tested at checkout with a full-price and an excluded item, value matches copy, does not stack with subscription. HTML 74 KB. Unsubscribe works. Estimate 41,200 against brief 43,000 (within 20%). Approval requested for campaign.publish with this payload."
+A preflight record for build v4: "Copy v4 matches build field by field. Received seed messages (receipt IDs) correct in Gmail app, Apple Mail, Outlook. 11 links: 8 commerce, all 200 on the live domain, max 1 redirect, UTMs present; unsubscribe and preference links untagged and working; 1 mailto; 2 social links on approved external domains. Two dynamic blocks tested with buyer, non-buyer and empty profiles. Recent purchasers excluded via exclusion segment; sale code tested at checkout with a full-price and an excluded item, value matches copy, does not stack with subscription. Decoded delivered HTML 74,100 bytes. Estimate 41,200 against brief 43,000 (within 20%). Approval requested for campaign.publish with this payload; not yet approved or scheduled."
 
 ### Not good
 "Built and scheduled for 9 AM, looks good in the preview." No approval was requested, the timezone is unstated, no test send or link check was recorded, the offer was never tested, and "looks good in the preview" is not a received-message test.
 
 ## Quality checklist
-- [ ] The build matches the approved copy version exactly (subject, preview, body, CTA, destination).
-- [ ] Every link resolves 2xx on the current store domain within 2 redirects and carries UTMs.
-- [ ] Include and exclude segments match the approved calendar row; suppressed and unengaged profiles are excluded.
-- [ ] Every dynamic block and personalization token has a tested fallback.
-- [ ] The promised offer was tested at checkout and behaves as the offer spec states.
-- [ ] A test send reached the seed list, and render, footer address and unsubscribe were checked in Gmail, Apple Mail and Outlook.
-- [ ] Send time, timezone and smart-sending setting are stated in the approval payload.
-- [ ] The `campaign.publish` approval matches the exact payload that was scheduled.
-- [ ] Launch verification and the post-send review are recorded, with attribution labelled.
+- [ ] The output declares phase (brief, copy, design direction, draft build, preflight, release verification or post-send review), artifact version and approved decision reference; no future phase is claimed complete.
+- [ ] A creative-phase output contains the channel-specific deliverable and the applicable offer, voice and design evidence; render and send tests are marked pending until a build exists.
+- [ ] A draft-build or preflight output includes a field-level copy/build comparison, audience rules and IDs, sender, Smart Sending setting, schedule/timezone and version-bound draft receipt.
+- [ ] A preflight output includes dated received-message/render, dynamic-data, classified-link and checkout-test evidence for the exact build; missing required evidence blocks release.
+- [ ] A preflight output includes current reach, consent/exclusion, stock and offer-expiry checks, or states the blocked release gate with owner.
+- [ ] A release-verification output contains both the human approval receipt and matching platform schedule/send receipt; a preflight approval request is not described as approval or scheduling.
+- [ ] A post-send output contains actual delivery/guardrail checks and either a mature, attribution-labelled review or a provisional result with its read date.
+- [ ] Any phase-specific item not applicable to this task is identified from the task's approved phase, with the required future evidence and handoff; an unperformed in-scope check never passes as verified.
 
 ## Owner and approvals
 | Action | Level | Who decides |
@@ -104,6 +104,7 @@ A QA record: "Copy v4 matches build. Subject and preview correct in Gmail app, A
 - **Brief** (kind `brief`), **copy** (kind `copy`) and **design direction** (kind `design_direction`) in the task output.
 - **Draft build spec** (kind `draft_spec`, written by `build_draft`).
 - **QA record**: one `record_check` per checklist item, with notes.
+- **Evidence companion** (internal): approved-fact excerpts, source/version/as-of references, calculations and actual test receipts. A source ID or "tested successfully" is not verification.
 - **Approval request** for `campaign.publish`, bound to the payload.
 - **Post-send report** (kind `report`) to the task output; summarized in the Client Hub and the next client meeting.
 

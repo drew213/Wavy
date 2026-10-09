@@ -21,12 +21,14 @@ Look up each with `get_context` before building or changing any audience.
 - `subscription_platform` and `subscription_state_source` – where active, paused and cancelled status comes from. Missing: subscription state is unknown, never inactive.
 - `retailer_account_rule` – how wholesale or retailer profiles are identified. Missing: `flag_insight`; exclude known business accounts manually and note the gap.
 - `internal_and_test_profiles` – staff, seed and test addresses. Missing: ask the account lead; exclude obvious seeds.
-- `markets_served` – countries that change consent rules. Missing: assume the strictest market the store ships to and flag it.
+- `markets_served` – countries or states that change consent rules. Missing: `flag_insight`; profiles in a market without a confirmed consent basis stay out of marketing audiences.
 - `sms_provider` – where SMS consent lives. Missing: SMS-consented counts are unknown.
 
 Common exceptions: transactional-only profiles are reachable for order service, never marketing. Imported lists without consent provenance are not marketable.
 
 ## Inputs and sources
+Use the supplied exports below; `get_context` supplies standards and approved facts, not account queries. Check IDs (DAT-*, RET-*, CMP-*) count only when the packet supplies each check's version, precondition, calculation, severity and threshold; otherwise the check is unknown.
+
 - **Profiles with subscription fields**: trusted for current consent per channel. Trap: list membership is not consent; a profile can sit on a list after unsubscribing.
 - **Pinned order events with line items**: trusted for recency, frequency and product affinity. Trap: empty item arrays block product segments; check the extractor and integration first (DAT-03).
 - **Engagement events**: clicks, site activity, orders are trusted. Opens are machine-affected (Apple Mail Privacy Protection); use them only where the platform separates real opens, and never alone.
@@ -49,7 +51,7 @@ Common exceptions: transactional-only profiles are reachable for order service, 
 5. Name every audience with the convention below.
 6. Validate (see Decision rules). Record counts with the as-of time.
 7. Compute sendable reach per channel: consented, not suppressed, deduplicated.
-8. `save_output` the audience spec as a draft_spec and the validation as an analysis. Use `build_draft` to prepare segment changes, under an approved decision covering `audience.prepare`.
+8. Save the architecture as `draft_spec` and validation as `analysis`. `build_draft` does not create segments. Hand off creation under an approved `audience.prepare` decision to a named authorized executor and require a platform receipt. Editing any segment or list already referenced by a live or scheduled send is not non-live preparation and needs a separately authorized live-change path.
 9. `request_approval` for anything that moves profiles in or out of sends. `finish`.
 
 ## Decision rules
@@ -60,6 +62,8 @@ Common exceptions: transactional-only profiles are reachable for order service, 
 - If a VIP rule would include a profile with an open refund or service case, then exclude them from VIP promotions until resolved.
 - If validation fails any test below, then the segment stays draft and you `flag_insight`.
 - **Validation tests:** disjoint tiers sum exactly to their parent; counts reconcile to the order metric within the as-of window; 20 random members per segment (pseudonymous IDs only) match the rule by hand; suppressed profiles appear in zero send audiences; no segment depends on a dormant metric.
+- `audience.prepare` covers only new or detached audiences. If an audience is used by a live flow or a scheduled send, then a change to it is a live change: request `flow.change_live` (live flow) or a fresh `campaign.publish` approval (scheduled send), never a plan-level preparation.
+- **Recipient state:** every state audience (open shopping episode, open service case, recent purchaser, contacted in window) names its state owner (platform-native, subscription or SMS provider, or external system), the event that updates it, its expiry and the episode identity it keys on. If a segment refreshes on a lag, then it can't enforce a same-hour exit or a cross-channel cap; mark the exclusion best-effort and route enforcement to flow filters or a person-level contact ledger. Validate with synthetic fixtures for simultaneous cart, checkout, purchase and service events.
 - If a change would suppress, delete or bulk-unsubscribe profiles, then it needs `profile.suppress_delete` explicit approval. Never do it under a plan.
 - If an import lacks consent source and date, then don't add it to any marketing audience; escalate to the account lead.
 - An older consent import must never overwrite a newer opt-out.
@@ -80,6 +84,7 @@ Common exceptions: transactional-only profiles are reachable for order service, 
 - [ ] Unknown subscription state is a separate group excluded from replenishment and winback.
 - [ ] Standing suppressions and exclusions are listed with which sends each applies to.
 - [ ] Validation results are recorded per segment with pass or fail.
+- [ ] Every state-based exclusion names its state owner, update event, expiry and enforcement point; no live or scheduled audience is changed under `audience.prepare`.
 - [ ] No personal data appears in the output.
 
 ## Owner and approvals
@@ -91,13 +96,14 @@ Common exceptions: transactional-only profiles are reachable for order service, 
 | draft.create | autonomous | Agent (logged) |
 | fact.propose | autonomous | Agent (logged); stays proposed |
 | decision.propose | autonomous | Agent (logged) |
-| audience.prepare | approved_plan | Covered by a decision approved by org admin, account lead, or client owner/approver |
+| audience.prepare | approved_plan | Covered by a decision approved by org admin, account lead, or client owner/approver; new or detached audiences only |
+| flow.change_live | explicit_approval | Org admin, account lead, or client owner/approver (audiences used by live flows) |
 | fact.approve | explicit_approval | Org admin, account lead, or client owner/approver |
 | profile.suppress_delete | explicit_approval (locked) | Org admin or client owner |
 | account.settings_change | explicit_approval (locked) | Org admin or client owner |
 
 ## Outputs and destination
-- **draft_spec**: the audience architecture. One row per audience: name, channel, rule, source metric, window, inclusions, exclusions, used by, count, as-of. Goes to task output; approved specs feed `build_draft`.
+- **draft_spec**: the audience architecture. One row per audience: name, channel, rule, source metric, window, inclusions, exclusions, used by, count, as-of. Goes to task output; approved specs go to the named executor as a handoff requiring a platform receipt.
 - **analysis**: validation and reach census, with each test's result. Goes to task output and the Client Hub after review.
 - **report**: a client summary of reach and tiers, sent only through approved `client.message.send`.
 

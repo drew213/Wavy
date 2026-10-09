@@ -16,8 +16,8 @@ Call `get_context` for `experimentation`, `reporting` and `economics`. If a fact
 
 - `holdout_policy` – whether the client agreed to customer-level holdouts, the share and for which programs. Missing: no holdout test; propose the policy to the account lead.
 - `test_approver` – who on the client side signs off tests and rollouts. Missing: the test can't launch.
-- `order_metric` and `attribution_settings` – the pinned order metric and attribution windows. Missing: stop; outcomes can't be measured.
-- `account_timezone` – for start and stop boundaries. Missing: stop.
+- `order_metric` and `attribution_settings` – the pinned order metric and attribution windows. Missing: stop; outcomes can't be measured. Store-order holdout outcomes use the test's own outcome horizon, not an ESP attribution window.
+- `account_timezone` – for enrollment and outcome boundaries. Missing: stop.
 - `contribution_margin` – for value-based primary metrics and offer tests. Missing: label value as gross; no offer test ranks on profit.
 - `approved_offers` and `discount_rules` – what offers a test arm may use. Missing: no offer arm.
 - `frequency_cap` – maximum messages per customer per period. Missing: an extra-send arm can't be designed.
@@ -26,53 +26,53 @@ Call `get_context` for `experimentation`, `reporting` and `economics`. If a fact
 Common exceptions: subscription customers and service-recovery cases are usually excluded from promotional arms; marketplace-only buyers may lack consent.
 
 ## Inputs and sources
-- **Order-level export** – trusted for conversions per assigned customer. Traps: duplicate order IDs; one order credited to several messages.
+- **Order-level export** – trusted for conversions and revenue per assigned customer, and for the per-customer revenue variance that revenue sizing needs. Traps: duplicate order IDs; one order credited to several messages.
 - **ESP campaign and flow reports** – trusted for deliveries, clicks, unsubscribes, complaints by arm. Traps: attribution windows overlap across arms; the ESP's auto-winner often picks on opens, which machine opens inflate.
-- **Assignment records** – the list of customers in each arm with assignment date. Trap: without them, a holdout can't be audited and the test is observational.
+- **Assignment records** – every customer randomized, their arm and assignment timestamp. Trap: without them, a holdout can't be audited, the sample-ratio check can't run and the test is observational.
 - **Earlier learning log entries** – trusted only as approved facts, with their population and date.
 
 ## SOP
-1. `get_context` for the three areas. List facts as approved, proposed or missing.
-2. Write the hypothesis: "Because [evidence ref], we believe [one change] for [eligible audience] will move [primary metric] by at least [minimum detectable effect] within [window], without [guardrails] crossing [limits]."
-3. Prioritize with value ÷ effort. Value = eligible pool × plausible effect × value per conversion over the plan window, low and base. Drop any test that can't reach its sample size inside the window; ship it as a judgment call instead and label it untested.
-4. Design: randomize at customer level with stable assignment that persists across sends. One change per arm. Keep the test mutually exclusive with other live tests on the same audience, or declare the overlap. For flows and programs, use a persistent customer holdout.
-5. Size it: compute sample per arm with the formula below from the baseline rate and the minimum detectable effect. Size the pool before holdout: pool = treated ÷ (1 − holdout share), rounded up, then allow for later exclusions.
-6. Pick one primary metric before launch: placed-order rate or revenue per assigned customer (assigned, not just delivered, so holdout comparisons are fair); contribution per eligible customer for retention tests. Clicks are a labelled proxy only when orders can't reach the minimum.
+1. `get_context` for the three areas. List facts as approved, proposed or missing. Read `task.phase`: a `plan` task stops at step 9; a `readout` task starts at step 12 from the approved plan.
+2. Write the hypothesis: "Because [evidence ref], we believe [one change] for [eligible audience] will move [primary metric] by at least [minimum detectable effect] within [outcome horizon H from each customer's assignment], without [guardrails] crossing [limits]."
+3. Prioritize with value ÷ effort. Value = eligible cohort × plausible effect × value per conversion, counting each customer once, low and base. Drop any test whose arms can't be filled at the planned allocation inside the enrollment period; ship it as a judgment call instead and label it untested.
+4. Design: randomize at customer level with stable assignment that persists across sends. Fix eligibility before assignment. One change per arm. Keep the test mutually exclusive with other live tests on the same audience, or prespecify the interaction analysis. For flows and programs, use a persistent customer holdout.
+5. Size the actual design. For a binary primary outcome, state baseline p, absolute effect δ, two-sided alpha, power and control share h; compute BOTH arm sizes for that allocation. Equal-arm screening uses n per arm ≈ 16 × p × (1 − p) ÷ δ² at 80% power and alpha .05. For unequal allocation, a small-effect total-N screening approximation is N ≈ 7.85 × p × (1 − p) ÷ (δ² × h × (1 − h)); confirm with the approved power implementation. Revenue or contribution outcomes need their own variance or a simulation, not the binary formula.
+6. Pick one primary metric before launch: placed-order rate or revenue per assigned customer (assigned, not just delivered, so holdout comparisons are fair); contribution per eligible customer for retention tests. Clicks are a labelled proxy only when orders can't reach the planned sample.
 7. Pick guardrails: unsubscribe, spam complaint, bounce, SMS opt-out, discount cost per order, refund or cancellation rate.
-8. Set the evaluation window: run period + longest attribution window + late-event buffer, or the full maturity horizon for repeat outcomes. The result window opens when the build task completes, so `window_days` must also cover the gap to launch.
-9. Save the plan (`save_output`, kind `brief`) with arms, assignment, n per arm, stop date, decision rule and the decision proposal: insight refs, metric, `window_days`, baseline and plan scope (`audience.prepare`, `flow.build_draft` or `campaign.build_draft`).
-10. After approval: prepare the arms with `audience.prepare` and `build_draft`. Launch needs `request_approval` with `campaign.publish` or `flow.change_live`.
+8. Define enrollment start and end separately from each assigned customer's fixed outcome horizon H. Earliest final read = last assignment + H + the declared data-latency buffer. A build-completion timestamp is not exposure; if the result scheduler only starts there, mark scheduling unsupported and require registered launch and assignment dates.
+9. Save the plan (`save_output`, kind `brief`) with arms, allocation, both arm sizes, enrollment dates, H, earliest final read, analysis method, decision rule and the decision proposal: insight refs, metric, `window_days` (covering enrollment + H + buffer from the registered launch date), baseline and plan scope (`audience.prepare`, `flow.build_draft` or `campaign.build_draft`). `finish`.
+10. After approval, in a new execution: build campaign or flow arms with `build_draft`. `build_draft` doesn't create segments or holdout audiences; hand them off under the approved `audience.prepare` decision to an authorized executor and require a platform receipt. Launch needs `request_approval` with `campaign.publish` or `flow.change_live`; then `finish`. Launch and assignment are confirmed only by receipts.
 11. During the run, check guardrails only, at fixed checkpoints. Don't read the primary metric.
-12. At the stop date and after the window closes: check that the arm split matches the plan, count each order once, compute the absolute and relative effect with a 95% interval, and review guardrails.
+12. At or after the earliest final read: run the sample-ratio-mismatch test, deduplicate order IDs within each customer's outcome, analyze everyone randomized in their assigned arm, compute the absolute and relative effect with a 95% interval by the planned method, and review guardrails.
 13. Save the readout (`save_output`, kind `analysis`) with the observed value or an inconclusive verdict and notes, ready to record under `result.record` once the window has closed. `propose_fact` the learning log entry as `learning_<slug>`. Draft the rollout recommendation. `finish`.
 
 ## Decision rules
-- If the planned sample can't be reached inside the window, then don't run it as a test.
-- If the arm split differs from the plan by more than 1 percentage point, or assignment records are missing, then the test is invalid: record it as inconclusive with the reason.
-- If the 95% interval excludes zero in the good direction, the effect is at least the minimum detectable effect, and no guardrail is breached, then save a rollout recommendation for the strategist to propose as a decision (a person approves it under `decision.approve`), keeping a persistent holdout for flows.
+- If both arms can't reach their planned sizes at the planned allocation inside the enrollment period, then don't run it as a test.
+- Test observed assignment counts against the planned allocation with a sample-ratio-mismatch test. Report observed/expected counts, method and p-value. Wavy investigation default: p < .001. Missing assignment records or an unexplained mismatch blocks a causal verdict.
+- Conclusive only when the planned sample was reached, the final read date has passed, the ratio check passed and the 95% interval excludes zero. If it also shows at least the minimum detectable effect in the good direction and no guardrail is breached, then save a rollout recommendation for the strategist to propose as a decision (a person approves it under `decision.approve`), keeping a persistent holdout for flows. No fixed conversion count substitutes for this rule.
 - If the interval includes zero, then call it inconclusive. Don't call it "no effect" unless the interval also excludes the minimum detectable effect. Keep the cheaper or lower-risk arm, or re-test with a larger sample.
 - If a guardrail crosses its limit at a checkpoint, then stop the test (request `flow.change_live` or cancel the scheduled send through the account lead) and `flag_insight` severity high. Stopping for harm is allowed; stopping for an early win is not.
-- If one order could count in two tests or levers, then assign it to one before analysis. One order is never a campaign win, a flow win and a save at once.
+- Deduplicate order IDs within each customer's outcome. Preserve outcomes for everyone randomized. Don't remove or assign away outcomes to make overlapping tests additive. Prespecify interactions or use a program-level comparison; never sum separate flow tests as program lift.
 - If a test needs a new offer, then `request_approval` with `discount.change` before building.
 - If a stakeholder asks for interim results, then share guardrails only and the scheduled read date.
 - If a learning came from one client, then it stays a client fact. Agency standards change only through reviewed promotion with client data removed.
 
 ## Examples
 ### Good
-"Hypothesis: because the checkout flow's second message gets 70% of its clicks from mobile and lands on the cart, linking to a rebuilt cart will raise placed orders per assigned customer by at least 0.5 pp in 21 days, without unsubscribes above 0.3%. Customer-level 50/50 split, stable assignment, baseline 4.0%: 16 × 0.04 × 0.96 ÷ 0.005² ≈ 24,600 per arm; at current entry volume that takes 19 days, so the stop date is day 19 and the read is day 19 + attribution window + 5. Result: +0.3 pp, 95% interval −0.1 to +0.7. Inconclusive; keep the control link (lower effort) and re-test only with a bigger change."
+"Hypothesis: because the checkout flow's second message gets 70% of its clicks from mobile and lands on the cart, linking to a rebuilt cart will raise placed orders per assigned customer by at least 0.5 pp within H = 21 days of assignment, without unsubscribes above 0.3%. Customer-level 50/50 split, stable assignment, baseline 4.0%: 16 × 0.04 × 0.96 ÷ 0.005² ≈ 24,600 per arm; at current entry volume enrollment takes 19 days. Earliest final read: last assignment + 21 days + 5-day buffer. (A 90/10 holdout at the same p and δ would need N ≈ 7.85 × 0.0384 ÷ (0.005² × 0.09) ≈ 134,000, about 13,400 in control.) Readout: assigned 24,710 / 24,655, ratio check p = .80. Result: +0.3 pp, 95% interval −0.1 to +0.7. Inconclusive; keep the control link (lower effort) and re-test only with a bigger change."
 ### Not good
-"Subject B won (open rate 48% vs 41%) after the first two hours, so we rolled it out. Revenue up 20% this week." It picks on machine-inflated opens, peeks, has no sample plan or guardrails, and reads an unrelated revenue change as the test effect.
+"Subject B won (open rate 48% vs 41%) after the first two hours, so we rolled it out. Revenue up 20% this week." It picks on machine-inflated opens, peeks, has no sample plan, ratio check or guardrails, and reads an unrelated revenue change as the test effect.
 
 ## Quality checklist
-- [ ] The hypothesis names evidence, one change, audience, primary metric, minimum detectable effect, window and guardrails.
-- [ ] Randomization unit, stable assignment and overlap with other tests are stated.
-- [ ] Sample per arm is computed from a stated baseline, and the pool before holdout is shown.
-- [ ] Exactly one primary metric, fixed before launch, measured per assigned customer.
-- [ ] The stop date and evaluation window are fixed in advance and cover attribution plus buffer.
-- [ ] The result shows n per arm, absolute and relative effect, a 95% interval and guardrails.
-- [ ] Inconclusive results are labelled inconclusive, not as wins or as "no effect".
-- [ ] Orders are deduplicated, and none is counted for more than one test or lever.
-- [ ] The learning log entry is proposed as a fact, not written as an approved rule.
+- [ ] The output states its `task.phase` (plan or readout); a plan contains no result, interval or verdict, a readout cites the approved plan version, and items for the other phase are marked not applicable with that reason.
+- [ ] Plan: the hypothesis names evidence, one change, eligible audience, primary metric, minimum detectable effect, outcome horizon H and guardrails.
+- [ ] Plan: randomization unit, stable assignment, eligibility fixed before assignment and overlap handling (mutually exclusive or prespecified interaction) are stated.
+- [ ] Plan: both arm sizes are computed for the actual allocation from a stated baseline, alpha and power; a revenue or contribution outcome uses its own variance or simulation.
+- [ ] Plan: exactly one primary metric per assigned customer is fixed, and enrollment dates, H, data-latency buffer and earliest final read are anchored to assignment, not build completion.
+- [ ] Readout: the read happens on or after last assignment + H + buffer, with assigned n per arm, a sample-ratio-mismatch test (observed/expected, method, p-value) and guardrails.
+- [ ] Readout: everyone randomized is analyzed in the assigned arm, order IDs are deduplicated within each customer's outcome, and no outcome is removed to make tests additive.
+- [ ] Readout: absolute and relative effect with a 95% interval are shown; inconclusive results are labelled inconclusive, not as wins or as "no effect".
+- [ ] Readout: the learning log entry is proposed as a fact and the rollout is a recommendation, not an approved rule.
 
 ## Owner and approvals
 | Action | Level | Who decides |
@@ -84,7 +84,7 @@ Common exceptions: subscription customers and service-recovery cases are usually
 | `fact.propose` | autonomous | Agent; stays proposed |
 | `decision.propose` | autonomous | Staff or agent, logged |
 | `result.record` | autonomous | Agent, once the measurement window has closed |
-| `audience.prepare` | approved_plan | Covered by an approved decision that lists it |
+| `audience.prepare` | approved_plan | Covered by an approved decision that lists it; new or detached audiences only |
 | `campaign.build_draft` | approved_plan | Covered by an approved decision that lists it |
 | `flow.build_draft` | approved_plan | Covered by an approved decision that lists it |
 | `decision.approve` | explicit_approval | Account lead, org admin or client owner/approver |
@@ -93,11 +93,11 @@ Common exceptions: subscription customers and service-recovery cases are usually
 | `discount.change` | explicit_approval | Org admin or client owner/approver (locked) |
 
 ## Outputs and destination
-- **Test plan** (brief): hypothesis, arms, assignment, sample, metrics, window, decision rule, decision proposal. Task output; becomes a decision once approved.
-- **Test readout** (analysis): setup, n per arm, effect with interval, guardrails, validity checks, verdict, rollout recommendation. Task output; summarized in the monthly report's learning section.
+- **Test plan** (brief, phase `plan`): everything listed in SOP step 9. Task output; becomes a decision once approved.
+- **Test readout** (analysis, phase `readout`): setup, assigned n per arm, ratio check, effect with interval, guardrails, verdict, rollout recommendation. Task output; summarized in the monthly report's learning section.
 - **Learning log entry** (other): test, dates, population, verdict, effect, what to do next. Proposed client fact.
 
-Thresholds. Published statistical rule (Lehr's approximation, 80% power, two-sided 5%): n per arm ≈ 16 × p × (1 − p) ÷ δ², where p is the baseline rate and δ the absolute minimum detectable effect. Wavy starting defaults: 10% persistent customer-level holdout for flows and programs; at least 20 primary conversions per arm before any read; 5-day late-event buffer; arm-split tolerance of 1 percentage point; guardrail limits at the Klaviyo "healthy" band edges used in `reporting`.
+Thresholds. Published statistical approximations (80% power, two-sided 5%, binary outcomes): the equal-arm (Lehr) and unequal-allocation formulas in SOP step 5. They are screening values; confirm with the approved power implementation. Wavy starting defaults: 10% persistent customer-level holdout for flows and programs, sized for the 10% arm; 5-day data-latency buffer; sample-ratio-mismatch investigation at p < .001 (a Wavy alert, not a universal rule); guardrail limits at the Klaviyo "healthy" band edges used in `reporting`.
 
 ## Maintenance
 The lead analyst reviews this skill every 90 days. Review early after any rollout that later reversed, any test invalidated by assignment errors, or a change to ESP testing or attribution features.

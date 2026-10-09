@@ -34,19 +34,19 @@ Look each up with `get_context` (area `account_management`, and `onboarding` for
 ## SOP
 1. **Daily:** call `get_context` for `account_management`. List open client requests, pending approvals, tasks due in 5 business days, and blocked items.
 2. **Requests intake:** for each new request, record requester, date, exact ask (quoted), and classify it: in scope, scope change, question, or issue. In scope: create a task with owner, due date and done-when. Scope change: draft a change note (what, effort, price impact if known, what it displaces) for the account lead. Issue: `flag_insight` with severity. Draft an acknowledgement.
-3. **Feedback handling:** log each piece of feedback verbatim with the asset and version it refers to. Map it to a change, a question or a disagreement. Changes become tasks; disagreements with a standard (for example a claim or compliance rule) go to the account lead with the reason. Confirm back what will change and when.
+3. **Feedback handling:** log each piece of feedback verbatim with the asset and version it refers to. Map it to a change, a question or a disagreement. Changes become tasks; disagreements with a standard (for example a claim or compliance rule) go to the account lead with the rule and a permitted alternative; a restriction is never waived on request. Confirm back what will change and when.
 4. **Approval reminders:** for each pending approval, check its due date against the release date. Draft a reminder at the Wavy default trigger (below) naming the item, the exact version, the deadline and what slips if it's missed.
 5. **Delays:** the moment a due date is at risk, draft a delay notice: what is late, why in one sentence, the new date, what the client needs to do (if anything), and the impact on dependent work. Never hide a delay inside a status update.
 6. **Weekly update:** draft a short written update: done this week (with links), in progress, needs your decision (with deadline), coming next, risks. Use finding-first sentences. Every number traces to a verified report.
-7. **Escalations:** for a live error, compliance risk or client complaint, `flag_insight` at high or critical severity immediately with evidence, and draft a holding message for the account lead. Do not fix live systems yourself.
+7. **Escalations:** for a live error, compliance risk or client complaint, `flag_insight` at high or critical severity immediately with evidence, and draft a holding message for the account lead. Do not fix live systems yourself, and never describe a fix as made without the executor's receipt.
 8. **Relationship health:** weekly, score the account on the signals below and save the note. Flag any red signal.
-9. Save every draft with `save_output` (kind `copy` for messages, `report` for the update). Call `request_approval` with `client.message.send` and the exact text for each client message, then `finish`.
+9. Save every draft with `save_output` (kind `copy` for messages, `report` for the update). Saved outputs are internal. Call `request_approval` with `client.message.send` and the exact client-visible text for each client message, then `finish`. Sending is a later phase; never report a message as sent from this task.
 
 ## Decision rules
 - If a request is not in `scope_of_work`, then do not start it; draft a scope-change note and wait for an approved decision.
 - If an approval is still pending when a release is 3 business days away (Wavy starting default), then send the reminder draft; at 1 business day, escalate to the account lead to move the date.
 - If a client approves content and the content then changes, then the approval is void; request a new one for the new version.
-- If a client asks for something that breaks a published rule (sending outside quiet hours, mailing people who did not consent, an unsubstantiated claim), then explain the rule and the risk in the draft and offer a compliant alternative; the account lead decides.
+- If a client requests a prohibited send or an unsupported claim (outside quiet hours, to people without consent, an unsubstantiated claim), draft the specific rule, evidence and a permitted alternative. The account lead may choose a compliant alternative or obtain qualified review of applicability; no agency or client approval overrides applicable law, carrier/platform restrictions or locked policy.
 - If a delay affects a dated client promise (a launch, a sale), then notify the same business day it is known.
 - If the client contact is silent for 10 business days (Wavy starting default), then flag a relationship-health risk and suggest a call.
 - If feedback is ambiguous, then ask one specific question rather than guessing.
@@ -66,7 +66,9 @@ Look each up with `get_context` (area `account_management`, and `onboarding` for
 - [ ] Each delay notice states the new date and the impact on dependent work.
 - [ ] The weekly update separates done, in progress, decisions needed (with deadlines), next and risks.
 - [ ] No unapproved number, offer or out-of-scope commitment appears in client text.
-- [ ] Every client message is submitted via `request_approval` with `client.message.send`.
+- [ ] Every client message is submitted via `request_approval` with `client.message.send` and is described as pending approval, not sent.
+- [ ] Client-visible text is a separate artifact from internal evidence and contains no insight IDs, tool names, internal scoring or other clients' data.
+- [ ] Any client request that conflicts with law, platform rules or locked policy is answered with the rule and a permitted alternative, never accepted as an override.
 - [ ] Relationship health signals are scored and any red signal is flagged.
 
 ## Owner and approvals
@@ -84,6 +86,7 @@ Look each up with `get_context` (area `account_management`, and `onboarding` for
 | `client.message.send` | explicit_approval | Account lead or org admin |
 
 ## Outputs and destination
+Every saved output is internal by default. A client-visible version is a separate copy artifact, stripped of internal evidence, insight references and tooling, and reaches the client or Client Hub only through an approved `client.message.send` whose approval matches that exact version. Record the approved version and send receipt; a changed version needs new approval.
 - **Request log** (other): request, requester, classification, task or note link. Task output.
 - **Acknowledgements, reminders, delay notices** (copy): client messages via `request_approval`.
 - **Weekly update** (report): Client Hub and client message after approval.

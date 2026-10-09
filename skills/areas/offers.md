@@ -20,8 +20,9 @@ Look up each fact with `get_context` for `offers`, then `economics`.
 - `contribution_margin_inputs` – unit cost, fulfilment, payment fees, shipping cost by product, given in writing. Missing: label every value gross and do not claim profitability.
 - `discount_combinability` – how codes combine with sitewide, automatic, subscription and loyalty discounts in the store settings. Missing: assume unknown and require a checkout test before any send.
 - `subscription_terms` – subscription discount, cadence, and whether one-time codes apply to subscription orders. Missing: no subscription incentive copy.
-- `free_shipping_threshold`, `aov_baseline` – current threshold and median order value. Missing: `propose_fact` from order data, labelled proposed.
+- `free_shipping_threshold`, `aov_baseline` – obtain the threshold and market eligibility from current shipping configuration and client approval. Compute AOV as eligible net sales divided by eligible order count; report median order value separately. Missing threshold: no shipping promise. Missing order data: no order-value estimate.
 - `gwp_inventory` – gift items, units and cost. Missing: no gift-with-purchase.
+- `inventory_alert_rules` – for restock, waitlist or limited-stock offers: exact variants, units, whether stock is reserved or first-come, alert expiry. Missing: no availability or reserved-stock promise.
 - `excluded_products` – new launches, low-margin items, bundles, gift cards, subscriptions. Missing: `flag_insight`; checkout test must cover full-price and excluded lines.
 - `offer_eligibility_rules` – first-time only, existing customers, VIP, winback age. Missing: stop audience setup.
 - `promo_frequency_limit` – how often sitewide promotions may run. Missing: use the Wavy starting default and `propose_fact`.
@@ -41,14 +42,14 @@ Common exceptions: marketplace orders and retail partners have their own pricing
 1. Trigger: a calendar row or flow that needs an incentive. Run `get_context` for `offers` and `economics`.
 2. Name the job: first order, threshold lift, clear stock, launch, winback, subscription start. If the job can be done without an offer (education, early access, social proof), propose that first.
 3. Pick the mechanism from `approved_offer_types` that fits the job: threshold or gift to lift order value; bundle to move a slow item with a fast one; early access to reward without margin; subscription incentive only for eligible repeat buyers.
-4. Confirm how discounts combine from the platform's combination settings and a test checkout, never from arithmetic alone: some setups apply only the best discount; others apply a later percentage to the already-discounted price, where the effective discount is 1 − ((1 − d1) × (1 − d2) × …) (25% then 15% is 36.25%, not 40%). Record the tested result as the `stacking_rules` fact.
+4. Compute discount depth from the verified discount classes, eligible bases and application order in the store's combination settings, never from arithmetic alone. Some setups apply only the best discount. Sequential discounts use different bases: 25% then 15% gives 1 − (0.75 × 0.85) = 36.25%. Two combinable Shopify percentage order discounts on the same subtotal can total 40%. Use checkout evidence for the actual basket, including excluded items, amount-off, shipping and gift effects. Unknown mechanics block a combined-saving claim. `propose_fact` the tested result as an update to `discount_combinability`.
 5. Compute contribution per order: net price after all discounts − unit cost − fulfilment − payment fees − shipping subsidy − gift cost. Show the inputs. If any input is missing, write "gross only".
 6. Check against `max_discount_depth`, the margin floor and `promo_frequency_limit`.
 7. Define eligibility and exclusions: who qualifies, which products are excluded, expiry, code type (unique single-use for welcome and winback; shared only for public sales).
 8. Write the offer spec: mechanism, value, effective depth, eligibility, exclusions, start and true expiry, code type, stacking behaviour, contribution, and the exact customer-facing terms line.
 9. `save_output` (kind `brief`, label "Offer spec: <name>").
 10. `request_approval` with action `discount.change` and the offer spec as payload. `finish`. Never create or edit a discount yourself.
-11. After approval and creation, run the checkout test (SOP of the `campaign_production` QA step) and record the result with evidence: code applies, value matches copy, exclusions hold, stacking matches spec, expiry is real.
+11. Creation and checkout testing happen in a later phase and a new execution. In this one, save a handoff request naming the discount owner, the authorized checkout tester, the test baskets and the release gate. A later execution records the supplied receipt: code applies, value matches copy, exclusions hold, combination matches spec, expiry is real. Never describe an untested offer as tested.
 12. After the send window closes, `save_output` (kind `analysis`) with redemptions, effective depth realized, contribution and full-price conversion during the window.
 
 ## Decision rules
@@ -59,6 +60,7 @@ Common exceptions: marketplace orders and retail partners have their own pricing
 - **Escalation:** a flow carries one offer and never escalates its value across steps unless the client approved an escalation test with a control. No fake deadlines, countdown timers or "last chance" on an offer that will recur.
 - **Promotional fatigue, Wavy starting default:** no more than one sitewide promotion every 6 weeks outside peak. Flag fatigue if the share of orders using a discount rises 3 months in a row, or full-price conversion falls during non-promo weeks.
 - If a welcome or winback code would be shared publicly, then use unique single-use codes with an expiry.
+- If an offer or alert depends on restocked or limited inventory, then name the exact variant, units, reservation or first-come policy and expiry, and exclude people who bought that variant since requesting. Never promise stock or a held price the store does not enforce.
 - If a subscription is involved, then a one-time code must not stack onto the subscription discount unless the spec says so and the test proves it.
 - If a "was/now" or "save $X" claim appears, then the reference price must be a real recent selling price (FTC Guides Against Deceptive Pricing, 16 CFR Part 233).
 - If the checkout test fails, then the send stops. `flag_insight` (critical) and correct copy or settings before re-approval.
@@ -69,16 +71,16 @@ Common exceptions: marketplace orders and retail partners have their own pricing
 "Job: lift order value for repeat buyers. Mechanism: gift with purchase above a threshold set 20% over median order value; gift unit cost and inventory from the client's sheet. Effective discount: none on product price. Contribution: shown per order at threshold, gross of returns. Eligibility: purchased at least once, marketing consent. Exclusions: subscriptions, gift cards. Expiry: real, 23:59 recipient timezone on the stated date. Code: automatic, no code. Stacking: does not combine with the welcome code (store setting confirmed). Terms line drafted. Status: awaiting discount.change approval."
 
 ### Not good
-"Add an extra 15% to the sale for VIPs, it'll stack, so they get 40% off. Ends tonight!" The stacked value is wrong (36.25%), the depth may break the margin floor, stacking is asserted not tested, "ends tonight" is false if the offer recurs, and nobody approved it.
+"Add an extra 15% to the sale for VIPs, it'll stack, so they get 40% off. Ends tonight!" The total is asserted, not computed: depending on the discount classes it is 36.25% (sequential), 40% (two order discounts on the same subtotal) or the larger one alone. The depth may break the margin floor, combination is asserted not tested, "ends tonight" is false if the offer recurs, and nobody approved it.
 
 ## Quality checklist
-- [ ] The offer spec names the job, mechanism, value and the effective discount computed multiplicatively for every possible stack.
+- [ ] The offer spec names the job, mechanism, value and the effective depth of every possible combination, computed from the verified discount classes, bases and application order; unknown mechanics carry no combined-saving claim.
 - [ ] Contribution per order is shown with inputs, or the spec says "gross only, profitability unverified".
 - [ ] Eligibility, exclusions, code type, start and a real expiry are all stated.
 - [ ] Stacking behaviour is stated and matches the store's combinability settings.
 - [ ] The mechanism is in the client's approved offer types and within the approved depth, or it is clearly marked as a client decision.
 - [ ] A `discount.change` approval was requested for any new or changed offer; the agent created no discount.
-- [ ] The checkout test result is recorded with evidence before any send that carries the offer.
+- [ ] A supplied checkout-test receipt for the actual basket is attached, or the offer is marked untested with the tester, handoff and blocked release gate named.
 - [ ] Customer-facing terms match the spec word for word (value, eligibility, expiry).
 - [ ] No fake urgency, escalating flow offer or unsupported reference price.
 
@@ -98,7 +100,7 @@ Common exceptions: marketplace orders and retail partners have their own pricing
 
 ## Outputs and destination
 - **Offer spec** (kind `brief`): the fields in SOP step 8. Goes to the task output and is the payload of the `discount.change` approval.
-- **Checkout test record**: evidence per offer (code, basket, result) attached to the production task.
+- **Checkout test handoff and record**: the test request (owner, tester, baskets, gate); later, the supplied receipt per offer (code, basket, result) attached to the production task.
 - **Offer review** (kind `analysis`) after the window closes: redemptions, realized depth, contribution, full-price conversion, fatigue signals.
 - Approved offers appear in the Client Hub; clients see an offer only through approved copy or an approved client message.
 

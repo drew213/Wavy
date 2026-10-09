@@ -37,7 +37,7 @@ Call `get_context` for `quarterly_planning`, `economics`, `reporting` and `journ
 2. Goal review: last quarter's goal against the actual on the same basis, timezone and definitions, plus what was committed, done, measured and still pending. Separate what Wavy changed from season, offers and acquisition mix.
 3. Lifecycle maturity: score each stage (capture, welcome, browse and cart recovery, post-purchase onboarding, second order and replenishment, winback, loyalty, SMS, deliverability, measurement) on the scale below, each with an evidence reference.
 4. Opportunity list: every failed or weak stage, open insight and approved learning becomes a candidate lever. Put broken promises, broken links, missing events and consent problems first.
-5. Size each lever: eligible pool × expected rate change × value per conversion × months. Write each input with its source. Low, base and high are separate assumptions, not ±20%. Rate changes come from the account's own history first, then a stated Wavy default. Months are the run time left after the build. Subtract ordinary revenue the lever displaces.
+5. Forecast the baseline first: expected revenue with no new levers, on the target's revenue basis and period. Then size each lever with explicit units. A one-off eligible cohort is counted once: people × absolute H-day conversion-rate change × value per incremental conversion. For ongoing enrollment, sum disjoint dated cohorts whose follow-up falls inside the financial window; never multiply an H-day cohort effect by months. Separate value forecast inside the quarter from effects measured later. Write each input with its source. Low, base and high are separate assumptions, not ±20%. Rate changes come from the account's own history first, then a stated Wavy default. Show costs, displaced ordinary revenue and uncertainty.
 6. Remove double counting: assign each customer and order pool to one lever. One order is never a winback win, a campaign win and a replenishment win.
 7. Dependencies: for each lever, list its gates (DNS and authentication proof, consent census, event tests, offer approval, margin, inventory, client build). Each gate gets an owner and a due date. If a gate fails, the lever goes to zero.
 8. Resource allocation: estimate build-days per lever, rank by base value ÷ build-days, and fill `wavy_capacity` after reserving ordinary production. Mark client-dependent work against `client_capacity`.
@@ -53,20 +53,21 @@ Call `get_context` for `quarterly_planning`, `economics`, `reporting` and `journ
 - If foundations (sending authentication, canonical events, consent, broken promises) are failing, then they come before any expansion, whatever their sized value.
 - If total build-days exceed capacity, then cut from the bottom of the value ÷ effort ranking. Don't compress estimates.
 - If a lever needs a new offer, then gate it on `discount.change` approval and margin.
-- If the target exceeds the high case of all gated levers combined, then say so in the QBR and ask the client to confirm or revise the target.
+- Compare the target with the baseline forecast plus additional non-overlapping feasible lever value, on the same revenue basis and period, and show any remaining gap. Never compare an absolute revenue target with incremental levers alone. If the gap exceeds the combined high case, then say so in the QBR and ask the client to confirm or revise the target.
 - If no holdout is possible, then the plan's success measures are observed change. Don't promise incremental revenue.
 - If a launch falls inside a freeze window or peak week, then move it or get an explicit client decision.
 
 ## Examples
 ### Good
-"Lever: second-order journey for one-time DTC buyers aged 30–90 days. Pool: current email-consented, deduplicated count from the census dated the 3rd, excluding active subscribers. Rate change: +0.5 / +1.0 / +2.0 pp on the 60-day second-order rate (low a Wavy default, base from the account's own comparable journey, high from an approved learning). Value: gross AOV from the pinned order metric. Months: 2 after a 3-week build. Gates: product data backfill (client, the 16th), consent refresh (Wavy, the 9th). Overlap: excludes winback pool. Build: 6 days; ranked 2nd by value ÷ effort."
+"Lever: second-order journey for one-time DTC buyers aged 30–90 days. Pool: current email-consented, deduplicated count from the census dated the 3rd, excluding active subscribers; a one-off cohort counted once, plus buyers reaching day 30 later as separate dated cohorts. Rate change: +0.5 / +1.0 / +2.0 pp absolute on the 60-day second-order rate (low a Wavy default, base from the account's own comparable journey, high from an approved learning). Value: gross AOV (eligible net sales ÷ eligible orders, pinned order metric) per incremental second order. Timing: 3-week build; only cohorts whose 60-day follow-up ends inside the quarter count in the quarter's forecast; later cohorts are reported as effects measured next quarter. Gates: product data backfill (client, the 16th), consent refresh (Wavy, the 9th). Overlap: excludes winback pool. Build: 6 days; ranked 2nd by value ÷ effort."
 ### Not good
 "Q4 plan: add $500k by launching 8 new flows and daily SMS. Floor $120k." It sizes from list size, has no inputs, gates or capacity check, adds levers that share customers, and calls a scenario a guaranteed floor.
 
 ## Quality checklist
 - [ ] Goal review compares target and actual on the same basis, timezone and definitions.
 - [ ] Every stage has a maturity score with an evidence reference.
-- [ ] Every sized lever shows pool, rate change, value and months with sources, as separate low, base and high.
+- [ ] Every sized lever shows cohort definition and dates, absolute H-day rate change, value per incremental conversion, costs and displacement with sources, as separate low, base and high; no H-day effect is multiplied by months.
+- [ ] The target is compared with baseline forecast plus non-overlapping lever value on the same basis and period, with the remaining gap shown.
 - [ ] No customer or order pool is assigned to more than one lever.
 - [ ] Every lever lists its gates with owner and due date, and states that a failed gate sets it to zero.
 - [ ] Levers are ranked by value ÷ build-days and the plan fits stated capacity.
@@ -89,7 +90,7 @@ Call `get_context` for `quarterly_planning`, `economics`, `reporting` and `journ
 | `client.message.send` | explicit_approval | Account lead or org admin |
 
 ## Outputs and destination
-- **Opportunity sizing table** (analysis): lever, pool, assumptions, low/base/high, overlap assignment, gates, build-days, rank. Task output.
+- **Opportunity sizing table** (analysis): baseline forecast; per lever, cohort and dates, assumptions, low/base/high inside the quarter and measured later, overlap assignment, gates, build-days, rank; the gap to target. Task output.
 - **Lifecycle maturity assessment** (analysis): stage, score, evidence, gap. Task output; feeds `journey`.
 - **30/60/90-day roadmap and decision proposals** (brief): initiatives with owners, dates, dependencies and measurement. Decisions after approval.
 - **QBR deck** (report): goal review, maturity, learnings, plan, decisions needed. Client Hub and client message after approval.

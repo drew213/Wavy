@@ -29,30 +29,31 @@ Common exceptions: regulated products need claim review on every image; marketpl
 
 ## Inputs and sources
 - **Brand guidelines and website**: trusted for the visual identity. Trap: web fonts often do not render in email clients; always set fallbacks.
-- **Template HTML**: trusted for size and structure. Trap: a template is not a received message; measure the final rendered HTML of the actual message.
-- **Rendered previews across clients**: the only proof of mobile, dark-mode and image-off behaviour.
+- **Template HTML**: trusted for structure. Trap: a template is not a received message; size is measured on the decoded delivered HTML of the actual message.
+- **Received-message render receipts across clients**: supplied evidence, the only proof of clipping, mobile, dark-mode and image-off behaviour. They exist only once a build does.
 - **Image library**: trusted for rights only if recorded. Trap: store product images often carry claim badges, marketplace badges or old packaging.
 - **Check library results** (Gmail clipping, image-only emails, link checks): scored evidence with thresholds.
 - **Historical emails**: visual references, not proof that a layout won.
 
 ## SOP
-1. Trigger: a new client system build, a template request, or a design-direction step in production. Run `get_context` for `design_system` and `voice_copy`.
+1. Trigger: a new client system build, a template request, or a design-direction step in production. Run `get_context` for `design_system` and `voice_copy`. Note the task phase: a design-direction task cannot prove received HTML.
 2. For a system build: document the tokens (colours with hex, type scale, spacing, button style), then the module list with purpose, required fields and mobile behaviour, then one base template per job (campaign, welcome, recovery, post-purchase, winback, transactional).
 3. For a message: write the design direction section by section in the order a phone shows them. For each section: module, exact copy reference (copy version), image or asset, CTA and destination, must-retain fields and designer-discretion fields.
 4. Set the mobile hierarchy: brand, headline, the main visual and the primary CTA must sit on the first mobile screen (about 600 px tall at 375 px wide).
 5. Specify imagery: approved asset IDs only, alt text for each image, no text-heavy images (headline, offer and CTA stay live text).
-6. Run the technical checks on the build: HTML size, live-text ratio, image weights, alt text, contrast, tap targets, dark-mode render, image-off render, link list.
-7. Record the review: renders checked in Gmail (web and app), Apple Mail (iOS) and Outlook (desktop) at minimum, in light and dark mode, with images on and off.
+6. Design-direction phase: check what the direction can show (live-text plan, alt text, contrast of specified colours, tap-target sizes, image weights of chosen assets) and list build checks as pending with owner and required receipts.
+7. Build or preflight phase: from supplied receipts, record decoded delivered HTML bytes, clipping, and renders in Gmail (web and app), Apple Mail (iOS) and Outlook (desktop), light and dark, images on and off. Missing receipts: not verified.
 8. `save_output` (kind `design_direction`, label "<message> design v<n>") with the section table, asset list, technical results and open issues. For a system build, save the system as kind `other`, labelled "Design system v<n>".
 9. `flag_insight` for any failed technical check you cannot fix in the direction. `finish`.
 
 ## Decision rules
-- **Gmail clipping:** Gmail clips messages whose HTML exceeds about 102 KB (Gmail platform behaviour), hiding everything below the cut, often including the unsubscribe link. Wavy starting default: keep final HTML under 90 KB. If over, then remove hidden blocks, inline-style bloat and long product grids before cutting content.
+- **Gmail clipping:** treat the roughly 102 KB clipping behavior as approximate, not an exact 102,400-byte platform guarantee; clipping can hide the unsubscribe link. Wavy release budget: less than 90,000 bytes of decoded final delivered HTML, measured after personalization and tracking, with received-message clipping evidence. Do not count downloaded image files as HTML bytes. If over, remove hidden blocks, inline-style bloat and long product grids before cutting content.
 - **Image-only risk:** if a message has under 300 characters of live text and 3 or more images, then it is image-heavy (Wavy starting default) and fails for any welcome or checkout first email. Headline, offer, CTA and legal text must be live HTML text so the message reads with images blocked and with a screen reader.
 - **Claims in images:** never use a product or lifestyle image with claims baked in: claim badges ("clinically proven", "#1", "doctor recommended"), before/after pairs, star ratings without a source, marketplace badges, or out-of-date packaging. If no clean image exists, then use a clean packshot and `flag_insight` for a new asset.
 - **Accessibility (WCAG 2.1 AA, W3C):** text contrast at least 4.5:1, large text at least 3:1; every meaningful image has alt text describing its purpose; decorative images have empty alt text; links say where they go. Wavy starting defaults: body text at least 16 px on mobile, CTA buttons at least 44 × 44 points (Apple Human Interface Guidelines touch target), buttons built as live HTML, never images.
 - **Dark mode:** if the logo or icons are dark on transparent backgrounds, then supply a light variant or a padded light container. Never put dark text on a transparent image. Check that inverted colours keep brand colours legible.
 - **Image weight, Wavy starting default:** each image under 500 KB, total images under 2 MB; animated GIFs under 1 MB with the key message on the first frame (older Outlook desktop versions show only the first frame).
+- **Preserve effective creative:** when revising an existing or proven design, keep the approved proof (sourced reviews, ratings, price framing), product imagery and module order the brief marks must-retain. Acceptable changes: resizing, re-cropping, rebuilding image text as live text, dark-mode variants. Rejected: swapping approved proof or product shots for generic stock imagery or blank space to look cleaner. Remove a retained element only for a recorded claim, rights, accessibility or technical defect.
 - **Templates and modules:** if a request can be met with existing modules, then reuse them. A new module needs a reviewed reason and goes into the library, not a one-off.
 - **Product presentation:** show the product the customer will receive (current packaging, correct variant), with name and price only when the brief confirms them.
 - **Asset organization:** name exports as `client-key_YYYYMMDD_message_module_v<n>` (Wavy starting default) and keep editable sources with the export.
@@ -61,21 +62,22 @@ Common exceptions: regulated products need claim review on every image; marketpl
 
 ## Examples
 ### Good
-"Section 1, header module: logo (dark-mode variant asset ID), no navigation bar. Section 2, hero: live-text headline from copy v3, approved lifestyle image (asset ID, alt text 'Customer holding the product at a kitchen counter'), button 'Shop the routine' to the product page. Section 3, review module: verbatim quote with source ID. Section 4, footer: address, unsubscribe, preferences. HTML 61 KB; live text 820 characters; contrast 7.2:1; dark mode and images-off renders checked in four clients."
+"Section 1, header module: logo (dark-mode variant asset ID), no navigation bar. Section 2, hero: live-text headline from copy v3, approved lifestyle image (asset ID, alt text 'Customer holding the product at a kitchen counter'), button 'Shop the routine' to the product page. Section 3, review module: verbatim quote with source ID. Section 4, footer: address, unsubscribe, preferences. Live text 820 characters; contrast 7.2:1; review module kept from the prior winning version as must-retain. Pending until build v1 exists: decoded delivered HTML size, clipping, dark-mode and images-off renders (owner: QA; evidence: received seed messages)."
 
 ### Not good
 A single 1,400 px tall image containing the headline, the offer and a "clinically proven" badge from the product page, with a button that is part of the image and no alt text. With images off it is blank, a screen reader reads nothing, the claim is unapproved, and the offer cannot be updated without a redesign.
 
 ## Quality checklist
-- [ ] Final HTML size is recorded and under 102 KB (target under 90 KB).
+- [ ] The output declares its phase and version; checks that need a build are marked pending with owner and required receipts, never passed in a design-direction task.
+- [ ] In a build or preflight phase, decoded delivered HTML is under 90,000 bytes after personalization and tracking, with received-message clipping evidence.
 - [ ] Headline, offer, CTA and legal text are live text; the message is not image-heavy.
 - [ ] Every image has an approved asset ID and appropriate alt text (empty for decorative images).
 - [ ] No image contains a claim badge, before/after, unsourced rating, marketplace badge or outdated packaging.
 - [ ] Text contrast meets 4.5:1 (3:1 for large text), and CTA buttons are live HTML at least 44 × 44 points.
 - [ ] Brand, headline and primary CTA appear on the first mobile screen.
-- [ ] Dark-mode and images-off renders are recorded for Gmail, Apple Mail and Outlook.
+- [ ] In a build or preflight phase, dark-mode and images-off render receipts are cited for Gmail, Apple Mail and Outlook.
 - [ ] The footer has a physical address, an unsubscribe link and a preferences link.
-- [ ] Each section cites the copy version it uses and marks must-retain versus designer-discretion fields.
+- [ ] Each section cites its copy version and marks must-retain versus designer-discretion fields; any removed approved proof or imagery has a recorded defect reason.
 
 ## Owner and approvals
 | Action | Level | Who decides |
@@ -91,7 +93,7 @@ A single 1,400 px tall image containing the headline, the offer and a "clinicall
 | account.settings_change | explicit_approval | Org admin or client owner; locked (for example brand defaults in the platform) |
 
 ## Outputs and destination
-- **Design direction** (kind `design_direction`): section table, asset list with IDs and alt text, mobile hierarchy, technical check results and open issues. Goes to the task output and the designer handoff.
+- **Design direction** (kind `design_direction`): section table, asset list with IDs and alt text, mobile hierarchy, technical results for the current phase, pending build checks with owners, and open issues. Goes to the task output and the designer handoff.
 - **Design system** (kind `other`): tokens, module library, base templates per job and the review checklist. Goes to the Client Hub once approved.
 - Ready for design means copy is approved and assets are listed. It does not mean approved to launch.
 

@@ -33,7 +33,8 @@ The audit is read-only. No flow edits, sends, list changes or setting changes, e
 - **Order-event attribution**: event-time basis. Never add to send-date figures.
 - **Metric event counts**: prove a trigger metric is receiving events (DAT-02).
 - **Template HTML**: trusted for size (CRV-01) and image share (CRV-02). Not a received message.
-- **Received messages and link crawls**: trusted for what customers see, links (CRV-03), UTMs (CRV-04) and offers (CRV-05).
+- **Received messages, link-test and checkout-test receipts**: supplied evidence, trusted for what customers see, links (CRV-03), UTMs (CRV-04) and offers (CRV-05). A template's link list is not a link test.
+- **Check definitions**: each invoked check's version, precondition, calculation, severity and threshold must be in the packet. A check without its definition is unknown; never reconstruct it from the ID.
 
 ## SOP
 1. `get_context`. Confirm the facts above. Score DAT-01, DAT-02 and DAT-05 first; if any fails, stop revenue scoring and `flag_insight`.
@@ -44,15 +45,15 @@ The audit is read-only. No flow edits, sends, list changes or setting changes, e
 6. **Filters and exclusions.** Score FLW-09 (intent flows exit on canonical purchase) and FLW-10 (Smart Sending, no transactional flag on marketing, no drafts in live core flows). Check cart excludes checkout starters and browse has a re-entry limit.
 7. **Timing.** Compare post-purchase, replenishment and winback delays with the account's p25 and median repeat gaps (RET-02, FLW-06).
 8. **Message performance.** Per message: delivered, click rate, placed-order rate, revenue per recipient, unsubscribe and complaint rate. Keep historical revenue from messages now in draft, and from flow IDs missing from today's inventory, with a "history" label.
-9. **Offer logic.** Read every offer stated in flows. Redeem each at checkout. Score CRV-05.
+9. **Offer logic.** Read every offer stated in flows. Score CRV-05 from supplied checkout-test receipts; without one, CRV-05 is unknown and a test request goes to the owner.
 10. **Content quality.** Review received renders: brand name, current products, claims, mobile and dark mode, image-only (CRV-02), clipping (CRV-01).
-11. **Links.** Crawl every link in live flows. Score CRV-03 and CRV-04.
+11. **Links.** From supplied link-test results, classify each link as commerce, account/service, preference/unsubscribe, approved external, tracking wrapper or non-HTTP, and verify its intended destination and action. More than two redirects is a diagnostic warning unless the journey fails. Score CRV-03, and CRV-04 on commerce links only: signed, unsubscribe, preference, payment, mailto and tel links need no UTMs.
 12. **Score and rank** (Decision rules). Size failed and warned checks with each check's impact method.
-13. `save_output` the scorecard (analysis) and recommendations (report). `flag_insight` every critical fail. A separate QA reviewer runs `record_check` on recomputes. `finish`.
+13. `save_output` the scorecard (analysis), with area status, and recommendations (report). `flag_insight` every critical fail. A separate QA reviewer runs `record_check` on recomputes. `finish`.
 
 ## Decision rules
 - **Verdicts:** pass, warn, fail, n/a (precondition absent, with reason), or unknown (data unavailable). Unknown is never pass or fail, and missing data is never zero.
-- **Area status (Wavy starting default):** Fail if any critical check fails; Warn if any high check fails or any critical check warns; otherwise Pass. Show counts by severity next to it. No hidden weighting.
+- **Area status:** Failed if a verified critical check fails; Needs action if a verified high check fails or critical check warns; Not verified if any mandatory critical check is unknown or its evidence is missing; otherwise Passed for the declared scope. Show scoped/checked/unknown/not-applicable counts. Unchecked coverage never becomes a green overall result. No hidden weighting.
 - **Purpose-aware warnings:** a missing purchase exit is a defect in welcome, browse, cart and checkout. It is not automatically a defect in post-purchase education, service messages or consent-sync webhooks.
 - Keep these states separate: confirmed defect, configuration risk, test opportunity, not applicable, unknown.
 - Potential overlap between two flows' eligibility is a configuration risk. Confirmed duplicate delivery needs received-message or send-record evidence.
@@ -64,7 +65,7 @@ The audit is read-only. No flow edits, sends, list changes or setting changes, e
 - Escalate to the account lead before reporting anything that implies another agency, team member or vendor is at fault. Name prefixes and tracking footprints prove nothing about ownership.
 
 ### Thresholds
-All are **Wavy starting defaults** from the check library: welcome live with at least 3 emails sending in 90 days (FLW-01); checkout live with at least 2 emails and coverage of at least 25% of checkout starters (FLW-02); flows at least 35% of email-attributed revenue (FLW-08); Smart Sending on at least 90% of marketing flow emails (FLW-10); winback timed at 1.5–2× the median repeat gap (FLW-06); no template over 102,400 bytes, the size where Gmail clips (CRV-01); at least 90% of links tagged (CRV-04). Recalibrate after 5 or more audits; when a value is close to a threshold, say so.
+All are **Wavy starting defaults** from the check library: welcome live with at least 3 emails sending in 90 days (FLW-01); checkout live with at least 2 emails and coverage of at least 25% of checkout starters (FLW-02); flows at least 35% of email-attributed revenue (FLW-08); Smart Sending on at least 90% of marketing flow emails (FLW-10); winback timed at 1.5–2× the median repeat gap (FLW-06); no template over 102,400 bytes (CRV-01; a template proxy, since Gmail's clipping point is approximate and release uses the `design_system` budget of under 90,000 bytes of decoded delivered HTML); at least 90% of commerce links tagged (CRV-04). Recalibrate after 5 or more audits; when a value is close to a threshold, say so.
 
 ## Examples
 ### Good
@@ -75,9 +76,10 @@ All are **Wavy starting defaults** from the check library: welcome live with at 
 ## Quality checklist
 - [ ] DAT-01, DAT-02 and DAT-05 are scored before any revenue finding.
 - [ ] The inventory includes archived flows and counts live and draft messages separately.
-- [ ] Every scored check has a verdict, a value and an evidence path; unknown and n/a carry reasons.
+- [ ] Every scored check has its definition version, a verdict, a value and an evidence path; unknown and n/a carry reasons.
+- [ ] The area status follows the rule: any unknown mandatory critical check gives "Not verified", with scoped, checked, unknown and n/a counts shown.
 - [ ] Coverage claims about SMS or subscription service state the platform checked, or say unknown.
-- [ ] Offer and link findings come from checkout tests and link crawls, not templates.
+- [ ] Offer and link findings cite supplied checkout-test and link-test receipts, with each link classified; untaggable links are not counted against CRV-04.
 - [ ] Send-date and event-time figures are never added together, and each states its basis and window.
 - [ ] Every recommendation has flow and message ID, fix, owner, dependency, release proof and measure.
 - [ ] No account change was made during the audit.
