@@ -37,7 +37,7 @@ Tell the client and the team what is actually happening, with numbers they can t
 ## Decision rules
 - If a metric moved more than the Wavy starting default alert band (±30% week over week on a metric with at least 30 events in each week), investigate before reporting it as a trend.
 - If the source is ambiguous (two order metrics, a dormant integration), stop and `flag_insight`. Don't pick one quietly.
-- If a sample is small (Wavy starting default: fewer than 100 conversions per arm), report direction only and say it's not conclusive.
+- If a test hasn't reached the sample per arm computed in its plan (the experimentation skill's sizing rule), or a comparison has no plan, report direction only and say it's not conclusive.
 - If a result looks too good, look for double counting, a window error or a tracking change before celebrating.
 - Prefer a range with stated assumptions over a single confident number.
 

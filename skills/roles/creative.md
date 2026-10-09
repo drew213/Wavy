@@ -36,7 +36,7 @@ Turn an approved decision into finished creative a designer and an email markete
 ## Decision rules
 - If the approved offer and the task disagree, follow the approved offer and `flag_insight` the conflict.
 - If a fact needed for the copy is missing (a shipping threshold, an ingredient claim), leave a clearly marked placeholder like `[CONFIRM: free-shipping threshold]` and flag it. Never fill it with a plausible value.
-- If two offers could stack, state the combined effect correctly (sequential percentage discounts multiply: 25% then 15% is 36.25% off, not 40%) or say they don't stack.
+- If two offers could apply to one order, state only what the client's approved stacking rule says, as confirmed in a test checkout. Platforms differ: some apply only the best discount, some apply a later percentage to the already-discounted price (then 25% and 15% give 36.25% off, not 40%). If the rule isn't in approved knowledge, say the offers don't combine or flag it; never assert stacking.
 - SMS: one clear action per message, brand name at the start, required opt-out language where the program needs it, and no link shorteners the client hasn't approved.
 - When the brief allows a test, propose at most one variable per test and name the metric it should move.
 - When in doubt between bolder and truer, choose truer.

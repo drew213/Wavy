@@ -84,8 +84,8 @@ Look each up with `get_context` (area `knowledge_maintenance`, plus every area w
 | `task.manage` | autonomous | Agent, logged |
 | `fact.propose` | autonomous | Agent or client decider; stays proposed |
 | `result.record` | autonomous | Analyst agent after the window closes |
-| `standard.publish` | autonomous | Org admin only (human); agents never publish |
-| `connection.manage` | autonomous | Org admin or account lead only (human); key revocation |
+| `standard.publish` | autonomous (human only; agents are refused) | Org admin only (human); agents never publish |
+| `connection.manage` | autonomous (human only; agents are refused) | Org admin or account lead only (human); key revocation |
 | `fact.approve` | explicit_approval | Account lead, org admin or client owner/approver |
 | `client.message.send` | explicit_approval | Account lead or org admin |
 | `campaign.publish` | explicit_approval | Account lead, org admin or client owner/approver |

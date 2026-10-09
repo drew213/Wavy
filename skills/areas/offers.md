@@ -41,7 +41,7 @@ Common exceptions: marketplace orders and retail partners have their own pricing
 1. Trigger: a calendar row or flow that needs an incentive. Run `get_context` for `offers` and `economics`.
 2. Name the job: first order, threshold lift, clear stock, launch, winback, subscription start. If the job can be done without an offer (education, early access, social proof), propose that first.
 3. Pick the mechanism from `approved_offer_types` that fits the job: threshold or gift to lift order value; bundle to move a slow item with a fast one; early access to reward without margin; subscription incentive only for eligible repeat buyers.
-4. Compute the effective discount: 1 − ((1 − d1) × (1 − d2) × …) for every discount a single order could receive. A 25% then a 15% discount is 36.25%, not 40%.
+4. Confirm how discounts combine from the platform's combination settings and a test checkout, never from arithmetic alone: some setups apply only the best discount; others apply a later percentage to the already-discounted price, where the effective discount is 1 − ((1 − d1) × (1 − d2) × …) (25% then 15% is 36.25%, not 40%). Record the tested result as the `stacking_rules` fact.
 5. Compute contribution per order: net price after all discounts − unit cost − fulfilment − payment fees − shipping subsidy − gift cost. Show the inputs. If any input is missing, write "gross only".
 6. Check against `max_discount_depth`, the margin floor and `promo_frequency_limit`.
 7. Define eligibility and exclusions: who qualifies, which products are excluded, expiry, code type (unique single-use for welcome and winback; shared only for public sales).

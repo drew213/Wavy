@@ -82,7 +82,7 @@ Look each up with `get_context` (area `data_infrastructure`). If a fact is missi
 | `insight.create` | autonomous | Agent, logged |
 | `fact.propose` | autonomous | Agent; stays proposed |
 | `job.run` | autonomous | Scheduled checks |
-| `connection.manage` | autonomous | Org admin or account lead only (human) |
+| `connection.manage` | autonomous (human only; agents are refused) | Org admin or account lead only (human) |
 | `audience.prepare` | approved_plan | Inside an approved decision |
 | `work.implement_nonlive` | approved_plan | Inside an approved decision (for example a test profile setup) |
 | `flow.change_live` | explicit_approval | Account lead, org admin or client owner/approver |

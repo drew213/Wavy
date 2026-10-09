@@ -83,7 +83,7 @@ Exceptions: sister brands are separate workspaces with separate keys; if another
 | `issue.flag` | autonomous | Agent, logged |
 | `fact.propose` | autonomous | Agent or client decider; stays proposed |
 | `approval.request` | autonomous | Agent |
-| `connection.manage` | autonomous | Org admin or account lead only (human) |
+| `connection.manage` | autonomous (human only; agents are refused) | Org admin or account lead only (human) |
 | `fact.approve` | explicit_approval | Account lead, org admin or client owner/approver |
 | `decision.approve` | explicit_approval | Account lead, org admin or client owner/approver (30-day plan) |
 | `client.message.send` | explicit_approval | Account lead or org admin |

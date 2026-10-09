@@ -49,7 +49,7 @@ Common exceptions: subscription customers and service-recovery cases are usually
 ## Decision rules
 - If the planned sample can't be reached inside the window, then don't run it as a test.
 - If the arm split differs from the plan by more than 1 percentage point, or assignment records are missing, then the test is invalid: record it as inconclusive with the reason.
-- If the 95% interval excludes zero in the good direction, the effect is at least the minimum detectable effect, and no guardrail is breached, then recommend rollout through `decision.approve`, keeping a persistent holdout for flows.
+- If the 95% interval excludes zero in the good direction, the effect is at least the minimum detectable effect, and no guardrail is breached, then save a rollout recommendation for the strategist to propose as a decision (a person approves it under `decision.approve`), keeping a persistent holdout for flows.
 - If the interval includes zero, then call it inconclusive. Don't call it "no effect" unless the interval also excludes the minimum detectable effect. Keep the cheaper or lower-risk arm, or re-test with a larger sample.
 - If a guardrail crosses its limit at a checkpoint, then stop the test (request `flow.change_live` or cancel the scheduled send through the account lead) and `flag_insight` severity high. Stopping for harm is allowed; stopping for an early win is not.
 - If one order could count in two tests or levers, then assign it to one before analysis. One order is never a campaign win, a flow win and a save at once.
