@@ -50,6 +50,7 @@ def request(session: Session, scope: Scope, action: str, subject_kind: str, subj
 
 def decide(session: Session, scope: Scope, approval_id: str, approve: bool, note: str = "") -> m.Approval:
     from . import knowledge, operations  # noqa: F401  (registers the ON_DECIDED handlers)
+    from .execution import engine  # noqa: F401
     ap = get_scoped(session, scope, m.Approval, approval_id)
     actor = scope.actor
     if not actor.is_human:

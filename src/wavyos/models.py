@@ -33,6 +33,9 @@ class Client(IdMixin, Base):
     status: Mapped[str] = mapped_column(String(20), default="onboarding")
     timezone: Mapped[str] = mapped_column(String(64), default="UTC")
     website: Mapped[Optional[str]] = mapped_column(String(300))
+    # {"allowed_providers": ["anthropic", "codex"], "daily_budget_usd": 10}. Client data is sent only to
+    # providers listed here; the default is none, so each client opts in explicitly.
+    settings: Mapped[dict] = mapped_column(default=dict)
 
 
 USER_KINDS = ("staff", "client")
@@ -370,3 +373,79 @@ class Event(Base):
     prev_hash: Mapped[str] = mapped_column(String(64))
     hash: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime]
+
+
+# ---------------------------------------------------------------- execution (task-level work by models and people)
+
+EXECUTION_STATUSES = ("queued", "running", "waiting_approval", "succeeded", "failed", "cancelled")
+EXECUTION_PURPOSES = ("produce", "qa")
+
+
+class Execution(IdMixin, Base):
+    """One attempt by one executor (a model or a person) to do one task, or to QA it."""
+    __tablename__ = "executions"
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"), index=True)
+    purpose: Mapped[str] = mapped_column(String(10), default="produce")
+    executor: Mapped[str] = mapped_column(String(40))      # anthropic | codex | human | fake
+    model: Mapped[str] = mapped_column(String(80), default="")
+    agent_role: Mapped[str] = mapped_column(String(30))
+    status: Mapped[str] = mapped_column(String(20), default="queued", index=True)
+    attempt: Mapped[int] = mapped_column(Integer, default=1)
+    packet: Mapped[dict] = mapped_column(default=dict)     # the exact work packet the executor received
+    packet_hash: Mapped[str] = mapped_column(String(64))
+    result: Mapped[dict] = mapped_column(default=dict)     # {summary, outputs:[...], checks:[...]}
+    error: Mapped[str] = mapped_column(Text, default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    waiting_on: Mapped[Optional[str]] = mapped_column(ForeignKey("approvals.id"))
+    started_at: Mapped[Optional[datetime]]
+    finished_at: Mapped[Optional[datetime]]
+    requested_by: Mapped[str] = mapped_column(String(80))
+
+
+STEP_KINDS = ("model_call", "tool_call", "policy", "approval", "note", "error")
+
+
+class ExecutionStep(IdMixin, Base):
+    """The trace: every model call, tool call and policy decision inside an execution, in order."""
+    __tablename__ = "execution_steps"
+    __table_args__ = (UniqueConstraint("execution_id", "seq"),)
+    execution_id: Mapped[str] = mapped_column(ForeignKey("executions.id"), index=True)
+    seq: Mapped[int] = mapped_column(Integer)
+    kind: Mapped[str] = mapped_column(String(20))
+    name: Mapped[str] = mapped_column(String(120))
+    status: Mapped[str] = mapped_column(String(20), default="ok")   # ok | denied | error | waiting
+    input: Mapped[dict] = mapped_column(default=dict)
+    output: Mapped[dict] = mapped_column(default=dict)
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class Artifact(IdMixin, Base):
+    """Something an execution produced: a brief, copy, a report. Content lives here, versioned per task."""
+    __tablename__ = "artifacts"
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    task_id: Mapped[str] = mapped_column(ForeignKey("tasks.id"), index=True)
+    execution_id: Mapped[Optional[str]] = mapped_column(ForeignKey("executions.id"))
+    kind: Mapped[str] = mapped_column(String(40))      # brief | copy | design_direction | report | analysis | other
+    label: Mapped[str] = mapped_column(String(300))
+    content: Mapped[str] = mapped_column(Text)
+    content_hash: Mapped[str] = mapped_column(String(64))
+    created_by: Mapped[str] = mapped_column(String(80))
+
+
+class ProviderCredential(IdMixin, Base):
+    """An org-level model provider key (e.g. Anthropic). Sealed with the vault like client connections."""
+    __tablename__ = "provider_credentials"
+    __table_args__ = (UniqueConstraint("org_id", "provider"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    provider: Mapped[str] = mapped_column(String(30))
+    secret_ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
+    key_ref: Mapped[str] = mapped_column(String(100))
+    created_by: Mapped[str] = mapped_column(String(80))
