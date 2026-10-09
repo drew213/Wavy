@@ -1,0 +1,106 @@
+---
+key: area.voice_copy
+kind: area
+area: voice_copy
+title: Brand voice and copy
+owner_role: creative
+version: 1
+reviewed: 2026-10-09
+review_every_days: 90
+---
+## Purpose
+Copy is where the brand earns attention or loses it. This area turns an approved brief into subject lines, preview text, body copy, CTAs and texts that sound like the client, say only what is true and approved, and ask for one clear action. For health and supplement brands, one unapproved claim can create legal exposure for the client, so factual discipline matters as much as voice.
+
+## Client facts and rules
+Look up each fact with `get_context` for `voice_copy`, then `product_customer` and `offers`.
+
+- `voice_guide` – voice traits written as "is / is never", tone settings per message job (welcome, education, launch, promotion, recovery, post-purchase, winback). Missing: `flag_insight`; draft in a restrained, plain register and label it "voice unconfirmed".
+- `approved_examples` – client-approved past messages to imitate, by job. Missing: use the voice guide only; never treat a high-revenue old email as approved.
+- `prohibited_language` – banned words, competitor names, claims and tones. Missing: apply the Wavy stop-list below.
+- `customer_vocabulary` – the customer's own words for problems and outcomes, from reviews and surveys. Missing: write in plain category language; do not invent customer quotes.
+- `messaging_pillars` – the ranked reasons to buy, each with its approved proof. Missing: `flag_insight`; lead with the product fact in the brief.
+- `approved_claims` – the claim register: exact approved benefit wording per product, and the substantiation on file. Missing: no benefit claims beyond the product's listed purpose.
+- `claims_approver` – who signs off claim language. Missing: stop before any new claim.
+- `product_facts` – directions, servings, sizes, ingredients, verified against the physical label. Missing or conflicting: use a placeholder and `flag_insight`.
+- `regulated_category` – supplement, cosmetic, CBD/THC, alcohol or none. Missing: treat as regulated until confirmed.
+- `required_disclaimers` – for example the FDA structure/function disclaimer. Missing: `propose_fact` if the category needs one.
+- `review_source` – the review platform and whether quotes may be used. Missing: no customer quotes.
+- `personalization_fields` – available profile fields, fill rates and approved fallbacks. Missing: no personalization.
+- `founder_voice_permission` – whether a founder may sign, with their approved samples. Missing: no founder-signed copy.
+
+Common exceptions: transactional and service messages carry no promotion; retailer or wholesale audiences have their own voice; sister brands never share copy or vocabulary.
+
+## Inputs and sources
+- **Current brief**: the only source of facts, offer, audience, deadline and CTA.
+- **Voice guide and approved examples**: trusted for rhythm, structure and vocabulary. Traps: old emails contain expired offers, prices, claims, wrong product names and earlier brand names; take style, never facts.
+- **Copy library search**: retrieval context. Repeated variants are one example; a template snapshot is not proof of what was sent; image text found by OCR must be checked against the image.
+- **Reviews and surveys**: customer evidence for vocabulary. Traps: a review asserting a health result is not an approved claim; paraphrase in quote marks is a fabricated quote.
+- **Product page and label**: trusted for product facts after reconciliation. If they disagree, the label wins and the conflict is flagged.
+- **Founder samples**: one person's evidence only. A signature does not prove they wrote it; never blend founders.
+
+## SOP
+1. Trigger: an approved brief for a campaign, flow message or text. Run `get_context` for `voice_copy`, `product_customer` and `offers`.
+2. Check the brief has audience, job, approved facts, offer key (or "none"), CTA and destination. If a blocking fact is missing, `flag_insight` and `finish`. Use a visible placeholder like [CONFIRM: serving size] for a nonblocking one.
+3. Pull 3–5 distinct approved examples for the same job and channel.
+4. Write the messaging hierarchy: one main message, one proof, one action. Everything else is cut or demoted.
+5. Draft 3 subject lines with distinct angles (benefit, curiosity, specificity), each with a preview line that adds information rather than repeating the subject.
+6. Draft the body: the main message in the first two lines; short paragraphs; concrete nouns; one primary CTA written as verb plus object; the CTA may repeat once lower down to the same destination.
+7. Add personalization only from `personalization_fields`, each with its fallback written out.
+8. Run the claims review: list every claim and every number in the draft, map each to `approved_claims`, `product_facts` or the brief, and mark anything unmapped. Remove or rewrite unmapped claims.
+9. Verify every customer quote verbatim against `review_source`, recording the source ID and confirming it is publicly displayed.
+10. Run the prohibited-language and offer-consistency checks: the offer value, eligibility and expiry are identical in subject, preview, body, image text and terms.
+11. `save_output` (kind `copy`, label "<message> copy v<n>") with customer-facing copy first, then editor notes: source IDs, claims map, placeholders, open questions.
+12. If a claim needs sign-off, `flag_insight` to the `claims_approver` and mark the copy "claims pending". `finish`.
+
+## Decision rules
+- **No unapproved health or clinical claims (supplement and health brands).** Never write disease claims (treat, cure, prevent, heal, diagnose, or naming a disease), "clinically proven/studied/tested", "science-backed", "doctor-recommended", percentages, study results, guaranteed outcomes or timelines unless the exact wording is in `approved_claims` with substantiation on file. Structure/function claims need the FDA disclaimer (21 CFR 101.93) where the client's category requires it. FTC rules require substantiation for health claims and truthful endorsements (16 CFR Part 255).
+- **Review quotes:** verbatim only, from a publicly displayed review, with the source ID kept in editor notes. Never edit a quote, never use one that asserts a health result the brand cannot claim, never imply typical results, and disclose incentives if the reviewer was rewarded.
+- **Wavy stop-list (default when the client has none):** detox, cleanse (as a health claim), fat-burning, miracle, cure, guaranteed, risk-free, "you need this", shaming language about bodies, fake scarcity.
+- **Subject lines, Wavy starting default:** 30–50 characters; the key word in the first 35 characters (mobile truncation); at most one emoji, and only if the voice guide allows it; no all-caps words beyond brand style; never deceptive about content (CAN-SPAM requires subject lines that are not misleading).
+- **Preview text, Wavy starting default:** 40–90 characters, adds a second reason to open, never repeats the subject, never left to default to "View in browser".
+- **Body:** the main message and CTA visible on the first mobile screen; most paragraphs 1–3 sentences; one primary action per message.
+- **Personalization:** if a field's fill rate is under 80% (Wavy starting default), then do not use it in the subject line. Never personalize on inferred health conditions or sensitive data.
+- **Founder copy:** only with `founder_voice_permission`, only that person's evidence, no invented memories, credentials, opinions or product use. Final founder copy needs the founder's own approval.
+- **Old copy:** if a phrase comes from an archive email, then keep the rhythm and drop its facts. Never reuse a whole old email with a new product name.
+- If two approved sources disagree on a fact, then use neither; `flag_insight` and use a placeholder.
+- SMS copy follows the `sms` skill (prefix, encoding, length, compliance).
+
+## Examples
+### Good
+Subject: "The 2-minute morning routine" · Preview: "Where it fits between coffee and the commute." Body opens with the approved usage direction from the label, adds one verbatim review line about the experience with its source ID in notes, and ends with "Shop the routine" to the product page. Editor notes map every claim to the register and flag one placeholder: [CONFIRM: water amount, label and listing disagree].
+
+### Not good
+Subject: "Clinically proven to flatten your stomach in 7 days 🔥🔥" It makes an unapproved clinical claim, a body-outcome promise and a timeline, uses two emojis, and would expose a supplement client to FTC and FDA risk. A "customer quote" in the body was paraphrased from a review, which makes it a fabricated quote.
+
+## Quality checklist
+- [ ] Every claim and number in the copy maps to the approved claim register, verified product facts or the brief, and the map is in the editor notes.
+- [ ] No disease, clinical, timeline or guaranteed-result language appears unless it is in the approved claims with substantiation.
+- [ ] Every customer quote is verbatim, from a public review, with its source ID recorded.
+- [ ] The offer (or "no offer") is identical across subject, preview, body, image text and terms.
+- [ ] Three subject lines with distinct angles are provided, each paired with preview text that does not repeat it.
+- [ ] There is one primary CTA, written as verb plus object, with its destination stated.
+- [ ] Every personalization token has a written fallback.
+- [ ] No word from the client's prohibited list or the Wavy stop-list appears.
+- [ ] Placeholders for missing facts are visible and listed; none are disguised as facts.
+
+## Owner and approvals
+| Action | Level | Who decides |
+|---|---|---|
+| data.read | autonomous | Agent (logged) |
+| draft.create | autonomous | Agent (logged) |
+| insight.create | autonomous | Agent (logged) |
+| fact.propose | autonomous | Agent (logged); stays proposed until approved |
+| approval.request | autonomous | Agent (logged) |
+| fact.approve | explicit_approval | Org admin, account lead, or client owner/approver |
+| decision.approve | explicit_approval | Org admin, account lead, or client owner/approver |
+| client.message.send | explicit_approval | Org admin or account lead |
+| campaign.publish | explicit_approval | Org admin, account lead, or client owner/approver |
+
+## Outputs and destination
+- **Copy deliverable** (kind `copy`): subject options with previews, body, CTA and destination, personalization with fallbacks; then editor notes with source IDs, the claims map, placeholders and open questions. Saved to the task output.
+- Approved copy is version-bound: any later change to subject, preview, body, CTA or destination clears the copy approval and returns it to review.
+- Copy reaches the client only through the Client Hub review or an approved `client.message.send`.
+- Client corrections are recorded as reviewed examples for the voice guide; they become a standard only through a reviewed promotion with client data removed.
+
+## Maintenance
+The creative lead reviews this skill every 90 days. Review early when a client rejects copy for voice twice in a row, a claim is challenged by a client, platform or regulator, FTC or FDA guidance changes, or a new regulated category client is onboarded.

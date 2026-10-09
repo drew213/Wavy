@@ -11,7 +11,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import knowledge
+from .. import knowledge, skills
 from .. import models as m
 from ..policy import payload_hash
 from ..scope import Scope
@@ -33,6 +33,8 @@ def build(session: Session, scope: Scope, task: m.Task, purpose: str, *, agent_r
         "purpose": purpose,
         "role": agent_role,
         "role_brief": ROLE_BRIEFS.get(agent_role, ""),
+        # The full role skill (skills/roles/<role>.md) once `wavyos seed skills` has run.
+        "role_skill": skills.role_skill(session, scope.org_id, agent_role),
         "client": {"id": task.client_id},
         "task": {"id": task.id, "title": task.title, "area": task.area, "done_when": task.done_when,
                  "due_date": task.due_date.isoformat() if task.due_date else None,

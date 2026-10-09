@@ -128,6 +128,27 @@ def cmd_seed_standards(args, settings: Settings) -> int:
     return 0
 
 
+def cmd_seed_skills(args, settings: Settings) -> int:
+    from . import skills
+    errs = skills.validate(args.root or skills.DEFAULT_ROOT)
+    if errs:
+        print("skills don't validate:\n  " + "\n  ".join(errs), file=sys.stderr)
+        return 2
+    with transaction(_factory(settings)) as s:
+        actor = _user(s, args.actor, args.org)
+        out = skills.publish(s, scope_for_user(s, actor, None), args.root or skills.DEFAULT_ROOT)
+    changed = sum(c for _, _, c in out)
+    print(f"{len(out)} skill standards: {changed} published, {len(out) - changed} unchanged")
+    return 0
+
+
+def cmd_skills_check(args, settings: Settings) -> int:
+    from . import skills
+    errs = skills.validate(args.root or skills.DEFAULT_ROOT)
+    print("all skills valid" if not errs else "\n".join(errs))
+    return 0 if not errs else 2
+
+
 def cmd_schedule(args, settings: Settings) -> int:
     _load_jobmods()
     with transaction(_factory(settings)) as s:
@@ -281,6 +302,16 @@ def build_parser() -> argparse.ArgumentParser:
     st.add_argument("--org")
     st.add_argument("--root", help="audit-os folder (default: WAVYOS_AUDIT_OS_ROOT)")
     st.set_defaults(fn=cmd_seed_standards)
+
+    sk = ssub.add_parser("skills", help="validate and publish skills/ (roles and areas) as agency standards")
+    sk.add_argument("--as", dest="actor", required=True, help="email of an org admin")
+    sk.add_argument("--org")
+    sk.add_argument("--root", help="skills folder (default: the repo's skills/)")
+    sk.set_defaults(fn=cmd_seed_skills)
+
+    kc = sub.add_parser("skills-check", help="validate the skill files without loading them")
+    kc.add_argument("--root")
+    kc.set_defaults(fn=cmd_skills_check)
 
     sc = sub.add_parser("schedule", help="queue every job whose period is due")
     sc.add_argument("--org")
