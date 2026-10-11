@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import base64
 import os
+from datetime import timedelta
 
 import pytest
+from sqlalchemy import select, update
 
+from wavyos import models as m
 from wavyos.cli import main
 from wavyos.config import load_settings, normalize_database_url
-from wavyos.ratelimit import Limiter
+from wavyos.db import utcnow
+from wavyos.ratelimit import Limiter, prune
 from wavyos.vault import EnvKeyProvider, LocalKeyProvider, Vault, VaultError, key_provider
 
 
@@ -46,10 +50,26 @@ def test_key_provider_prefers_the_env_key(tmp_path):
     assert isinstance(key_provider(local), LocalKeyProvider)
 
 
-def test_limiter_blocks_after_the_limit_per_key():
-    lim = Limiter(3, 60)
-    assert [lim.allow("a") for _ in range(4)] == [True, True, True, False]
-    assert lim.allow("b")
+def test_limiter_blocks_after_the_limit_per_key(session):
+    ip = "203.0.113.9"
+    lim = Limiter("t", 3, 60)
+    assert [lim.allow(session, ip, now=6000) for _ in range(4)] == [True, True, True, False]
+    assert lim.allow(session, "198.51.100.1", now=6000)
+    # Halfway through the next window the last one's 3 attempts count as 1.5.
+    assert [lim.allow(session, ip, now=6090) for _ in range(3)] == [True, True, False]
+    assert lim.allow(session, ip, now=6200)
+    assert all(ip not in k for k in session.scalars(select(m.RateLimit.key)))
+
+
+def test_limiter_counts_are_shared_and_pruned(factory):
+    lim = Limiter("t", 2, 60)
+    with factory() as a, factory() as b:  # two web processes
+        assert lim.allow(a, "k") and lim.allow(b, "k")
+        assert not lim.allow(a, "k")
+    with factory() as s:
+        s.execute(update(m.RateLimit).values(expires_at=utcnow() - timedelta(seconds=1)))
+        assert prune(s) == 1
+        s.commit()
 
 
 def test_login_is_rate_limited(tmp_path):

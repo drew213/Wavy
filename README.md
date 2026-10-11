@@ -248,7 +248,8 @@ Per client, set with `wavyos client allow`: `allowed_providers` and `daily_budge
 
 | Command | Does |
 |---|---|
-| `wavyos init-db` | Create the tables |
+| `wavyos init-db` | Create or upgrade the tables (runs migrations; safe on every deploy) |
+| `wavyos db-revision -m MESSAGE` | Write a migration for changes to `models.py` |
 | `wavyos bootstrap --org-name --org-slug --admin-email --admin-name` | Create an organization, its admin and its five agents; prints a token once |
 | `wavyos token --email` | Issue an API token; prints it once |
 | `wavyos client create --as --name --slug [--timezone] [--website]` | Create a client workspace |
@@ -258,8 +259,8 @@ Per client, set with `wavyos client allow`: `allowed_providers` and `daily_budge
 | `wavyos seed standards --as [--root]` | Load an Audit OS process folder as standards |
 | `wavyos skills-check [--root]` | Validate skill files without loading them |
 | `wavyos schedule [--org]` | Queue the jobs that are due |
-| `wavyos work [--loop] [--interval S] [--jobs-only \| --executions-only]` | Run queued jobs and executions |
-| `wavyos serve [--host] [--port]` | Run the API and console |
+| `wavyos work [--loop] [--interval S] [--schedule-every S] [--threads N] [--jobs-only \| --executions-only]` | Run queued jobs and executions; `--threads` runs several jobs at once (Postgres) |
+| `wavyos serve [--host] [--port] [--with-worker] [--worker-threads N]` | Run the API and console, optionally with the worker inside |
 | `wavyos verify-events --client <slug>` | Check a client's event chain |
 | `wavyos demo` | Build and run the fictional demo workspace |
 
@@ -299,7 +300,13 @@ src/wavyos/
   knowledge.py       standards (layer 1) and client facts (layer 2)
   operations.py      insight → decision → task → result
   skills.py          skill loader, validator, publisher
-  jobs.py            registry, scheduler, runner
+  jobs.py            registry, scheduler, runner (threads, heartbeats)
+  collector/         Klaviyo audit collector: stages, checkpoints, reporting budget
+  migrate.py         Alembic upgrade, adoption of pre-migration databases, db-revision
+  migrations/        Alembic revisions
+  ratelimit.py       database-backed sign-in and sign-up limits
+  housekeeping.py    pruning run on the scheduler tick
+  monitoring.py      optional Sentry error reporting
   jobmods/           job handlers and contracts
   execution/         work packets, tool gateway, adapters (Claude, Codex, fake), engine, provider keys
   connectors/        read-only Klaviyo client
@@ -311,7 +318,7 @@ src/wavyos/
   console/           ops API and the console page
   cli.py, demo.py, config.py, seed.py
 skills/              5 role skills, 23 area skills, FORMAT.md
-docs/                ARCHITECTURE.md, CLIENT-HUB-INTEGRATION.md, REVIEW-LOG.md
+docs/                ARCHITECTURE.md, AUDIT-PLAN.md, SCALING.md, CLIENT-HUB-INTEGRATION.md, REVIEW-LOG.md
 tests/               unit, service, API, console and audit tests
 ```
 
@@ -350,11 +357,11 @@ Run the suite against Postgres with `WAVYOS_TEST_POSTGRES_URL=postgresql+psycopg
 
 Still to do as usage grows:
 
-1. **Migrations.** Tables are created with `init-db` (`create_all`), which adds new tables but never alters existing ones. Add Alembic before the first column change.
-2. **Secrets.** Swap `EnvKeyProvider` for a cloud KMS provider (implement `wrap` and `unwrap` in `vault.py`).
-3. **Several web instances.** Sign-in rate limits are kept in memory per instance; move them to the database or Redis first.
-4. **Sign-in.** Password reset, email verification and SSO (OIDC) for staff; API tokens stay for automation.
-5. **Backups.** Render backs Postgres up daily; keep the master key and event-hash anchors with them.
+1. **Secrets.** Swap `EnvKeyProvider` for a cloud KMS provider (implement `wrap` and `unwrap` in `vault.py`).
+2. **Sign-in.** Password reset, email verification and SSO (OIDC) for staff; API tokens stay for automation.
+3. **Capacity.** `docs/SCALING.md` has the limits of the free setup, the paid plan and when to move.
+
+Schema changes are Alembic migrations in `src/wavyos/migrations/`, applied by `init-db`; sign-in rate limits are kept in the database, so they hold across web instances. Set `SENTRY_DSN` to report errors (and failed jobs) to Sentry; nothing personal is sent.
 
 ---
 

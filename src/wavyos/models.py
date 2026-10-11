@@ -313,11 +313,22 @@ class JobRun(IdMixin, Base):
     status: Mapped[str] = mapped_column(String(20), default="queued")
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     started_at: Mapped[Optional[datetime]]
+    heartbeat_at: Mapped[Optional[datetime]]  # touched while running; a stale one means the worker died
     finished_at: Mapped[Optional[datetime]]
     summary: Mapped[str] = mapped_column(Text, default="")
     produced: Mapped[dict] = mapped_column(default=dict)   # {insights: [], tasks: [], approvals: []}
     error: Mapped[str] = mapped_column(Text, default="")
     cost_usd: Mapped[Optional[float]] = mapped_column(Float)
+
+
+class RateLimit(IdMixin, Base):
+    """Attempts per key per window, shared by every web process. Keys are hashed: no IPs or emails stored."""
+    __tablename__ = "rate_limits"
+    __table_args__ = (UniqueConstraint("key", "bucket"),)
+    key: Mapped[str] = mapped_column(String(64))
+    bucket: Mapped[int] = mapped_column(Integer)
+    count: Mapped[int] = mapped_column(Integer, default=0)
+    expires_at: Mapped[datetime] = mapped_column(index=True)
 
 
 # ---------------------------------------------------------------- durable onboard output and commerce ingest

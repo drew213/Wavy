@@ -8,17 +8,19 @@ nothing must say why (status no_action), so observation without execution is vis
 """
 from __future__ import annotations
 
+import threading
 import traceback
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Callable, Literal, Optional
+from typing import Callable, Iterator, Literal, Optional
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
-from . import events
+from . import events, monitoring
 from . import models as m
 from .db import utcnow
 from .policy import authorize
@@ -152,8 +154,9 @@ def claim(factory: sessionmaker[Session], job_key: Optional[str] = None) -> Opti
         if job_key:
             q = q.where(m.JobRun.job_key == job_key)
         for run_id in s.scalars(q).all():
+            now = utcnow()
             res = s.execute(update(m.JobRun).where(m.JobRun.id == run_id, m.JobRun.status == "queued")
-                            .values(status="running", started_at=utcnow(), attempts=m.JobRun.attempts + 1))
+                            .values(status="running", started_at=now, heartbeat_at=now, attempts=m.JobRun.attempts + 1))
             if res.rowcount == 1:
                 s.commit()
                 return run_id
@@ -163,7 +166,7 @@ def claim(factory: sessionmaker[Session], job_key: Optional[str] = None) -> Opti
 def execute(factory: sessionmaker[Session], run_id: str, services: Optional[dict] = None) -> m.JobRun:
     """Run one claimed job in its own transaction. Failures are recorded, never swallowed silently."""
     services = services or {}
-    with factory() as s:
+    with heartbeat(factory, run_id), factory() as s:
         run = s.get(m.JobRun, run_id)
         defn = REGISTRY.get(run.job_key)
         try:
@@ -184,6 +187,7 @@ def execute(factory: sessionmaker[Session], run_id: str, services: Optional[dict
             events.record(s, scope, f"job.{run.status}", run, run.summary, {"job": defn.key, "produced": ctx.produced})
             s.commit()
         except Exception as e:
+            monitoring.report(e)
             s.rollback()
             run = s.get(m.JobRun, run_id)
             run.status, run.finished_at = "failed", utcnow()
@@ -192,19 +196,72 @@ def execute(factory: sessionmaker[Session], run_id: str, services: Optional[dict
         return run
 
 
-def run_pending(factory: sessionmaker[Session], services: Optional[dict] = None, limit: int = 50) -> list[m.JobRun]:
-    done = []
-    for _ in range(limit):
-        run_id = claim(factory)
-        if run_id is None:
-            break
-        done.append(execute(factory, run_id, services))
+def run_pending(factory: sessionmaker[Session], services: Optional[dict] = None, limit: int = 50,
+                threads: int = 1) -> list[m.JobRun]:
+    """Claim and run queued jobs until none are left or `limit` have run. With threads > 1 several
+    run at once (claims are atomic), so one long audit doesn't hold up everything queued behind it."""
+    done: list[m.JobRun] = []
+    left, lock = [limit], threading.Lock()
+
+    def drain() -> None:
+        while True:
+            with lock:
+                if left[0] <= 0:
+                    return
+                left[0] -= 1
+            run_id = claim(factory)
+            if run_id is None:
+                return
+            r = execute(factory, run_id, services)
+            with lock:
+                done.append(r)
+
+    if threads <= 1:
+        drain()
+    else:
+        pool = [threading.Thread(target=drain, name=f"wavyos-job-{i}") for i in range(threads)]
+        for t in pool:
+            t.start()
+        for t in pool:
+            t.join()
     return done
 
 
-def requeue_stuck(session: Session, older_than: timedelta = timedelta(hours=1), max_attempts: int = 3) -> int:
-    """A worker that died mid-run leaves it 'running'. Put it back, up to max_attempts."""
-    cutoff = utcnow() - older_than
-    res = session.execute(update(m.JobRun).where(m.JobRun.status == "running", m.JobRun.started_at < cutoff,
-                                                 m.JobRun.attempts < max_attempts).values(status="queued"))
+HEARTBEAT_S = 60.0
+STALE_AFTER = timedelta(minutes=10)
+
+
+@contextmanager
+def heartbeat(factory: sessionmaker[Session], run_id: str, every: Optional[float] = None) -> Iterator[None]:
+    """Touch the run's heartbeat_at while it executes, so a long audit isn't mistaken for a dead one."""
+    every = HEARTBEAT_S if every is None else every
+    stop = threading.Event()
+
+    def beat() -> None:
+        while not stop.wait(every):
+            try:
+                with factory() as s:
+                    s.execute(update(m.JobRun).where(m.JobRun.id == run_id, m.JobRun.status == "running")
+                              .values(heartbeat_at=utcnow()))
+                    s.commit()
+            except Exception:  # a missed beat only matters once STALE_AFTER passes without one
+                pass
+
+    t = threading.Thread(target=beat, name=f"wavyos-heartbeat-{run_id[:8]}", daemon=True)
+    t.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        t.join(timeout=5)
+
+
+def requeue_stuck(session: Session, stale_after: timedelta = STALE_AFTER, max_attempts: int = 3) -> int:
+    """A worker that died mid-run leaves it 'running' with a heartbeat that stops moving. Put it back,
+    up to max_attempts; after that mark it failed so it doesn't sit 'running' forever."""
+    cutoff = utcnow() - stale_after
+    dead = (m.JobRun.status == "running") & (func.coalesce(m.JobRun.heartbeat_at, m.JobRun.started_at) < cutoff)
+    res = session.execute(update(m.JobRun).where(dead, m.JobRun.attempts < max_attempts).values(status="queued"))
+    session.execute(update(m.JobRun).where(dead, m.JobRun.attempts >= max_attempts).values(
+        status="failed", finished_at=utcnow(), error=f"the worker stopped responding {max_attempts} times"))
     return res.rowcount

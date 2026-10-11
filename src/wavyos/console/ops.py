@@ -409,8 +409,8 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
 
     # ---------------------------------------------------------------- brand accounts and saved audits
 
-    signup_limit = Limiter(5, 3600)
-    login_by_ip, login_by_email = Limiter(20, 900), Limiter(10, 900)
+    signup_limit = Limiter("signup", 5, 3600)
+    login_by_ip, login_by_email = Limiter("login-ip", 20, 900), Limiter("login-email", 10, 900)
 
     def too_many() -> HTTPException:
         return HTTPException(429, {"error": "Too many attempts. Wait a few minutes and try again."})
@@ -422,7 +422,7 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
     def signup(body: SignupBody, request: Request, s: Session = Depends(db)):
         from .. import accounts
         from ..api.deps import service
-        if not signup_limit.allow(visitor(request)):
+        if not signup_limit.allow(s, visitor(request)):
             raise too_many()
 
         def _create():
@@ -436,7 +436,7 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
     @r.post("/login")
     def login(body: LoginBody, request: Request, s: Session = Depends(db)):
         from .. import accounts
-        if not (login_by_ip.allow(visitor(request)) and login_by_email.allow(body.email.strip().lower())):
+        if not (login_by_ip.allow(s, visitor(request)) and login_by_email.allow(s, body.email.strip().lower())):
             raise too_many()
         try:
             _, token = accounts.sign_in(s, body.email, body.password.get_secret_value())

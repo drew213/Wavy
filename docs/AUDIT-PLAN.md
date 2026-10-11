@@ -179,7 +179,7 @@ The real audits used a language model to write the narrative from a sanitized pa
 - **Facts check:** every number in model output must match a value in the run's facts table (built by code, never by the model) within rounding. A mismatch blocks the draft; it doesn't get auto-fixed.
 - **Outputs:** foundational-report narrative (priorities, 90-day phases, 13-week plan, owner decisions), the journey map (hub shape: stages, nodes with trigger, timing, eligibility, exit, message jobs, success metric, guardrails, finding ids), calendar.
 - **Review:** a strategist approves, edits or rejects each draft in the staff console before the brand sees it (decision 2). Approvals are policy actions and events.
-- Runs on the Anthropic provider (backlog item 8), allowed per client.
+- Runs on the Anthropic provider (backlog item 6), allowed per client.
 
 ## 7. Phases and acceptance
 
