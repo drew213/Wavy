@@ -4,6 +4,7 @@ SQLite for dev and tests, Postgres in production; the models only use portable t
 """
 from __future__ import annotations
 
+import os
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -44,7 +45,10 @@ def make_engine(url: str) -> Engine:
     if url.startswith("sqlite"):
         engine = create_engine(url, future=True)
     else:  # managed Postgres drops idle connections; check each one before handing it out
-        engine = create_engine(url, future=True, pool_pre_ping=True, pool_recycle=1800)
+        # Per process. Keep (web instances + workers) x (size + overflow) under the database's connection limit.
+        engine = create_engine(url, future=True, pool_pre_ping=True, pool_recycle=1800,
+                               pool_size=int(os.environ.get("WAVYOS_DB_POOL_SIZE", "5")),
+                               max_overflow=int(os.environ.get("WAVYOS_DB_MAX_OVERFLOW", "10")))
     if engine.dialect.name == "sqlite":
         @event.listens_for(engine, "connect")
         def _fk_on(dbapi_conn, _):  # SQLite ignores foreign keys unless asked

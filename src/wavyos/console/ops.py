@@ -5,7 +5,6 @@ Staff with org-wide roles see every client; client stakeholders see only their o
 """
 from __future__ import annotations
 
-from collections import Counter
 from typing import Callable, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
@@ -109,15 +108,24 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
         return bool(s.scalar(select(func.count()).select_from(m.Membership).where(
             m.Membership.user_id == u.id, m.Membership.client_id.is_(None))))
 
-    def visible_clients(s: Session, u: m.User) -> list[m.Client]:
+    def visible(s: Session, u: m.User):
+        """The clients this user may see, as a query to filter or join on (never loaded wholesale)."""
         q = select(m.Client).where(m.Client.org_id == u.org_id)
         if not org_wide(s, u):
-            ids = s.scalars(select(m.Membership.client_id).where(m.Membership.user_id == u.id)).all()
-            q = q.where(m.Client.id.in_(ids))
-        return list(s.scalars(q.order_by(m.Client.name)))
+            q = q.where(m.Client.id.in_(select(m.Membership.client_id).where(m.Membership.user_id == u.id)))
+        return q
+
+    def visible_clients(s: Session, u: m.User) -> list[m.Client]:
+        return list(s.scalars(visible(s, u).order_by(m.Client.name)))
+
+    def visible_ids(s: Session, u: m.User):
+        return visible(s, u).with_only_columns(m.Client.id).scalar_subquery()
+
+    def visible_client(s: Session, u: m.User, client_id: Optional[str]) -> Optional[m.Client]:
+        return s.scalar(visible(s, u).where(m.Client.id == client_id)) if client_id else None
 
     def client_by_slug(s, u, slug) -> m.Client:
-        c = next((c for c in visible_clients(s, u) if c.slug == slug), None)
+        c = s.scalar(visible(s, u).where(m.Client.slug == slug))
         if c is None:
             raise HTTPException(404, {"error": "client not found"})
         return c
@@ -138,25 +146,35 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
 
     @r.get("/overview")
     def overview(u: m.User = Depends(user), s: Session = Depends(db)):
-        out = []
-        for c in visible_clients(s, u):
-            def count(model, *conds):
-                return s.scalar(select(func.count()).select_from(model).where(model.client_id == c.id, *conds)) or 0
-            tasks = Counter(dict(s.execute(select(m.Task.status, func.count()).where(m.Task.client_id == c.id).group_by(m.Task.status)).all()))
-            decisions = Counter(dict(s.execute(select(m.Decision.status, func.count()).where(m.Decision.client_id == c.id).group_by(m.Decision.status)).all()))
-            out.append({
-                "slug": c.slug, "name": c.name, "status": c.status, "timezone": c.timezone,
-                "providers": engine.allowed_providers(c),
-                "insights_open": count(m.Insight, m.Insight.status == "open"),
-                "decisions": dict(decisions), "tasks": dict(tasks),
-                "results_pending": count(m.Result, m.Result.status == "pending"),
-                "approvals_pending": count(m.Approval, m.Approval.status == "pending"),
-                "executions": dict(Counter(dict(s.execute(select(m.Execution.status, func.count()).where(
-                    m.Execution.client_id == c.id).group_by(m.Execution.status)).all()))),
-                "spend_today_usd": round(engine.spent_today(s, c.id), 4),
-                "budget_usd": float((c.settings or {}).get("daily_budget_usd", engine.DEFAULT_DAILY_BUDGET_USD)),
-            })
-        return {"now": utcnow().isoformat(), "clients": out}
+        # One grouped query per table for all visible clients, so the page costs the same at 5 or 5,000.
+        ids = visible_ids(s, u)
+
+        def count(model, *conds) -> dict[str, int]:
+            return dict(s.execute(select(model.client_id, func.count()).where(model.client_id.in_(ids), *conds)
+                                  .group_by(model.client_id)).all())
+
+        def by_status(model) -> dict[str, dict[str, int]]:
+            out: dict[str, dict[str, int]] = {}
+            for cid, status, n in s.execute(select(model.client_id, model.status, func.count())
+                                            .where(model.client_id.in_(ids)).group_by(model.client_id, model.status)):
+                out.setdefault(cid, {})[status] = n
+            return out
+
+        insights, results = count(m.Insight, m.Insight.status == "open"), count(m.Result, m.Result.status == "pending")
+        approvals = count(m.Approval, m.Approval.status == "pending")
+        tasks, decisions, executions = by_status(m.Task), by_status(m.Decision), by_status(m.Execution)
+        spend = engine.spent_today_by_client(s, ids)
+        return {"now": utcnow().isoformat(), "clients": [{
+            "slug": c.slug, "name": c.name, "status": c.status, "timezone": c.timezone,
+            "providers": engine.allowed_providers(c),
+            "insights_open": insights.get(c.id, 0),
+            "decisions": decisions.get(c.id, {}), "tasks": tasks.get(c.id, {}),
+            "results_pending": results.get(c.id, 0),
+            "approvals_pending": approvals.get(c.id, 0),
+            "executions": executions.get(c.id, {}),
+            "spend_today_usd": round(spend.get(c.id, 0.0), 4),
+            "budget_usd": float((c.settings or {}).get("daily_budget_usd", engine.DEFAULT_DAILY_BUDGET_USD)),
+        } for c in visible_clients(s, u)]}
 
     # ---------------------------------------------------------------- the chain board
 
@@ -209,25 +227,25 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
     @r.get("/executions")
     def executions(client: Optional[str] = None, status: Optional[str] = None, limit: int = Query(50, le=200),
                    u: m.User = Depends(user), s: Session = Depends(db)):
-        cs = {c.id: c for c in visible_clients(s, u)}
+        q = (select(m.Execution, m.Task.title, m.Client).join(m.Task, m.Task.id == m.Execution.task_id)
+             .join(m.Client, m.Client.id == m.Execution.client_id).where(m.Execution.client_id.in_(visible_ids(s, u))))
         if client:
-            cs = {k: v for k, v in cs.items() if v.slug == client}
-        q = select(m.Execution, m.Task.title).join(m.Task, m.Task.id == m.Execution.task_id).where(m.Execution.client_id.in_(list(cs)))
+            q = q.where(m.Client.slug == client)
         if status:
             q = q.where(m.Execution.status == status)
         rows = s.execute(q.order_by(m.Execution.created_at.desc()).limit(limit)).all()
-        return {"executions": [ex_row(ex, cs[ex.client_id], title) for ex, title in rows]}
+        return {"executions": [ex_row(ex, c, title) for ex, title, c in rows]}
 
     @r.get("/executions/{ex_id}")
     def execution(ex_id: str, u: m.User = Depends(user), s: Session = Depends(db)):
-        cs = {c.id: c for c in visible_clients(s, u)}
         ex = s.get(m.Execution, ex_id)
-        if ex is None or ex.client_id not in cs:
+        c = visible_client(s, u, ex.client_id if ex else None)
+        if c is None:
             raise HTTPException(404, {"error": "execution not found"})
         task = s.get(m.Task, ex.task_id)
         steps = s.scalars(select(m.ExecutionStep).where(m.ExecutionStep.execution_id == ex.id).order_by(m.ExecutionStep.seq)).all()
         arts = s.scalars(select(m.Artifact).where(m.Artifact.execution_id == ex.id).order_by(m.Artifact.created_at)).all()
-        return {**ex_row(ex, cs[ex.client_id], task.title), "packet": ex.packet, "packet_hash": ex.packet_hash,
+        return {**ex_row(ex, c, task.title), "packet": ex.packet, "packet_hash": ex.packet_hash,
                 "result": ex.result, "error_full": ex.error, "waiting_on": ex.waiting_on,
                 "steps": [{"seq": st.seq, "kind": st.kind, "name": st.name, "status": st.status, "input": st.input,
                            "output": st.output, "input_tokens": st.input_tokens, "output_tokens": st.output_tokens,
@@ -245,9 +263,8 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
 
     @r.post("/executions/{ex_id}/cancel")
     def cancel(ex_id: str, u: m.User = Depends(user), s: Session = Depends(db)):
-        cs = {c.id: c for c in visible_clients(s, u)}
         ex = s.get(m.Execution, ex_id)
-        if ex is None or ex.client_id not in cs:
+        if visible_client(s, u, ex.client_id if ex else None) is None:
             raise HTTPException(404, {"error": "execution not found"})
         if ex.status not in ("queued", "waiting_approval"):
             raise HTTPException(409, {"error": f"can't cancel a {ex.status} execution"})
@@ -263,31 +280,32 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
 
     @r.get("/jobs")
     def jobs(limit: int = Query(50, le=200), u: m.User = Depends(user), s: Session = Depends(db)):
-        cs = {c.id: c.slug for c in visible_clients(s, u)}
-        runs = s.scalars(select(m.JobRun).where(m.JobRun.client_id.in_(list(cs))).order_by(m.JobRun.created_at.desc()).limit(limit)).all()
+        runs = s.execute(select(m.JobRun, m.Client.slug).join(m.Client, m.Client.id == m.JobRun.client_id)
+                         .where(m.JobRun.client_id.in_(visible_ids(s, u)))
+                         .order_by(m.JobRun.created_at.desc()).limit(limit)).all()
         return {
             "definitions": [{"key": d.key, "title": d.title, "cadence": d.cadence, "owner_role": d.owner_role,
                              "checks": d.checks, "action": d.action, "completion": d.completion,
                              "events": list(d.events), "implemented": d.handler is not None} for d in REGISTRY.values()],
-            "runs": [{"id": j.id, "client": cs[j.client_id], "job": j.job_key, "status": j.status, "summary": j.summary,
+            "runs": [{"id": j.id, "client": slug, "job": j.job_key, "status": j.status, "summary": j.summary,
                       "produced": j.produced, "error": j.error.split("\n")[0][:300], "due_at": j.due_at.isoformat(),
-                      "finished_at": j.finished_at.isoformat() if j.finished_at else None} for j in runs],
+                      "finished_at": j.finished_at.isoformat() if j.finished_at else None} for j, slug in runs],
         }
 
     @r.get("/approvals")
     def approvals(u: m.User = Depends(user), s: Session = Depends(db)):
-        out = []
-        for c in visible_clients(s, u):
-            for a in s.scalars(select(m.Approval).where(m.Approval.client_id == c.id, m.Approval.status == "pending").order_by(m.Approval.created_at)):
-                out.append({"id": a.id, "client": c.slug, "action": a.action, "summary": a.summary, "payload": a.payload,
-                            "subject": f"{a.subject_kind}:{a.subject_id}", "requested_by": a.requested_by,
-                            "created_at": a.created_at.isoformat(), "expires_at": a.expires_at.isoformat() if a.expires_at else None})
-        return {"approvals": out}
+        rows = s.execute(select(m.Approval, m.Client.slug).join(m.Client, m.Client.id == m.Approval.client_id)
+                         .where(m.Approval.client_id.in_(visible_ids(s, u)), m.Approval.status == "pending")
+                         .order_by(m.Client.name, m.Approval.created_at)).all()
+        return {"approvals": [{"id": a.id, "client": slug, "action": a.action, "summary": a.summary, "payload": a.payload,
+                               "subject": f"{a.subject_kind}:{a.subject_id}", "requested_by": a.requested_by,
+                               "created_at": a.created_at.isoformat(),
+                               "expires_at": a.expires_at.isoformat() if a.expires_at else None} for a, slug in rows]}
 
     @r.post("/approvals/{ap_id}/decide")
     def decide(ap_id: str, body: DecideBody, u: m.User = Depends(user), s: Session = Depends(db)):
         ap = s.get(m.Approval, ap_id)
-        if ap is None or ap.client_id not in {c.id for c in visible_clients(s, u)}:
+        if visible_client(s, u, ap.client_id if ap else None) is None:
             raise HTTPException(404, {"error": "approval not found"})
         return guard(lambda: {"status": approvals_svc.decide(s, scope_for_user(s, u, ap.client_id), ap_id, body.approve, body.note).status})
 
@@ -368,15 +386,15 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
     def onboard_status(run_id: str, u: m.User = Depends(user), s: Session = Depends(db)):
         from ..storage import progress_for
         run = s.get(m.JobRun, run_id)
-        visible = {c.id: c for c in visible_clients(s, u)}
-        if run is None or run.client_id not in visible:
+        c = visible_client(s, u, run.client_id if run else None)
+        if c is None:
             raise HTTPException(404, {"error": "onboarding run not found"})
         row = s.scalar(select(m.Dossier).where(m.Dossier.job_run_id == run.id))
         ready = row is not None and run.status == "succeeded"
         return {
             "status": run.status,
             "job_run_id": run.id,
-            "client_slug": visible[run.client_id].slug,
+            "client_slug": c.slug,
             "summary": run.summary,
             "error": run.error.split("\n", 1)[0] if run.error else "",
             "progress": progress_for(s, run.id),
@@ -388,14 +406,14 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
     @r.get("/events")
     def events_tail(after: int = 0, client: Optional[str] = None, limit: int = Query(100, le=500),
                     u: m.User = Depends(user), s: Session = Depends(db)):
-        cs = {c.id: c.slug for c in visible_clients(s, u)}
+        q = (select(m.Event, m.Client.slug).join(m.Client, m.Client.id == m.Event.client_id)
+             .where(m.Event.org_id == u.org_id, m.Event.id > after, m.Event.client_id.in_(visible_ids(s, u))))
         if client:
-            cs = {k: v for k, v in cs.items() if v == client}
-        q = select(m.Event).where(m.Event.org_id == u.org_id, m.Event.id > after, m.Event.client_id.in_(list(cs)))
-        rows = s.scalars(q.order_by(m.Event.id.desc()).limit(limit)).all()
-        return {"events": [{"id": e.id, "client": cs.get(e.client_id), "seq": e.seq, "actor": e.actor, "role": e.actor_role,
+            q = q.where(m.Client.slug == client)
+        rows = s.execute(q.order_by(m.Event.id.desc()).limit(limit)).all()
+        return {"events": [{"id": e.id, "client": slug, "seq": e.seq, "actor": e.actor, "role": e.actor_role,
                             "action": e.action, "object": f"{e.object_kind}:{e.object_id}", "summary": e.summary,
-                            "at": e.created_at.isoformat(), "hash": e.hash[:12]} for e in reversed(rows)]}
+                            "at": e.created_at.isoformat(), "hash": e.hash[:12]} for e, slug in reversed(rows)]}
 
     @r.get("/me")
     def me(u: m.User = Depends(user), s: Session = Depends(db)):
@@ -409,8 +427,8 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
 
     # ---------------------------------------------------------------- brand accounts and saved audits
 
-    signup_limit = Limiter(5, 3600)
-    login_by_ip, login_by_email = Limiter(20, 900), Limiter(10, 900)
+    signup_limit = Limiter("signup", 5, 3600)
+    login_by_ip, login_by_email = Limiter("login-ip", 20, 900), Limiter("login-email", 10, 900)
 
     def too_many() -> HTTPException:
         return HTTPException(429, {"error": "Too many attempts. Wait a few minutes and try again."})
@@ -422,7 +440,7 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
     def signup(body: SignupBody, request: Request, s: Session = Depends(db)):
         from .. import accounts
         from ..api.deps import service
-        if not signup_limit.allow(visitor(request)):
+        if not signup_limit.allow(s, visitor(request)):
             raise too_many()
 
         def _create():
@@ -436,7 +454,7 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
     @r.post("/login")
     def login(body: LoginBody, request: Request, s: Session = Depends(db)):
         from .. import accounts
-        if not (login_by_ip.allow(visitor(request)) and login_by_email.allow(body.email.strip().lower())):
+        if not (login_by_ip.allow(s, visitor(request)) and login_by_email.allow(s, body.email.strip().lower())):
             raise too_many()
         try:
             _, token = accounts.sign_in(s, body.email, body.password.get_secret_value())
@@ -468,7 +486,7 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
         from .. import intake
 
         def _save():
-            c = next((x for x in visible_clients(s, u) if x.slug == body.client_slug), None)
+            c = s.scalar(visible(s, u).where(m.Client.slug == body.client_slug))
             if c is None:
                 if not org_wide(s, u) or not (body.client_name or "").strip():
                     raise HTTPException(404, {"error": "client not found"})
@@ -486,17 +504,19 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
     @r.get("/clients/{slug}/audit")
     def saved_audit(slug: str, version: Optional[int] = None, u: m.User = Depends(user), s: Session = Depends(db)):
         c = client_by_slug(s, u, slug)
-        rows = s.scalars(select(m.Dossier).where(m.Dossier.client_id == c.id).order_by(m.Dossier.version.desc())).all()
-        if not rows:
+        versions = s.execute(select(m.Dossier.version, m.Dossier.created_at,
+                                    m.Dossier.document["overall_health_score"].as_float())
+                             .where(m.Dossier.client_id == c.id).order_by(m.Dossier.version.desc())).all()
+        if not versions:
             raise HTTPException(404, {"error": "no audit yet for this brand"})
-        row = next((d for d in rows if d.version == version), None) if version else rows[0]
+        row = s.scalar(select(m.Dossier).where(m.Dossier.client_id == c.id,
+                                               m.Dossier.version == (version or versions[0][0])))
         if row is None:
             raise HTTPException(404, {"error": f"there is no version {version}"})
         return {
             "client_slug": c.slug, "client_name": c.name, "version": row.version,
             "created_at": row.created_at.isoformat(), "result": row.document,
-            "versions": [{"version": d.version, "created_at": d.created_at.isoformat(),
-                          "health_score": (d.document or {}).get("overall_health_score")} for d in rows],
+            "versions": [{"version": v, "created_at": at.isoformat(), "health_score": score} for v, at, score in versions],
         }
 
     return r

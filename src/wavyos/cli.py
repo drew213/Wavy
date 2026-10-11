@@ -12,10 +12,10 @@ from typing import Optional, Sequence
 
 from sqlalchemy import select
 
-from . import events, jobs, tenancy
+from . import events, housekeeping, jobs, monitoring, tenancy
 from . import models as m
 from .config import Settings, ensure_sqlite_dir, load_settings
-from .db import create_all, make_engine, make_sessionmaker, transaction
+from .db import make_engine, make_sessionmaker, transaction
 from .scope import InvalidState, NotFound, NotPermitted, scope_for_user
 
 
@@ -80,9 +80,22 @@ def _job_services(settings: Settings) -> dict:
 # ---------------------------------------------------------------- commands
 
 def cmd_init_db(args, settings: Settings) -> int:
+    from . import migrate
     ensure_sqlite_dir(settings.database_url)
-    create_all(make_engine(settings.database_url))
+    engine = make_engine(settings.database_url)
+    print(migrate.upgrade(engine))
+    drift = migrate.differences(engine)
+    engine.dispose()
+    if drift:
+        print(f"warning: the database differs from models.py in {len(drift)} place(s), first: {drift[0]}")
     print("database ready")
+    return 0
+
+
+def cmd_db_revision(args, settings: Settings) -> int:
+    from . import migrate
+    path = migrate.new_revision(args.message)
+    print(f"wrote {path}; read it before committing")
     return 0
 
 
@@ -208,34 +221,68 @@ def cmd_schedule(args, settings: Settings) -> int:
 
 def cmd_work(args, settings: Settings) -> int:
     """Run queued jobs, then queued executions (model and QA work). --loop keeps the worker running."""
+    import threading
     import time
+    import traceback
     from .execution import engine
     from .execution.providers import adapter_factory
     _load_jobmods()
     factory = _factory(settings)
     services = _job_services(settings)
     adapters = adapter_factory(factory, services["vault"])
+    threads = getattr(args, "threads", 1)
+    if threads > 1 and settings.database_url.startswith("sqlite"):
+        print("worker     SQLite allows one writer at a time; running jobs on 1 thread")
+        threads = 1
+
+    def show(r: m.JobRun) -> None:
+        print(f"job        {r.status:16} {r.job_key} {r.summary.splitlines()[0] if r.summary else ''}".rstrip())
+
+    def job_loop() -> None:
+        while True:
+            try:
+                for r in jobs.run_pending(factory, services, limit=args.limit):
+                    show(r)
+            except Exception as e:
+                monitoring.report(e)
+                traceback.print_exc()
+            time.sleep(args.interval)
+
+    # Looping with several threads, each claims its own jobs so a long audit never holds up the rest.
+    background = args.loop and threads > 1 and not args.executions_only
+    if background:
+        for i in range(threads):
+            threading.Thread(target=job_loop, name=f"wavyos-jobs-{i}", daemon=True).start()
     failed, n_jobs, n_ex = False, 0, 0
     next_schedule = 0.0
     while True:
-        if args.schedule_every and time.monotonic() >= next_schedule:
-            with transaction(factory) as s:
-                requeued = jobs.requeue_stuck(s)
-                queued = jobs.enqueue_due(s)
-            if queued or requeued:
-                print(f"scheduler  queued {len(queued)} job run(s), requeued {requeued} stuck")
-            next_schedule = time.monotonic() + args.schedule_every
-        if not args.executions_only:
-            for r in jobs.run_pending(factory, services, limit=args.limit):
-                n_jobs += 1
-                failed |= r.status == "failed"
-                print(f"job        {r.status:16} {r.job_key} {r.summary.splitlines()[0] if r.summary else ''}".rstrip())
-        if not args.jobs_only:
-            for ex in engine.work(factory, adapters, limit=args.limit):
-                n_ex += 1
-                failed |= ex.status == "failed"
-                why = ex.error.splitlines()[0] if ex.error else (ex.result or {}).get("summary", "")
-                print(f"execution  {ex.status:16} {ex.purpose:7} {ex.executor} {ex.model} ${ex.cost_usd:.4f} {why[:120]}".rstrip())
+        try:
+            if args.schedule_every and time.monotonic() >= next_schedule:
+                with transaction(factory) as s:
+                    requeued = jobs.requeue_stuck(s)
+                    queued = jobs.enqueue_due(s)
+                    cleared = housekeeping.run(s)
+                if queued or requeued:
+                    print(f"scheduler  queued {len(queued)} job run(s), requeued {requeued} stuck")
+                if cleared:
+                    print(f"cleanup    {cleared}")
+                next_schedule = time.monotonic() + args.schedule_every
+            if not args.executions_only and not background:
+                for r in jobs.run_pending(factory, services, limit=args.limit, threads=threads):
+                    n_jobs += 1
+                    failed |= r.status == "failed"
+                    show(r)
+            if not args.jobs_only:
+                for ex in engine.work(factory, adapters, limit=args.limit):
+                    n_ex += 1
+                    failed |= ex.status == "failed"
+                    why = ex.error.splitlines()[0] if ex.error else (ex.result or {}).get("summary", "")
+                    print(f"execution  {ex.status:16} {ex.purpose:7} {ex.executor} {ex.model} ${ex.cost_usd:.4f} {why[:120]}".rstrip())
+        except Exception as e:
+            if not args.loop:
+                raise
+            monitoring.report(e)
+            traceback.print_exc()  # a bad pass (say the database blipped) shouldn't stop the worker
         if not args.loop:
             break
         time.sleep(args.interval)
@@ -279,9 +326,10 @@ def cmd_client_allow(args, settings: Settings) -> int:
 
 
 def cmd_demo(args, settings: Settings) -> int:
+    from . import migrate
     from .demo import build
     ensure_sqlite_dir(settings.database_url)
-    create_all(make_engine(settings.database_url))
+    migrate.upgrade(make_engine(settings.database_url))
     token = build(_factory(settings))
     print("demo workspace ready: organization wavy-demo, client northwind-demo (fictional)")
     print("console token for admin@demo.wavy.test (shown once):")
@@ -297,7 +345,7 @@ def cmd_serve(args, settings: Settings) -> int:
         import time
         import traceback
         work_args = argparse.Namespace(loop=True, interval=2.0, schedule_every=300.0, limit=50,
-                                       jobs_only=False, executions_only=False)
+                                       jobs_only=False, executions_only=False, threads=args.worker_threads)
 
         def worker() -> None:
             while True:
@@ -342,7 +390,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="wavyos", description="Wavy OS backend")
     sub = p.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("init-db", help="create the database tables").set_defaults(fn=cmd_init_db)
+    sub.add_parser("init-db", help="create or upgrade the database tables (runs migrations)").set_defaults(fn=cmd_init_db)
+    r = sub.add_parser("db-revision", help="write a migration for model changes (autogenerated; read it)")
+    r.add_argument("-m", "--message", required=True)
+    r.set_defaults(fn=cmd_db_revision)
     sub.add_parser("ensure-admin", help="create the org and admin from WAVYOS_ADMIN_* if missing (for deploys)"
                    ).set_defaults(fn=cmd_ensure_admin)
 
@@ -402,7 +453,8 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("--loop", action="store_true", help="keep running")
     w.add_argument("--interval", type=float, default=5.0, help="seconds between passes with --loop")
     w.add_argument("--schedule-every", type=float, default=0, metavar="S",
-                   help="also queue due jobs (and requeue runs a dead worker left) every S seconds; 0 is off")
+                   help="also queue due jobs, requeue runs a dead worker left and clear expired data every S seconds; 0 is off")
+    w.add_argument("--threads", type=int, default=1, help="jobs to run at once (Postgres only)")
     g = w.add_mutually_exclusive_group()
     g.add_argument("--jobs-only", action="store_true")
     g.add_argument("--executions-only", action="store_true")
@@ -433,6 +485,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="proxies whose X-Forwarded-For is trusted ('*' behind a host's load balancer)")
     sv.add_argument("--with-worker", action="store_true",
                     help="also run the worker and scheduler in this process (when the host has no separate worker)")
+    sv.add_argument("--worker-threads", type=int, default=1, help="with --with-worker: jobs to run at once (Postgres only)")
     sv.set_defaults(fn=cmd_serve)
 
     v = sub.add_parser("verify-events", help="check a client's event hash chain")
@@ -444,6 +497,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = build_parser().parse_args(argv)
+    monitoring.init()
     try:
         return args.fn(args, load_settings())
     except (CliError, NotPermitted, NotFound, InvalidState, ValueError) as e:

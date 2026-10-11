@@ -8,7 +8,8 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, CheckConstraint, Date, Float, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy import (BigInteger, Boolean, CheckConstraint, Date, Float, ForeignKey, Index, Integer, LargeBinary, String,
+                        Text, UniqueConstraint)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base, IdMixin
@@ -304,6 +305,7 @@ JOB_RUN_STATUSES = ("queued", "running", "succeeded", "no_action", "failed", "sk
 
 class JobRun(IdMixin, Base):
     __tablename__ = "job_runs"
+    __table_args__ = (Index("ix_job_runs_status_due", "status", "due_at"),)  # the claim and stuck-run queries
     org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
     client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
     job_key: Mapped[str] = mapped_column(String(80), index=True)
@@ -313,11 +315,22 @@ class JobRun(IdMixin, Base):
     status: Mapped[str] = mapped_column(String(20), default="queued")
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     started_at: Mapped[Optional[datetime]]
+    heartbeat_at: Mapped[Optional[datetime]]  # touched while running; a stale one means the worker died
     finished_at: Mapped[Optional[datetime]]
     summary: Mapped[str] = mapped_column(Text, default="")
     produced: Mapped[dict] = mapped_column(default=dict)   # {insights: [], tasks: [], approvals: []}
     error: Mapped[str] = mapped_column(Text, default="")
     cost_usd: Mapped[Optional[float]] = mapped_column(Float)
+
+
+class RateLimit(IdMixin, Base):
+    """Attempts per key per window, shared by every web process. Keys are hashed: no IPs or emails stored."""
+    __tablename__ = "rate_limits"
+    __table_args__ = (UniqueConstraint("key", "bucket"),)
+    key: Mapped[str] = mapped_column(String(64))
+    bucket: Mapped[int] = mapped_column(Integer)
+    count: Mapped[int] = mapped_column(Integer, default=0)
+    expires_at: Mapped[datetime] = mapped_column(index=True)
 
 
 # ---------------------------------------------------------------- durable onboard output and commerce ingest
@@ -472,14 +485,15 @@ class AuditOrder(IdMixin, Base):
     order_id is the store's id ($event_id or OrderId) that the engine dedupes on.
     """
     __tablename__ = "audit_orders"
-    __table_args__ = (UniqueConstraint("client_id", "event_id"),)
+    __table_args__ = (UniqueConstraint("client_id", "event_id"),
+                      Index("ix_audit_orders_client_placed", "client_id", "placed_at"))
     org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
     client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
     metric_id: Mapped[str] = mapped_column(String(64))
     event_id: Mapped[str] = mapped_column(String(64))
     order_id: Mapped[Optional[str]] = mapped_column(String(120))
     profile_id: Mapped[Optional[str]] = mapped_column(String(64))
-    placed_at: Mapped[datetime] = mapped_column(index=True)
+    placed_at: Mapped[datetime]
     value: Mapped[float] = mapped_column(Float, default=0.0)
     items: Mapped[list] = mapped_column(default=list)
     discount: Mapped[Optional[list]] = mapped_column()
@@ -514,7 +528,8 @@ class Event(Base):
     """Append-only. hash = sha256(prev_hash + canonical event body), chained per (org, client)."""
     __tablename__ = "events"
     __table_args__ = (UniqueConstraint("org_id", "chain", "seq"),)
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # 64-bit on Postgres; SQLite only autoincrements a column declared exactly INTEGER.
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
     client_id: Mapped[Optional[str]] = mapped_column(ForeignKey("clients.id"), index=True)
     chain: Mapped[str] = mapped_column(String(40))  # client_id, or "org" for org-level events
