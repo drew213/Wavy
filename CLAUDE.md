@@ -58,15 +58,18 @@ Every push to `main` redeploys the live site. Work on branches and open pull req
 
 ## Backlog, in priority order
 
+**The audit comes first.** `docs/AUDIT-PLAN.md` is the plan for the whole audit: collector port, scoring on the brand path, and the workspace mapped to the Client Hub, in phases with acceptance criteria. Work through its phases in order before anything below except fixes. The Node collector, the audit SOP and the analyst brief it ports from are in `reference/` (read-only).
+
 1. **First real brand on the live site:** sign up at `/start` with a real read-only Klaviyo key, complete the questionnaire, and confirm the audit finishes on the free plan (the service must stay awake while it runs) and `/audit/<slug>` shows it. Staff sign-in, pages and headers are already verified live.
 2. **Approving a proposed plan should create its tasks.** Today a brand-started audit stores proposed task titles (`onboarding.py`, `first_30_day_plan.status == "proposed"`); a lead's approval needs to turn them into tasks through `operations.py`.
 3. **Don't make a returning brand re-enter its Klaviyo key.** If the client already has a live Klaviyo connection, skip step 1 of `/onboard` and run the audit with the stored key (`connections.py`, vault).
 4. **Account basics:** password reset and email verification (needs an email provider), and session tokens that survive a new browser tab (today they're in `sessionStorage`).
 5. **Rate limits across instances:** `ratelimit.py` is in-memory per process. Fine on one instance; move to the database before scaling out.
 6. **Alembic migrations** before the first change to an existing table.
-7. **Workspace sections from the Client Hub not built yet:** cohorts, campaign calendar, feedback, and the rest of the ATRAKT and Max Muscle hubs. The newest hub designs live in ChatGPT Sites; Andrew will export them. Match those, not older local copies.
+7. **Workspace sections from the Client Hub:** covered by `docs/AUDIT-PLAN.md` section 5 (section map, data shapes, design system).
 8. **Model work in the cloud:** the `codex` executor needs a ChatGPT-signed-in machine and won't run on Render. Store an Anthropic key with `wavyos provider add anthropic` (or `ANTHROPIC_API_KEY`) and allow it per client with `wavyos client allow`.
 9. **Shopify** as an order source alongside Klaviyo (`connectors/shopify.py` exists; not wired into onboarding).
+10. **Shopify transactional emails, redone: the first paid feature.** Queued behind audit phases 1–3; see `docs/AUDIT-PLAN.md` section 10. Don't start it yet.
 
 ## Before you open a pull request
 
