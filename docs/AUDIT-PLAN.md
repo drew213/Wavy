@@ -210,7 +210,7 @@ Order matters: 1 → 2 → 3 is the critical path. 4 can run beside 3; 5 needs 2
 2. **AI-written sections.** Recommended: measured findings show immediately; AI-written narrative (plan, journey map, calendar) is staff-only until a strategist approves it.
 3. **A paid worker before the first real brand.** The free web service sleeps after 15 idle minutes, which pauses an audit if the brand closes the tab. Checkpointing (phase 1) makes that recoverable, but a $7/month Render background worker makes it reliable. Recommended: add it when phase 1 merges.
 
-Until Andrew decides, build to the recommended option and keep the choice behind a single setting.
+**Decided (Oct 10, 2026): the recommended option for all three.** Brands see dollar ranges only when every input is measured; AI-written sections are staff-only until a strategist approves; the paid worker is added when phase 1 merges. Keep each choice behind a single setting.
 
 ## 10. After the audit: queued work
 
