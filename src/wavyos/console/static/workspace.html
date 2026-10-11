@@ -442,7 +442,7 @@ const VIEWS = {
 
   health() {
     const h = D().health || {};
-    if (h.score == null) return benchNotice("there is nothing to score yet");
+    if (h.score == null) return benchNotice(h.withheld ? `the score is withheld until more is measured (${h.withheld})` : "there is nothing to score yet");
     const color = r => r >= .8 ? "#9fd356" : r >= .5 ? "#e9c485" : "#ff8069";
     const why = { flow_coverage: "Five core flows catch shoppers at the moments they're most likely to buy. Each missing flow is revenue nobody is asking for.",
       email_share: "How much of recorded order value Klaviyo attributes to email. Healthy retention programs sit around 30%.",
@@ -464,19 +464,22 @@ const VIEWS = {
     const t = k.totals_12m || {}, rev = k.revenue_12m || {}, months = t.months || [];
     const peak = Math.max(...months.map(m => m.revenue || 0), 1);
     const mlabel = (m, i) => { const [y, mo] = m.month.split("-"); const name = new Date(+y, +mo - 1, 1).toLocaleDateString("en-US", { month: "short" }); return i === 0 || mo === "01" ? `${name} ${y.slice(2)}` : name; };
-    const flowNames = Object.fromEntries((k.flows || []).map(f => [f.id, f.name]));
+    const flowNames = { ...(rev.flow_names || {}), ...Object.fromEntries((k.flows || []).map(f => [f.id, f.name])) };
+    const src = (D().data_sources || {}).orders;
+    const orderNote = src === "benchmark" ? "Benchmark store: no Klaviyo key connected." : src === "unavailable" || e.target_aov == null
+      ? `Unavailable: ${esc((k.unavailable || {}).orders || "no orders could be read from Klaviyo")}.` : "From the imported orders.";
     const byFlow = Object.entries(rev.by_flow || {}).sort((a, b) => b[1] - a[1]);
     const share = (part) => rev.email_total ? part / rev.email_total : 0;
     return `<div class="metrics-grid">
         <div class="metric"><div class="metric-label">Recorded order value</div><strong class="lime">${compact(t.revenue)}</strong><p>${money(t.revenue)} gross Placed Order value, last 12 months, all sources.</p></div>
         <div class="metric"><div class="metric-label">Orders</div><strong>${num(t.orders)}</strong><p>Placed Order events in the same window.</p></div>
-        <div class="metric"><div class="metric-label">Average order value</div><strong>${e.target_aov != null ? "$" + Number(e.target_aov).toFixed(2) : "—"}</strong><p>From the imported orders.</p></div>
-        <div class="metric"><div class="metric-label">Repeat purchase rate</div><strong>${pct(e.repeat_purchase_rate)}</strong><p>${e.median_repurchase_days != null ? `Median ${esc(e.median_repurchase_days)} days to a second order.` : "Customers with more than one order."}</p></div>
+        <div class="metric"><div class="metric-label">Average order value</div><strong>${e.target_aov != null ? "$" + Number(e.target_aov).toFixed(2) : "—"}</strong><p>${orderNote}</p></div>
+        <div class="metric"><div class="metric-label">Repeat purchase rate</div><strong>${pct(e.repeat_purchase_rate)}</strong><p>${e.repeat_purchase_rate == null ? orderNote : e.median_repurchase_days != null ? `Median ${esc(e.median_repurchase_days)} days to a second order.` : "Customers with more than one order."}</p></div>
       </div>
       <div class="grid-2">
         <div class="panel"><div class="panel-head"><div><h2>Recorded order value</h2><p>Complete calendar months · USD · all synced order sources</p></div></div>
           ${months.length ? `<div class="revenue-chart" role="img" aria-label="Monthly recorded order value, last 12 months">${months.map((m, i) => `<div class="chart-column"><span class="chart-value">${compact(m.revenue)}</span><div class="chart-track"><div class="chart-bar" style="height:${Math.max(1, (m.revenue || 0) / peak * 100).toFixed(1)}%"></div></div><span class="chart-label">${esc(mlabel(m, i))}</span></div>`).join("")}</div>
-            <p style="font-size:13px;margin-top:16px">Gross order values, before refunds or a net-sales reconciliation.</p>` : `<p class="empty">Monthly totals weren't available from Klaviyo.</p>`}
+            <p style="font-size:13px;margin-top:16px">Gross order values, before refunds or a net-sales reconciliation.</p>` : `<p class="empty">Monthly totals weren't available from Klaviyo${(k.unavailable || {}).totals_12m ? ": " + esc(k.unavailable.totals_12m) : ""}.</p>`}
         </div>
         <div class="panel"><div class="panel-head"><div><h2>Campaigns &amp; flows</h2><p>Last 365 days · Klaviyo email attribution</p></div></div>
           <div class="mix-total">${money(rev.email_total)}<small>Attributed revenue · ${pct(rev.email_share)} of recorded value</small></div>

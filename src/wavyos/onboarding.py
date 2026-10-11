@@ -241,45 +241,48 @@ class ClientOnboardingService:
         # 2. Ingest Layer 2 Client Facts across 4 operating areas
         facts_count = self._ingest_layer_2_facts(client_scope, payload)
 
-        # 3. The order cohort: measured when a store source was read, benchmark otherwise
+        # 3. The order cohort: measured when a store source was read. Benchmark figures stand in only when
+        #    the brand chose to run without a key; a connected account never borrows them.
         progress("analyze", "active", "Working out AOV, repeat rate and time to second order")
-        if shopify_data is None:
+        if shopify_data is None and klaviyo is None:
+            from .benchmarks import sample_cohort
             orders_source = "benchmark"
-            shopify_client = ShopifyClient(
-                store_domain=payload.shopify_domain or f"{payload.client_slug}.myshopify.com",
-                access_token=payload.shopify_access_token
-            )
-            shopify_data = shopify_client.fetch_cohort_analytics()
-        orders_source = orders_source or "shopify"
-        median_days = shopify_data.median_days_to_second_order or payload.typical_consumption_days
-        totals = (klaviyo or {}).get("totals_12m") or {}
-        annual_orders = int(totals.get("orders") or shopify_data.total_orders_12m)
-        progress("analyze", "done",
-                 f"AOV ${shopify_data.blended_aov:,.2f}, {shopify_data.repeat_purchase_rate:.1%} repeat, "
-                 f"{median_days} days to second order",
-                 aov=shopify_data.blended_aov, repeat_rate=shopify_data.repeat_purchase_rate, median_days=median_days)
+            shopify_data = sample_cohort(payload.shopify_domain or f"{payload.client_slug}.myshopify.com")
+        orders_source = orders_source or ("shopify" if shopify_data is not None else "unavailable")
+        if shopify_data is not None:
+            median_days = shopify_data.median_days_to_second_order or None
+            progress("analyze", "done",
+                     f"AOV ${shopify_data.blended_aov:,.2f}, {shopify_data.repeat_purchase_rate:.1%} repeat"
+                     + (f", {median_days} days to second order" if median_days else ""),
+                     aov=shopify_data.blended_aov, repeat_rate=shopify_data.repeat_purchase_rate, median_days=median_days)
+        else:
+            median_days = None
+            progress("analyze", "skipped", "No orders could be read from Klaviyo, so customer numbers are unavailable")
 
-        # 4. Run Sizing Engine (05-sizing.md)
-        progress("sizing", "active", "Sizing the revenue leaks without double counting")
-        sizing_engine = OpportunitySizingEngine(
-            total_subscribers=42500,
-            engaged_subscribers=14200,
-            unengaged_subscribers=11500,
-            blended_aov=shopify_data.blended_aov,
-            repeat_purchase_rate=shopify_data.repeat_purchase_rate,
-            median_repurchase_days=median_days,
-            annual_orders=annual_orders,
-        )
-        sizing_report = sizing_engine.size_account_opportunities(audit_findings={})
-        progress("sizing", "done", f"${sizing_report.total_monthly_leak_base:,.0f} a month left on the table",
-                 monthly_leak=sizing_report.total_monthly_leak_base)
+        # 4. Sizing needs measured pools; the full audit sizes from the account. Benchmark runs size the sample.
+        sizing_report: Optional[SizingReport] = None
+        if orders_source == "benchmark":
+            from .benchmarks import POOLS
+            progress("sizing", "active", "Sizing the benchmark store's revenue leaks")
+            sizing_report = OpportunitySizingEngine(
+                **POOLS, blended_aov=shopify_data.blended_aov, repeat_purchase_rate=shopify_data.repeat_purchase_rate,
+                median_repurchase_days=median_days or payload.typical_consumption_days,
+                annual_orders=shopify_data.total_orders_12m,
+            ).size_account_opportunities(audit_findings={})
+            progress("sizing", "done", f"Benchmark store: ${sizing_report.total_monthly_leak_base:,.0f} a month",
+                     monthly_leak=sizing_report.total_monthly_leak_base)
+        else:
+            progress("sizing", "skipped", "Sized by the full audit from your account's measured pools")
 
         # 5. Emit Deduplicated Insights into Wavy OS
         progress("plan", "active", "Writing the first 30-day plan")
-        created_insights = self._emit_audit_insights(client_scope, sizing_report, shopify_data)
+        created_insights = (self._emit_audit_insights(client_scope, sizing_report, shopify_data)
+                            if sizing_report is not None else self._measured_insights(client_scope, klaviyo))
 
         # 6. Propose & Approve Decision: 'First 30-Day Onboarding & Repair Plan'
-        decision, tasks = self._create_decision_and_tasks(client_scope, created_insights, payload, sizing_report)
+        decision, tasks = self._create_decision_and_tasks(
+            client_scope, created_insights, payload, sizing_report,
+            shopify_data.repeat_purchase_rate if shopify_data and orders_source != "benchmark" else None)
 
         # 7. Generate Campaign Draft using Founder Voice
         creative_draft = self._generate_founder_voice_campaign(payload, shopify_data)
@@ -305,14 +308,14 @@ class ClientOnboardingService:
             "economics": {
                 "gross_margin_pct": payload.gross_margin_pct,
                 "free_shipping_threshold": payload.free_shipping_threshold,
-                "target_aov": shopify_data.blended_aov,
+                "target_aov": shopify_data.blended_aov if shopify_data else None,
                 "typical_consumption_days": payload.typical_consumption_days,
-                "repeat_purchase_rate": shopify_data.repeat_purchase_rate,
+                "repeat_purchase_rate": shopify_data.repeat_purchase_rate if shopify_data else None,
                 "median_repurchase_days": median_days,
             },
             "data_sources": {"orders": orders_source, "klaviyo": bool(klaviyo)},
             "klaviyo": klaviyo,
-            "sizing_summary": sizing_report.to_dict(),
+            "sizing_summary": sizing_report.to_dict() if sizing_report else None,
             "first_30_day_plan": {
                 "decision_id": decision.id,
                 "status": decision.status,
@@ -333,7 +336,7 @@ class ClientOnboardingService:
         progress("qa", "done", f"Compliance QA {'passed' if qa['passed'] else 'flagged issues'}: {qa['score']}/100",
                  qa_score=qa["score"], qa_passed=qa["passed"])
 
-        measured_rate = shopify_data.repeat_purchase_rate if orders_source != "benchmark" else None
+        measured_rate = shopify_data.repeat_purchase_rate if shopify_data and orders_source != "benchmark" else None
         dossier["health"] = klaviyo_intake.health(klaviyo, measured_rate)
         overall_health = dossier["health"]["score"]
 
@@ -343,7 +346,7 @@ class ClientOnboardingService:
             client_name=client.name,
             onboarded_at=now_iso,
             overall_health_score=overall_health,
-            sizing_report=sizing_report.to_dict(),
+            sizing_report=sizing_report.to_dict() if sizing_report else {},
             decision_id=decision.id,
             decision_title=decision.title,
             tasks_created=[{"id": t.id, "title": t.title, "area": t.area, "owner_role": t.owner_role} for t in tasks],
@@ -395,6 +398,32 @@ class ClientOnboardingService:
             count += 1
         return count
 
+    def _measured_insights(self, client_scope: Scope, klaviyo: Optional[Dict[str, Any]]) -> List[m.Insight]:
+        """Insights from what the Klaviyo read measured, for runs that have no sizing yet."""
+        k = klaviyo or {}
+        found: list[tuple[str, str, str, str, str]] = []
+        if (k.get("unavailable") or {}).get("orders"):
+            choice = k.get("metric_choice") or {}
+            found.append(("data_infrastructure", "Order data can't be read from Klaviyo",
+                          f"{k['unavailable']['orders']}. {choice.get('reason') or ''}".strip(), "high", "order_source"))
+        coverage = k.get("coverage") or {}
+        missing = [c["label"] for c in coverage.values() if not c["live"]]
+        if coverage:
+            found.append(("flow_audit", f"{len(coverage) - len(missing)} of {len(coverage)} core flows are live",
+                          "Not live: " + ", ".join(missing) + "." if missing else "Every core flow has a live match by name; "
+                          "the full audit checks what each one sends and earns.", "high" if missing else "low", "core_flows"))
+        if not found:
+            found.append(("data_infrastructure", "No Klaviyo account connected",
+                          "The audit can't measure anything until a read-only Klaviyo key is connected.", "high", "no_key"))
+        insights = []
+        for area, title, summary, severity, key in found:
+            ins, _ = operations.create_insight(
+                self.session, client_scope, area=area, title=title, summary=summary, severity=severity,
+                evidence=[{"kind": "klaviyo_read", "ref": f"klaviyo://onboarding/{key}", "detail": summary}],
+                source_kind="agent", source_ref="wavyos/klaviyo_intake.py", dedupe_key=f"onboarding_{key}")
+            insights.append(ins)
+        return insights
+
     def _emit_audit_insights(self, client_scope: Scope, sizing: SizingReport, shopify: ShopifyCohortData) -> List[m.Insight]:
         insights = []
         for opp in sizing.opportunities[:3]:
@@ -418,7 +447,8 @@ class ClientOnboardingService:
         return insights
 
     def _create_decision_and_tasks(self, client_scope: Scope, insights: List[m.Insight],
-                                  payload: OnboardingIntakePayload, sizing: SizingReport) -> tuple[m.Decision, List[m.Task]]:
+                                  payload: OnboardingIntakePayload, sizing: Optional[SizingReport],
+                                  baseline_repeat: Optional[float] = None) -> tuple[m.Decision, List[m.Task]]:
         insight_ids = [ins.id for ins in insights]
         from .scope import Actor
         strat_actor = Actor("agent", "strategist-agent", frozenset({"strategist"}))
@@ -428,8 +458,9 @@ class ClientOnboardingService:
             self.session, strat_scope,
             title="First 30-Day Onboarding & Foundation Plan",
             insight_ids=insight_ids,
-            rationale=f"Deploy critical behavioral flows to capture ${sizing.total_monthly_leak_base:,.0f}/mo in uncaptured GMV.",
-            measurement={"metric": "repeat_purchase_rate", "window_days": 30, "baseline": 0.28},
+            rationale=(f"Deploy critical behavioral flows to capture ${sizing.total_monthly_leak_base:,.0f}/mo in uncaptured GMV."
+                       if sizing else "Repair the foundation the audit finds, in order of measured impact."),
+            measurement={"metric": "repeat_purchase_rate", "window_days": 30, "baseline": baseline_repeat},
             plan_scope=["campaign.build_draft", "flow.build_draft", "work.implement_nonlive"]
         )
         # Approve the decision with human lead

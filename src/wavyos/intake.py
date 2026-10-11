@@ -12,6 +12,7 @@ from typing import Any, Optional
 
 T, C, M = "text", "choice", "multi"
 LONG, SHORT = "long", "short"
+STORE_PLATFORMS = ["Shopify", "WooCommerce", "BigCommerce", "Magento", "Other"]
 
 
 def _q(key, label, kind=T, *, required=False, help="", options=(), size=LONG, placeholder=""):
@@ -84,12 +85,15 @@ SECTIONS = [
      ]},
     {"key": "tools", "title": "Tools and access", "intro": "What you use, and what access the Wavy team needs.",
      "questions": [
+         _q("store_platform", "Store platform", C, required=True, options=STORE_PLATFORMS,
+            help="Where your orders are placed. Klaviyo often keeps old order sources after a platform switch."),
          _q("email_platform", "Email platform", C, required=True, options=["Klaviyo", "Omnisend", "Mailchimp", "Other"]),
          _q("sms_platform", "SMS platform", C, required=True,
             options=["Klaviyo SMS", "Attentive", "Postscript", "One Text", "Other", "We don't send SMS yet"]),
          _q("other_tools", "Other tools we should know about.", help="Reviews, loyalty, subscriptions, helpdesk, popups and forms, quizzes."),
          _q("access_given", "Which access have you already given the Wavy team?", M,
-            options=["Email platform", "SMS platform", "Shopify (collaborator)", "Reviews app", "Asset library", "None yet"]),
+            options=["Email platform", "SMS platform", "Shopify (collaborator)", "Store admin (WooCommerce or other)",
+                     "Reviews app", "Asset library", "None yet"]),
          _q("dns_owner", "Who can make DNS changes for your sending domain?", size=SHORT),
          _q("integrations", "Any custom integrations or events (quiz, app, wholesale portal)?"),
      ]},
@@ -183,6 +187,8 @@ def payload_fields(answers: dict) -> dict:
     f: dict[str, Any] = {"intake": dict(a)}
     if a.get("goals_90d"):
         f["primary_goal_90d"] = a["goals_90d"].strip()
+    if a.get("store_platform") and a["store_platform"] != "Other":
+        f["store_platform"] = a["store_platform"]
     voice = _words(a.get("voice_words"), 5)
     if voice:
         f["tone_descriptors"] = voice

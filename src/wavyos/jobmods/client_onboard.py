@@ -55,7 +55,7 @@ def _human_scope(ctx: JobContext, requested_by: str | None):
     return scope if scope.actor.roles & {"org_admin", "account_lead"} else ctx.scope
 
 
-def _klaviyo(ctx: JobContext, progress: Progress):
+def _klaviyo(ctx: JobContext, progress: Progress, platform: str | None = None):
     """(klaviyo section, cohort) from the client's connected Klaviyo account, or (None, None)."""
     vault, make_client = ctx.services.get("vault"), ctx.services.get("klaviyo_factory")
     conns = connections.active(ctx.session, ctx.scope, "klaviyo")
@@ -69,7 +69,7 @@ def _klaviyo(ctx: JobContext, progress: Progress):
         client = make_client(key)
         try:
             section = klaviyo_intake.run(ctx.session, ctx.scope, client, progress=progress,
-                                         expect_account=conn.external_account_id)
+                                         expect_account=conn.external_account_id, platform=platform)
         finally:
             close = getattr(client, "close", None)
             if callable(close):
@@ -105,7 +105,7 @@ def client_onboard(ctx: JobContext) -> JobOutcome:
     raw = (ctx.run.trigger or {}).get("payload") or {}
     payload, requested_by = _payload(raw)
     progress = Progress(ctx.session, ctx.scope, ctx.run.id, STAGES)
-    klaviyo, klaviyo_cohort = _klaviyo(ctx, progress)
+    klaviyo, klaviyo_cohort = _klaviyo(ctx, progress, (payload.intake or {}).get("store_platform"))
     shopify_cohort = _shopify_cohort(ctx, payload)
     cohort = shopify_cohort or klaviyo_cohort
     source = "shopify" if shopify_cohort else KLAVIYO if klaviyo_cohort else ""

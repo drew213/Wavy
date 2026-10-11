@@ -32,7 +32,7 @@ PAGE_1 = [_event(1, "P1", 90, 60.0, "Barrier Serum"), _event(2, "P2", 80, 100.0,
 PAGE_2 = [_event(3, "P1", 60, 80.0, "Barrier Serum"), _event(4, "P3", 10, 40.0, "Cleanser")]
 
 
-def fake_klaviyo(account_id="ACC1", calls=None):
+def fake_klaviyo(account_id="ACC1", calls=None, no_orders=False):
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.headers["authorization"] == f"Klaviyo-API-Key {KEY}"
         path = request.url.path.rstrip("/")
@@ -48,11 +48,16 @@ def fake_klaviyo(account_id="ACC1", calls=None):
                 {"id": "PO1", "attributes": {"name": "Placed Order", "integration": {"key": "shopify"}}}]})
         if path == "/api/metric-aggregates":
             body = json.loads(request.content)["data"]["attributes"]
-            assert body["metric_id"] == "PO1"
+            assert body["metric_id"] in {"PO1", "WOO"}
+            if body["metric_id"] == "WOO" or no_orders:  # a dormant copy of Placed Order: no orders in the window
+                return httpx.Response(200, json={"data": {"attributes": {"dates": [], "data": [
+                    {"measurements": {"count": [0], "sum_value": [0.0]}}]}}})
             dates = [f"2026-{mo:02d}-01T00:00:00+00:00" for mo in range(1, 13)]
             return httpx.Response(200, json={"data": {"attributes": {"dates": dates, "data": [{"measurements": {
                 "count": [0] * 9 + [1, 2, 1], "sum_value": [0] * 9 + [60.0, 180.0, 40.0]}}]}}})
         if path == "/api/events":
+            if no_orders:
+                return httpx.Response(200, json={"data": [], "links": {"next": None}})
             if request.url.params.get("page[cursor]"):
                 return httpx.Response(200, json={"data": PAGE_2, "links": {"next": None}})
             since = request.url.params["filter"].split("greater-or-equal(datetime,")[1].split(")")[0]
@@ -69,8 +74,8 @@ def fake_klaviyo(account_id="ACC1", calls=None):
                 {"id": "F4", "attributes": {"name": "Winback 90d", "status": "live"}}]})
         if path == "/api/flow-values-reports":
             return httpx.Response(200, json={"data": {"attributes": {"results": [
-                {"groupings": {"flow_id": "F1"}, "statistics": {"conversion_value": 30.0}},
-                {"groupings": {"flow_id": "F4"}, "statistics": {"conversion_value": 20.0}}]}}})
+                {"groupings": {"flow_id": "F1", "flow_name": "Abandoned Checkout - Core"}, "statistics": {"conversion_value": 30.0}},
+                {"groupings": {"flow_id": "F4", "flow_name": "Old Winback (archived)"}, "statistics": {"conversion_value": 20.0}}]}}})
         if path == "/api/campaign-values-reports":
             return httpx.Response(200, json={"data": {"attributes": {"results": [
                 {"groupings": {"campaign_id": "C1"}, "statistics": {"conversion_value": 10.0}}]}}})
@@ -130,7 +135,7 @@ def test_klaviyo_key_alone_produces_a_measured_audit(env):
 
     body = c.get(f"/v1/ops/onboard/{queued['job_run_id']}").json()
     stages = {s["key"]: s["status"] for s in body["progress"]["stages"]}
-    assert set(stages.values()) == {"done"}, stages
+    assert stages.pop("sizing") == "skipped" and set(stages.values()) == {"done"}, stages
     assert body["progress"]["metrics"]["orders_imported"] == 4
     assert body["progress"]["metrics"]["orders_expected"] == 4
     assert len(body["progress"]["metrics"]["months"]) == 12
@@ -144,10 +149,14 @@ def test_klaviyo_key_alone_produces_a_measured_audit(env):
     assert cov["abandoned_checkout"]["live"] and cov["customer_winback"]["live"]
     assert not cov["browse_abandonment"]["live"] and not cov["added_to_cart"]["live"]
     assert d["klaviyo"]["revenue_12m"] == {"flows": 50.0, "by_flow": {"F1": 30.0, "F4": 20.0}, "campaigns": 10.0,
-                                           "email_total": 60.0, "email_share": pytest.approx(60 / 280, abs=1e-4)}
+                                           "email_total": 60.0, "email_share": pytest.approx(60 / 280, abs=1e-4),
+                                           "flow_names": {"F1": "Abandoned Checkout - Core", "F4": "Old Winback (archived)"}}
     flows = {f["flow_key"]: f for f in d["execution"]["flows"]}
     assert flows["abandoned_checkout"]["already_live"] is True
     assert flows["browse_abandonment"]["already_live"] is False
+    assert d["klaviyo"]["metric_choice"]["metric_id"] == "PO1"
+    assert {c["id"]: c["orders_last_90_days"] for c in d["klaviyo"]["metric_choice"]["candidates"]}["WOO"] == 0
+    assert d["sizing_summary"] is None and body["result"]["sizing_report"] == {}
     assert body["result"]["overall_health_score"] == d["health"]["score"]
     assert {p["key"] for p in d["health"]["parts"]} == {"flow_coverage", "email_share", "repeat_rate"}
 
@@ -193,3 +202,16 @@ def test_a_key_that_opens_another_account_stops_the_run(env):
     done = jobs.run_pending(factory, _services(vault, httpx.MockTransport(fake_klaviyo(account_id="OTHER"))), limit=10)
     run = next(r for r in done if r.id == queued["job_run_id"])
     assert run.status == "failed" and "different account" in run.error
+
+
+def test_a_store_with_no_readable_orders_is_unavailable_not_benchmarked(env):
+    factory, c, vault, _ = env
+    queued = _onboard(c)
+    jobs.run_pending(factory, _services(vault, httpx.MockTransport(fake_klaviyo(no_orders=True))), limit=10)
+    body = c.get(f"/v1/ops/onboard/{queued['job_run_id']}").json()
+    assert body["status"] == "succeeded", body.get("error")
+    d = body["result"]["dossier"]
+    assert d["data_sources"]["orders"] == "unavailable"
+    assert d["economics"]["target_aov"] is None and d["economics"]["repeat_purchase_rate"] is None
+    assert d["sizing_summary"] is None and d["health"]["score"] is None
+    assert "80.0" not in json.dumps(d["economics"])

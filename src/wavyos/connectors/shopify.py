@@ -180,6 +180,12 @@ class ShopifyClient:
         total_custs = len(customer_orders) or max(len(orders), 1)
         repeats = sum(1 for items in customer_orders.values() if len(items) > 1)
         rpr = repeats / total_custs if total_custs else 0.0
+        gaps = sorted(
+            (datetime.fromisoformat(str(b["date"]).replace("Z", "+00:00"))
+             - datetime.fromisoformat(str(a["date"]).replace("Z", "+00:00"))).days
+            for a, b in (sorted(items, key=lambda i: str(i["date"]))[:2] for items in customer_orders.values()
+                         if len(items) > 1 and all(i.get("date") for i in items)))
+        refunded = sum(1 for o in orders if str(o.get("financial_status") or "") == "refunded")
 
         for cust_id, items in customer_orders.items():
             first_order_items = items[0].get("items", [])
@@ -201,36 +207,15 @@ class ShopifyClient:
             total_orders_12m=len(orders),
             total_unique_customers_12m=total_custs,
             lifetime_gmv_12m=round(total_gmv, 2),
-            blended_aov=round(total_gmv / len(orders), 2) if orders else 75.0,
+            blended_aov=round(total_gmv / len(orders), 2) if orders else 0.0,
             repeat_customer_count=repeats,
             repeat_purchase_rate=round(rpr, 3),
-            median_days_to_second_order=38,
+            median_days_to_second_order=gaps[len(gaps) // 2] if gaps else 0,
             top_gateway_skus=top_gateway,
             top_repeat_skus=top_repeat,
-            refund_rate_pct=1.9,
+            refund_rate_pct=round(100 * refunded / len(orders), 2) if orders else 0.0,
         )
 
     def _generate_representative_sample(self) -> ShopifyCohortData:
-        """Sample benchmark data reflecting an authentic $2.5M - $3M eCommerce brand."""
-        return ShopifyCohortData(
-            store_domain=self.store_domain,
-            currency="USD",
-            total_orders_12m=34200,
-            total_unique_customers_12m=26100,
-            lifetime_gmv_12m=2736000.00,
-            blended_aov=80.00,
-            repeat_customer_count=7330,
-            repeat_purchase_rate=0.281,
-            median_days_to_second_order=36,
-            top_gateway_skus=[
-                {"name": "Barrier Recovery Complex (50ml)", "units": 12400},
-                {"name": "Ultra Radiance C+ Serum", "units": 8900},
-                {"name": "Trial Discovery Protocol 3-Pack", "units": 4800},
-            ],
-            top_repeat_skus=[
-                {"name": "Barrier Recovery Complex (50ml)", "units": 6900},
-                {"name": "Ultra Radiance C+ Serum", "units": 5200},
-                {"name": "Hydra-Mist Infusion Refill", "units": 2400},
-            ],
-            refund_rate_pct=1.75,
-        )
+        from ..benchmarks import sample_cohort
+        return sample_cohort(self.store_domain)

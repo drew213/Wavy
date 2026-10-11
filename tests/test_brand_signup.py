@@ -99,7 +99,7 @@ ANSWERS = {
     "primary_contact": "Maya", "final_approver": "Maya", "success": "Repeat rate up 5 points by day 90",
     "economics": "AOV around $72, gross margin 64%", "shipping_returns": "Free shipping over $60, 30-day returns",
     "consumable_days": "Serum lasts about 6 weeks", "programs": ["Subscriptions", "Bundles"], "program_apps": "Recharge",
-    "submitted_by_name": "Maya Chen",
+    "submitted_by_name": "Maya Chen", "store_platform": "WooCommerce",
 }
 
 
@@ -113,7 +113,8 @@ def test_intake_answers_map_onto_the_build():
     assert f["free_shipping_threshold"] == 60 and f["gross_margin_pct"] == 64 and f["target_aov"] == 72
     assert f["typical_consumption_days"] == 42 and f["subscription_app"] == "Recharge"
     assert f["messaging_tools"] == ["Klaviyo", "Attentive"]
-    assert len(intake.QUESTIONS) == 49 and sum(q["required"] for q in intake.QUESTIONS.values()) == 13
+    assert f["store_platform"] == "WooCommerce"
+    assert len(intake.QUESTIONS) == 50 and sum(q["required"] for q in intake.QUESTIONS.values()) == 14
 
 
 def test_brand_questionnaire_autosaves_and_feeds_the_audit(env):
@@ -123,7 +124,7 @@ def test_brand_questionnaire_autosaves_and_feeds_the_audit(env):
     slug = made["client_slug"]
 
     blank = brand.get(f"/v1/ops/intake?client={slug}").json()
-    assert blank["answered"] == 0 and blank["total"] == 49 and len(blank["sections"]) == 8
+    assert blank["answered"] == 0 and blank["total"] == 50 and len(blank["sections"]) == 8
     partial = brand.put("/v1/ops/intake", json={"client_slug": slug, "answers": {"what_you_sell": "Skincare"}}).json()
     assert partial["answered"] == 1 and brand.get(f"/v1/ops/intake?client={slug}").json()["answers"] == {"what_you_sell": "Skincare"}
     assert brand.put("/v1/ops/intake", json={"client_slug": slug, "answers": {"nope": "x"}}).status_code == 422

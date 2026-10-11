@@ -8,6 +8,7 @@ every candidate, and left for staff to pin.
 from __future__ import annotations
 
 import re
+from datetime import datetime, timedelta
 from typing import Any, Iterable, Optional
 
 ALIAS_GROUPS: tuple[tuple[str, ...], ...] = (
@@ -84,9 +85,43 @@ def resolve_pinned(metrics: list[dict], names: Iterable[str], pins: Optional[dic
     return metric
 
 
+ACTIVITY_DAYS = 90
+
+
+def recent_activity(client, metric_ids: Iterable[str], now: datetime, days: int = ACTIVITY_DAYS) -> dict[str, Optional[int]]:
+    """Events per metric in the last `days`: {metric id: count, or None when Klaviyo wouldn't say}.
+
+    Used only to tell a live order source from a dormant one with the same name, so a failed read is
+    None (unknown) and never counts as dormant.
+    """
+    out: dict[str, Optional[int]] = {}
+    start = now - timedelta(days=days)
+    for mid in metric_ids:
+        try:
+            agg = client.metric_aggregate(mid, measurements=["count"], start=start, end=now, interval="month")
+        except Exception:  # noqa: BLE001 - any failure means "unknown", which is the safe answer
+            out[mid] = None
+            continue
+        rows = agg.get("data") or []
+        out[mid] = int(sum(float(x or 0) for r in rows for x in (r.get("measurements") or {}).get("count") or []))
+    return out
+
+
+def ecommerce_candidates(metrics: list[dict], names: str | list[str]) -> list[dict]:
+    names = [names] if isinstance(names, str) else list(names)
+    wanted = {_norm(a) for n in names for a in aliases(n)}
+    return [m for m in metrics if _norm(m.get("name")) in wanted and _ECOMMERCE.search(_integration_text(m))]
+
+
 def pick_metric(metrics: list[dict], names: str | list[str], prefer: Optional[str] = None,
-                pins: Optional[dict[str, dict]] = None) -> dict:
-    """{metric, candidates, status: selected|missing|ambiguous, reason}. prefer: 'ecommerce' | 'klaviyo' | None."""
+                pins: Optional[dict[str, dict]] = None, activity: Optional[dict[str, Optional[int]]] = None,
+                platform: Optional[str] = None) -> dict:
+    """{metric, candidates, status: selected|missing|ambiguous, reason}. prefer: 'ecommerce' | 'klaviyo' | None.
+
+    For ecommerce metrics, `activity` ({id: recent event count}) drops dormant copies left behind by a
+    platform switch, and `platform` (the store platform the brand named) breaks a remaining tie. Without
+    either, a Shopify copy is preferred, as the reference collector did.
+    """
     names = [names] if isinstance(names, str) else list(names)
     pinned = resolve_pinned(metrics, names, pins)
     if pinned is not None:
@@ -102,7 +137,20 @@ def pick_metric(metrics: list[dict], names: str | list[str], prefer: Optional[st
     if prefer == "ecommerce":
         shopify = [m for m in candidates if _SHOPIFY.search(_integration_text(m))]
         ecommerce = [m for m in candidates if _ECOMMERCE.search(_integration_text(m))]
-        if shopify:
+        if activity is not None or platform:
+            pool, notes = ecommerce or candidates, []
+            if activity is not None and len(pool) > 1:
+                live = [m for m in pool if activity.get(m.get("id")) is None or (activity.get(m.get("id")) or 0) > 0]
+                if live and len(live) < len(pool):
+                    notes.append(f"{len(pool) - len(live)} dormant copy (no events in {ACTIVITY_DAYS} days) set aside")
+                    pool = live
+            if platform and len(pool) > 1:
+                match = [m for m in pool if _norm(platform) in _norm(_integration_text(m))]
+                if match:
+                    notes.append(f"matches the store platform ({platform})")
+                    pool = match
+            reason = "Ecommerce order source with recent orders" + (f"; {'; '.join(notes)}" if notes else "")
+        elif shopify:
             pool, reason = shopify, "Canonical Shopify commerce source"
         elif ecommerce:
             pool, reason = ecommerce, "Only matching ecommerce metric; no Shopify candidate"

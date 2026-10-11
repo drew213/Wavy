@@ -12,6 +12,7 @@ Long stages save progress as they go (Collect.checkpoint), and a resumed stage s
 from __future__ import annotations
 
 import copy
+import hashlib
 import re
 import time
 from dataclasses import dataclass, field
@@ -692,9 +693,20 @@ def orders_file(session: Session, run: m.AuditRun) -> Optional[dict]:
     return {"metric": {"id": st.get("metric_id")}, "start": st["start"], "end": st["end"],
             "pageSize": st.get("page_size"), "pages": st.get("pages"), "truncated": bool(st.get("truncated")),
             "error": st.get("error"),
-            "orders": [{"p": r.profile_id, "t": utc_iso(r.placed_at if r.placed_at.tzinfo else r.placed_at.replace(tzinfo=timezone.utc)),
-                        "v": r.value, "i": r.items or [], "d": r.discount, "s": r.source, "o": r.order_id}
-                       for r in rows]}
+            "orders": [_order_row(r) for r in rows]}
+
+
+def order_key(source: Optional[str], order_number: Optional[str], placed_iso: str, value: float) -> str:
+    """One real order: (source, order number, UTC instant, value). Order numbers alone repeat on some
+    stores (WooCommerce reuses them), and a re-sent event keeps all four, so it still collapses."""
+    raw = f"{source or ''}|{order_number or ''}|{placed_iso}|{value:.2f}"
+    return f"{order_number or 'order'}~{hashlib.sha256(raw.encode()).hexdigest()[:12]}"
+
+
+def _order_row(r: m.AuditOrder) -> dict:
+    placed = utc_iso(r.placed_at if r.placed_at.tzinfo else r.placed_at.replace(tzinfo=timezone.utc))
+    return {"p": r.profile_id, "t": placed, "v": r.value, "i": r.items or [], "d": r.discount, "s": r.source,
+            "o": order_key(r.source, r.order_id, placed, r.value or 0.0), "n": r.order_id}
 
 
 # ---------------------------------------------------------------- stage 7: sizing pools
