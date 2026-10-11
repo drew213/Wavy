@@ -519,4 +519,17 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
             "versions": [{"version": v, "created_at": at.isoformat(), "health_score": score} for v, at, score in versions],
         }
 
+    @r.get("/clients/{slug}/workspace")
+    def client_workspace(slug: str, version: Optional[int] = None, u: m.User = Depends(user), s: Session = Depends(db)):
+        """The workspace bundle: the latest published version, or live collecting states before the first."""
+        from .. import workspace
+        c = client_by_slug(s, u, slug)
+        if version is None and workspace.latest_run(s, c.id) is None and s.scalar(
+                select(m.Dossier.id).where(m.Dossier.client_id == c.id).limit(1)) is None:
+            raise HTTPException(404, {"error": "no audit yet for this brand"})
+        out = workspace.current(s, c, version)
+        if out is None:
+            raise HTTPException(404, {"error": f"there is no version {version}"})
+        return out
+
     return r

@@ -499,6 +499,22 @@ class AuditFact(IdMixin, Base):
     evidence_class: Mapped[str] = mapped_column(String(20), default="documented")
 
 
+class WorkspaceBundle(IdMixin, Base):
+    """One published version of a client's workspace (wavyos.workspace.Bundle), built from one audit run.
+
+    status: measured (numbers only; written parts wait for strategist review) or reviewed.
+    """
+    __tablename__ = "workspace_bundles"
+    __table_args__ = (UniqueConstraint("client_id", "version"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("audit_runs.id"), unique=True)
+    version: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(20), default="measured")
+    bundle: Mapped[dict] = mapped_column(default=dict)
+    updated_at: Mapped[Optional[datetime]]
+
+
 class AuditOrder(IdMixin, Base):
     """One Placed Order event, compact. Profile ids are Klaviyo's pseudonymous ids: never emails or names.
 

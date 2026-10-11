@@ -150,6 +150,37 @@ def test_brand_questionnaire_autosaves_and_feeds_the_audit(env):
     assert brand.get(f"/v1/ops/intake?client={slug}").json()["submitted_at"]
 
 
+def test_the_workspace_bundle_has_every_section_with_an_honest_state(env):
+    from wavyos.workspace import SECTION_STATES, SECTIONS
+    factory, staff, vault, _ = env
+    made = _signup(TestClient(staff.app))
+    brand = _as(staff, made["token"])
+    slug = made["client_slug"]
+    assert brand.get(f"/v1/ops/clients/{slug}/workspace").status_code == 404
+    assert brand.put("/v1/ops/intake", json={"client_slug": slug, "answers": ANSWERS}).status_code == 200
+    queued = brand.post("/v1/ops/onboard", json={"client_name": "Glow Lab", "client_slug": slug, "klaviyo_private_key": KEY,
+                                                 "use_intake": True})
+    assert queued.status_code == 200, queued.text
+    jobs.run_pending(factory, _services(vault, httpx.MockTransport(fake_klaviyo())), limit=10)
+
+    b = brand.get(f"/v1/ops/clients/{slug}/workspace").json()
+    assert [s["id"] for s in b["sections"]] == [s[0] for s in SECTIONS]
+    assert all(s["state"] in SECTION_STATES for s in b["sections"])
+    assert all(s["reason"] for s in b["sections"] if s["state"] in ("partial", "unavailable", "queued", "collecting"))
+    by = {s["id"]: s for s in b["sections"]}
+    assert by["answers"]["state"] == "ready" and by["answers"]["data"]["answers"]["success"] == ANSWERS["success"]
+    assert by["sources"]["data"]["definitions"]
+    assert b["run"]["status"] in ("ready", "partial"), b["run"]
+    assert b["version"] == 1 and [v["version"] for v in b["versions"]] == [1]
+    assert by["foundational"]["data"]["checks"] and b["facts"]
+    assert by["opportunities"]["narrative_state"] == "awaiting_review"
+    fact = next(iter(b["facts"].values()))
+    assert {"label", "window", "source", "time_basis", "evidence_class"} <= set(fact)
+    assert brand.get(f"/v1/ops/clients/{slug}/workspace?version=9").status_code == 404
+    rival = _as(staff, _signup(TestClient(staff.app), email="sam@rival.co", brand="Rival")["token"])
+    assert rival.get(f"/v1/ops/clients/{slug}/workspace").status_code == 404
+
+
 def test_staff_can_start_a_questionnaire_for_a_new_client(env):
     _, staff, _, _ = env
     r = staff.put("/v1/ops/intake", json={"client_slug": "new-brand", "client_name": "New Brand", "answers": {"voice_words": "bold"}})

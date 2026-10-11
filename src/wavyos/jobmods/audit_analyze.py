@@ -6,6 +6,7 @@ has a scorecard is left alone.
 from __future__ import annotations
 
 from .. import models as m
+from .. import workspace
 from ..audit.pipeline import SCOREABLE, run_audit_for_run
 from ..jobs import JobContext, JobOutcome, job
 from ..scope import get_scoped
@@ -26,6 +27,7 @@ def audit_analyze(ctx: JobContext) -> JobOutcome:
         return JobOutcome(f"audit run {run.id} is already scored", no_action_reason="the run already has a scorecard")
     sc = run_audit_for_run(ctx.session, ctx.scope, run.id, link_fetcher=ctx.services.get("link_fetcher"))
     ctx.note("scorecards", sc.id)
+    ctx.note("workspace_bundles", workspace.publish(ctx.session, run).id)
     summary = sc.summary or {}
     unavailable = [k for k, v in (summary.get("analysis") or {}).items() if v.get("status") != "ok"]
     return JobOutcome(f"audit run {run.id} scored {summary.get('score')}: "
