@@ -426,6 +426,88 @@ class CheckResult(IdMixin, Base):
     scorecard: Mapped["Scorecard"] = relationship(back_populates="results")
 
 
+# ---------------------------------------------------------------- audit collection (docs/AUDIT-PLAN.md section 4)
+
+AUDIT_RUN_STATUSES = ("queued", "collecting", "scoring", "ready", "partial", "failed")
+
+
+class AuditRun(IdMixin, Base):
+    """One audit attempt: which collector stages ran, what each found, and where each stopped.
+
+    stages: {stage_key: {status, started_at, finished_at, detail, counts, error, cursor}}, rewritten
+    (never mutated in place) after every stage so readers and a resumed run see the latest state.
+    """
+    __tablename__ = "audit_runs"
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    connection_id: Mapped[Optional[str]] = mapped_column(ForeignKey("connections.id"))
+    account_id: Mapped[str] = mapped_column(String(100), default="")
+    track: Mapped[str] = mapped_column(String(10), default="snapshot")
+    status: Mapped[str] = mapped_column(String(20), default="queued")
+    stages: Mapped[dict] = mapped_column(default=dict)
+    started_by: Mapped[str] = mapped_column(String(80))
+    job_run_id: Mapped[Optional[str]] = mapped_column(ForeignKey("job_runs.id"))
+    scorecard_id: Mapped[Optional[str]] = mapped_column(ForeignKey("scorecards.id"))
+    started_at: Mapped[Optional[datetime]]
+    finished_at: Mapped[Optional[datetime]]
+    error: Mapped[str] = mapped_column(Text, default="")
+
+
+class AuditArtifact(IdMixin, Base):
+    """One collector output (a snapshot.FILES key) for one run, in the reference collector's JSON shape."""
+    __tablename__ = "audit_artifacts"
+    __table_args__ = (UniqueConstraint("run_id", "name"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("audit_runs.id"), index=True)
+    name: Mapped[str] = mapped_column(String(20))
+    payload: Mapped[dict] = mapped_column(default=dict)
+    captured_at: Mapped[Optional[datetime]]
+
+
+class AuditOrder(IdMixin, Base):
+    """One Placed Order event, compact. Profile ids are Klaviyo's pseudonymous ids: never emails or names.
+
+    Keyed by Klaviyo's event id, so a retried page or a re-audit upserts instead of duplicating.
+    order_id is the store's id ($event_id or OrderId) that the engine dedupes on.
+    """
+    __tablename__ = "audit_orders"
+    __table_args__ = (UniqueConstraint("client_id", "event_id"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    metric_id: Mapped[str] = mapped_column(String(64))
+    event_id: Mapped[str] = mapped_column(String(64))
+    order_id: Mapped[Optional[str]] = mapped_column(String(120))
+    profile_id: Mapped[Optional[str]] = mapped_column(String(64))
+    placed_at: Mapped[datetime] = mapped_column(index=True)
+    value: Mapped[float] = mapped_column(Float, default=0.0)
+    items: Mapped[list] = mapped_column(default=list)
+    discount: Mapped[Optional[list]] = mapped_column()
+    source: Mapped[Optional[str]] = mapped_column(String(120))
+
+
+class KlaviyoReportCall(IdMixin, Base):
+    """Reporting-endpoint calls per Klaviyo account per UTC day (Klaviyo allows 225, shared with the brand's other apps)."""
+    __tablename__ = "klaviyo_report_calls"
+    __table_args__ = (UniqueConstraint("account_id", "day"),)
+    account_id: Mapped[str] = mapped_column(String(100))
+    day: Mapped[str] = mapped_column(String(10))
+    count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class MetricPin(IdMixin, Base):
+    """A staff-verified metric id for one event name on one client's account. Pins fail closed:
+    a pinned id that's gone, renamed or from another integration stops the audit instead of guessing."""
+    __tablename__ = "metric_pins"
+    __table_args__ = (UniqueConstraint("client_id", "name"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    metric_id: Mapped[str] = mapped_column(String(64))
+    integration: Mapped[Optional[str]] = mapped_column(String(120))
+    created_by: Mapped[str] = mapped_column(String(80))
+
+
 # ---------------------------------------------------------------- event log
 
 class Event(Base):
