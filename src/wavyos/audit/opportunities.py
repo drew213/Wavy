@@ -28,15 +28,34 @@ def _rank_key(card: dict) -> tuple:
     sized = card["sizing"] if card.get("sizing") and card["sizing"].get("status") == "sized" else None
     per_day = sized["annual"]["base"] / max(card["effort_days"], 1) if sized else 0.0
     return (card["category"] != "fix_first", sized is None, -per_day,
-            -SEVERITY_WEIGHT.get(card["severity"], 2), card["verdict"] != "fail", card["check_id"])
+            -SEVERITY_WEIGHT.get(card["severity"], 2), card["verdict"] != "fail", card["id"])
 
 
-def build(snap: Snapshot, results: dict[str, dict], specs: dict[str, dict]) -> dict[str, Any]:
-    """results: {check_id: {verdict, message, evidence, value}}. Returns {opportunities, sizing, total}."""
+def _finding_card(f: dict, sizing: dict) -> dict:
+    readout = f.get("readout") or {"metric": f["title"].lower(), "days": 45}
+    return {
+        "id": f"opp-{f['id'].replace('.', '-').replace('_', '-')}", "check_id": None, "finding_id": f["id"],
+        "module": f["module"], "verdict": "fail" if f["severity"] in ("critical", "high") else "warn",
+        "severity": f["severity"], "area": f["module"], "title": f["title"], "category": f["category"],
+        "observation": f["finding"], "evidence": [{"ref": fid, "note": "fact"} for fid in f.get("facts") or []],
+        "evidence_text": f["evidence"], "evidence_class": f.get("evidence_class", "documented"),
+        "outcome": f"Moves {readout['metric']}, read out after {readout['days']} days.", "steps": [f["action"]],
+        "effort_days": f.get("effort_days", 2), "readout": readout,
+        "sizing": f.get("value") or (sizing.get(f["lever"]) if f.get("lever") else None),
+        "status": "Proposed", "owner": "UNCONFIRMED",
+    }
+
+
+def build(snap: Snapshot, results: dict[str, dict], specs: dict[str, dict], findings: Optional[list[dict]] = None,
+          unavailable: Optional[dict[str, str]] = None) -> dict[str, Any]:
+    """results: {check_id: {verdict, message, evidence, value}}; findings: analysis findings (Finding.as_dict);
+    unavailable: {analysis module: reason}. Returns {opportunities, sizing, total, gaps}."""
     book = playbooks()["playbooks"]
+    findings = findings or []
     hits = [cid for cid, r in results.items() if r["verdict"] in ("warn", "fail") and cid in book]
-    sizing = size_levers(snap, sorted({book[c]["lever"] for c in hits if book[c].get("lever")}))
-    cards = []
+    levers = {book[c]["lever"] for c in hits if book[c].get("lever")} | {f["lever"] for f in findings if f.get("lever")}
+    sizing = size_levers(snap, sorted(levers))
+    cards = [_finding_card(f, sizing) for f in findings]
     for cid in hits:
         pb, r, spec = book[cid], results[cid], specs.get(cid) or {}
         lever: Optional[dict] = sizing.get(pb["lever"]) if pb.get("lever") else None
@@ -55,5 +74,7 @@ def build(snap: Snapshot, results: dict[str, dict], specs: dict[str, dict]) -> d
              "reason": r["message"], "unlock": (book.get(cid) or {}).get("title")}
             for cid, r in sorted(results.items()) if r["verdict"] in ("na", "error", "not_implemented")
             and "not part of the" not in (r["message"] or "")]
+    gaps += [{"check_id": None, "module": mod, "title": f"Analysis: {mod.replace('_', ' ')}", "verdict": "na",
+              "reason": reason, "unlock": None} for mod, reason in sorted((unavailable or {}).items())]
     return {"opportunities": cards, "sizing": sizing, "total": total_of(ranked_levers), "gaps": gaps,
             "playbook_version": playbooks().get("version")}

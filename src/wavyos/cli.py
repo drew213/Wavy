@@ -72,9 +72,10 @@ def _klaviyo_factory(api_key: str):
 
 def _job_services(settings: Settings) -> dict:
     """What job handlers find in ctx.services (see wavyos.jobmods)."""
+    from .analysis.links import safe_fetch
     from .vault import Vault, key_provider
     return {"vault": Vault(key_provider(settings)), "klaviyo_factory": _klaviyo_factory,
-            "settings": settings}
+            "settings": settings, "link_fetcher": safe_fetch}
 
 
 # ---------------------------------------------------------------- commands

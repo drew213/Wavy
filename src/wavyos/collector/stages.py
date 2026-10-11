@@ -480,16 +480,28 @@ def _strip_html(html: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
+MAX_LINKS = 60
+_HREF = re.compile(r"<a\b[^>]*\bhref\s*=\s*[\"']([^\"']+)[\"']", re.I)
+_IMG = re.compile(r"<img\b[^>]*>", re.I)
+_ALT = re.compile(r"\balt\s*=\s*[\"']\s*[^\"'\s][^\"']*[\"']", re.I)
+
+
 def measure_template(entry: dict, resource: dict) -> dict:
     attrs = resource.get("attributes") or {}
     html = str(attrs.get("html") or attrs.get("content") or attrs.get("body") or attrs.get("editor_html") or "")
     text = _strip_html(html)
     size = len(html.encode("utf-8"))
     codes = re.findall(r"(?:\{\{|\{%)[\s\S]{0,180}?(?:\}\}|%\})", html)
+    imgs = _IMG.findall(html)
+    links = [h.strip() for h in _HREF.findall(html) if not h.strip().lower().startswith(("mailto:", "tel:", "#"))]
     return {**entry, "templateName": attrs.get("name"), "htmlBytes": size, "textChars": len(text),
-            "imageCount": len(re.findall(r"<img\b", html, re.I)), "linkCount": len(re.findall(r"<a\b", html, re.I)),
+            "imageCount": len(imgs), "linkCount": len(re.findall(r"<a\b", html, re.I)),
+            "imagesWithoutAlt": sum(1 for i in imgs if not _ALT.search(i)),
+            "hasUnsubscribe": bool(re.search(r"unsubscribe|manage_preferences|opt[\s-]?out", html, re.I)),
+            "hasAddress": bool(re.search(r"organization\.(full_)?address|organization\.address", html, re.I)),
+            "links": list(dict.fromkeys(links))[:MAX_LINKS],
             "dynamicCodeCount": len(re.findall(r"\{\{|\{%", html)), "overGmailClipThreshold": size > GMAIL_CLIP_BYTES,
-            "textSample": text[:500],
+            "text": text[:20_000], "textSample": text[:500],
             "dynamicCodeSamples": list(dict.fromkeys(re.sub(r"\s+", " ", x).strip() for x in codes))[:20]}
 
 

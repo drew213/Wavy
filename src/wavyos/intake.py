@@ -13,6 +13,9 @@ from typing import Any, Optional
 T, C, M = "text", "choice", "multi"
 LONG, SHORT = "long", "short"
 STORE_PLATFORMS = ["Shopify", "WooCommerce", "BigCommerce", "Magento", "Other"]
+KPI_OPTIONS = ["Gross revenue", "Net revenue", "Email revenue (campaigns + flows)", "SMS revenue", "Total buyers",
+               "New customers", "Average order value", "Repeat purchase rate", "Email list size", "Pop-up sign-ups"]
+REGULATED = ["No", "CBD / hemp / THC", "Supplements", "Alcohol", "Tobacco / nicotine", "Other regulated"]
 
 
 def _q(key, label, kind=T, *, required=False, help="", options=(), size=LONG, placeholder=""):
@@ -87,6 +90,8 @@ SECTIONS = [
      "questions": [
          _q("store_platform", "Store platform", C, required=True, options=STORE_PLATFORMS,
             help="Where your orders are placed. Klaviyo often keeps old order sources after a platform switch."),
+         _q("regulated_category", "Does anything you sell fall in a regulated category?", C, options=REGULATED,
+            help="Some categories can't use certain channels or claims (CBD and THC can't send Klaviyo SMS)."),
          _q("email_platform", "Email platform", C, required=True, options=["Klaviyo", "Omnisend", "Mailchimp", "Other"]),
          _q("sms_platform", "SMS platform", C, required=True,
             options=["Klaviyo SMS", "Attentive", "Postscript", "One Text", "Other", "We don't send SMS yet"]),
@@ -107,6 +112,8 @@ SECTIONS = [
          _q("talk_channel", "Where do you prefer to talk day to day?", C, options=["Slack Connect", "Email", "Either"]),
          _q("meeting_cadence", "How often would you like a meeting?", C, options=["Weekly", "Every two weeks", "Monthly"]),
          _q("success", "What does success look like at 30, 60 and 90 days?", required=True),
+         _q("kpis", "Which numbers will you judge us on?", M, options=KPI_OPTIONS,
+            help="Your workspace and every monthly report open with these."),
          _q("past_agency", "Anything that went wrong with past agencies that you want us to avoid?"),
      ]},
 ]

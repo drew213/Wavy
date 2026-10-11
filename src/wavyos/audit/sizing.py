@@ -373,7 +373,7 @@ def total_of(sized: list[dict]) -> dict:
     total = {"low": 0.0, "base": 0.0, "high": 0.0}
     counted = []
     for s in sized:
-        if s.get("status") != "sized" or s["pool_key"] in used:
+        if s.get("status") != "sized" or s.get("pool_key") in used:
             continue
         used.add(s["pool_key"])
         counted.append(s["lever"])

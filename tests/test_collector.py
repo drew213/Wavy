@@ -366,6 +366,9 @@ def test_the_job_runs_the_audit_with_the_vaulted_key(factory, session, shop, vau
     assert run.status == "ready" and run.scorecard_id
     summary = session.get(m.Scorecard, run.scorecard_id).summary
     assert summary["audit_run_id"] == run.id and summary["opportunities"][0]["check_id"] == "DAT-01"
+    errors = {k: v["reason"] for k, v in summary["analysis"].items() if v["status"] == "error"}
+    assert not errors, errors
+    assert session.scalar(select(m.AuditFact.id).where(m.AuditFact.run_id == run.id)) is not None
     again = jobs.run_pending(factory, {"vault": vault, "klaviyo_factory": lambda key: fake.client()})
     assert again == []
     actions = list(session.scalars(select(m.Event.action).where(m.Event.client_id == world.a.id)))

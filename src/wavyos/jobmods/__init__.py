@@ -4,6 +4,7 @@ Handlers take their dependencies from ctx.services:
   vault              wavyos.vault.Vault, to open connection secrets
   klaviyo_factory    callable (api_key) -> read-only Klaviyo client (tests pass fakes)
   today              optional date, or callable returning one; defaults to today in the client's timezone
+  link_fetcher       optional callable (url) -> {status, final_url, error}; audit.analyze checks template links with it
 """
 from . import audit_analyze, audit_collect, client_onboard, contracts, daily_health, knowledge_staleness, results_due  # noqa: F401  (registration side effects)
 

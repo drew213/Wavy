@@ -480,6 +480,25 @@ class AuditArtifact(IdMixin, Base):
     captured_at: Mapped[Optional[datetime]]
 
 
+class AuditFact(IdMixin, Base):
+    """One measured number an analysis module produced for a run: the ledger every report section and
+    narrative draft must quote from. value is {"v": ...}; v is None when the input was unavailable."""
+    __tablename__ = "audit_facts"
+    __table_args__ = (UniqueConstraint("run_id", "fact_id"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("audit_runs.id"), index=True)
+    fact_id: Mapped[str] = mapped_column(String(120))
+    module: Mapped[str] = mapped_column(String(40))
+    label: Mapped[str] = mapped_column(String(300))
+    value: Mapped[dict] = mapped_column(default=dict)
+    unit: Mapped[str] = mapped_column(String(30), default="")
+    window: Mapped[str] = mapped_column(String(60), default="")
+    time_basis: Mapped[str] = mapped_column(String(10), default="event")
+    source: Mapped[str] = mapped_column(String(300), default="")
+    evidence_class: Mapped[str] = mapped_column(String(20), default="documented")
+
+
 class AuditOrder(IdMixin, Base):
     """One Placed Order event, compact. Profile ids are Klaviyo's pseudonymous ids: never emails or names.
 

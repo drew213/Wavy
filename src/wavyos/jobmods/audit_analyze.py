@@ -24,8 +24,10 @@ def audit_analyze(ctx: JobContext) -> JobOutcome:
         return JobOutcome(f"audit run {run.id} is {run.status}", no_action_reason="only ready or partial runs are scored")
     if run.scorecard_id:
         return JobOutcome(f"audit run {run.id} is already scored", no_action_reason="the run already has a scorecard")
-    sc = run_audit_for_run(ctx.session, ctx.scope, run.id)
+    sc = run_audit_for_run(ctx.session, ctx.scope, run.id, link_fetcher=ctx.services.get("link_fetcher"))
     ctx.note("scorecards", sc.id)
     summary = sc.summary or {}
+    unavailable = [k for k, v in (summary.get("analysis") or {}).items() if v.get("status") != "ok"]
     return JobOutcome(f"audit run {run.id} scored {summary.get('score')}: "
-                      f"{len(summary.get('opportunities') or [])} opportunities")
+                      f"{len(summary.get('opportunities') or [])} opportunities"
+                      + (f"; analysis unavailable: {', '.join(unavailable)}" if unavailable else ""))

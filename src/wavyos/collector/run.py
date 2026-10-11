@@ -18,7 +18,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from .. import events, jobs
 from .. import models as m
-from ..audit.snapshot import Snapshot
+from ..audit.snapshot import FILES, Snapshot
 from ..connectors.klaviyo import KlaviyoError
 from ..scope import InvalidState, Scope
 from . import budget
@@ -146,7 +146,8 @@ def pins_for(session: Session, client_id: str) -> dict[str, dict]:
 
 def snapshot_for(session: Session, run: m.AuditRun, context: Optional[dict] = None) -> Snapshot:
     """The run's data as the check engine's Snapshot (the same files the Node collector wrote)."""
-    files = {a.name: a.payload for a in session.scalars(select(m.AuditArtifact).where(m.AuditArtifact.run_id == run.id))}
+    files = {a.name: a.payload for a in session.scalars(select(m.AuditArtifact).where(m.AuditArtifact.run_id == run.id))
+             if a.name in FILES}
     orders = st.orders_file(session, run)
     if orders is not None:
         files["orders"] = orders

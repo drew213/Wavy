@@ -57,7 +57,16 @@ def _human_scope(ctx: JobContext, requested_by: str | None):
     return scope if scope.actor.roles & {"org_admin", "account_lead"} else ctx.scope
 
 
-def _klaviyo(ctx: JobContext, progress: Progress, platform: str | None = None, continuation: bool = False):
+def audit_context(intake: dict) -> dict:
+    """Questionnaire answers the audit uses: metric choice, KPI scorecard, claim and channel rules."""
+    programs = intake.get("programs")
+    return {"store_platform": intake.get("store_platform") if intake.get("store_platform") != "Other" else None,
+            "kpis": intake.get("kpis"), "regulated_category": intake.get("regulated_category"),
+            "avoid_claims": intake.get("avoid_claims"), "sms_platform": intake.get("sms_platform"),
+            "sells_subscriptions": ("Subscriptions" in programs) if programs else None}
+
+
+def _klaviyo(ctx: JobContext, progress: Progress, context: dict | None = None, continuation: bool = False):
     """(klaviyo section, cohort) from the client's connected Klaviyo account, or (None, None)."""
     vault, make_client = ctx.services.get("vault"), ctx.services.get("klaviyo_factory")
     conns = connections.active(ctx.session, ctx.scope, "klaviyo")
@@ -67,6 +76,8 @@ def _klaviyo(ctx: JobContext, progress: Progress, platform: str | None = None, c
         progress("connect", "skipped", "No Klaviyo key connected: using benchmark data")
         return None, None
     conn = conns[0]
+    context = context or {}
+    platform = context.get("store_platform")
     with connections.secret(ctx.session, ctx.scope, vault, conn.id, "onboarding audit") as key:
         client = make_client(key)
         try:
@@ -77,16 +88,15 @@ def _klaviyo(ctx: JobContext, progress: Progress, platform: str | None = None, c
             if callable(close):
                 close()
     if not continuation:
-        section["full_audit"] = _start_full_audit(ctx, conn, platform)
+        section["full_audit"] = _start_full_audit(ctx, conn, context)
     label = section["account"].get("name") or conn.external_account_id
     return section, cohort_from_orders(ctx.session, ctx.scope, label, source=KLAVIYO)
 
 
-def _start_full_audit(ctx: JobContext, conn: m.Connection, platform: str | None) -> dict:
+def _start_full_audit(ctx: JobContext, conn: m.Connection, context: dict) -> dict:
     """Queue the collector run (audit.collect, then audit.analyze) behind this first look."""
     try:
-        run = collector.start(ctx.session, ctx.scope, conn, started_by=f"job:{ctx.run.id}"[:80],
-                              context={"store_platform": platform})
+        run = collector.start(ctx.session, ctx.scope, conn, started_by=f"job:{ctx.run.id}"[:80], context=context)
     except budget.BudgetExceeded as e:
         return {"run_id": None, "status": "deferred", "reason": str(e)}
     return {"run_id": run.id, "status": run.status}
@@ -119,7 +129,7 @@ def client_onboard(ctx: JobContext) -> JobOutcome:
     raw = (ctx.run.trigger or {}).get("payload") or {}
     payload, requested_by = _payload(raw)
     progress = Progress(ctx.session, ctx.scope, ctx.run.id, STAGES)
-    klaviyo, klaviyo_cohort = _klaviyo(ctx, progress, (payload.intake or {}).get("store_platform"),
+    klaviyo, klaviyo_cohort = _klaviyo(ctx, progress, audit_context(payload.intake or {}),
                                        continuation=bool(raw.get("continuation")))
     shopify_cohort = _shopify_cohort(ctx, payload)
     cohort = shopify_cohort or klaviyo_cohort
