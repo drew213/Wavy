@@ -94,21 +94,32 @@ def period_key(cadence: Cadence, now: datetime, tz: str) -> Optional[str]:
     }.get(cadence)
 
 
+SCHEDULE_BATCH = 100
+
+
 def enqueue_due(session: Session, now: Optional[datetime] = None, org_id: Optional[str] = None) -> list[m.JobRun]:
     """Queue every scheduled job whose period has no run yet, for every active client."""
     now = now or utcnow()
-    q = select(m.Client).where(m.Client.status.in_(("onboarding", "active")))
+    scheduled = [d for d in REGISTRY.values() if d.cadence != "event" and d.handler is not None]
+    if not scheduled:
+        return []
+    q = select(m.Client).where(m.Client.status.in_(("onboarding", "active"))).order_by(m.Client.id)
     if org_id:
         q = q.where(m.Client.org_id == org_id)
+    clients = session.scalars(q).all()
     created = []
-    for client in session.scalars(q):
-        for defn in REGISTRY.values():
-            if defn.cadence == "event" or defn.handler is None:
-                continue
-            pk = period_key(defn.cadence, now, client.timezone)
-            run = _enqueue(session, client, defn, f"{defn.key}:{client.id}:{pk}", now, {"kind": "schedule", "period": pk})
-            if run:
-                created.append(run)
+    for i in range(0, len(clients), SCHEDULE_BATCH):  # one lookup per batch of clients, not per client and job
+        wanted = {}
+        for client in clients[i:i + SCHEDULE_BATCH]:
+            for defn in scheduled:
+                pk = period_key(defn.cadence, now, client.timezone)
+                wanted[f"{defn.key}:{client.id}:{pk}"] = (client, defn, pk)
+        queued = set(session.scalars(select(m.JobRun.run_key).where(m.JobRun.run_key.in_(list(wanted)))))
+        for run_key, (client, defn, pk) in wanted.items():
+            if run_key not in queued:
+                run = _insert(session, client, defn, run_key, now, {"kind": "schedule", "period": pk})
+                if run:
+                    created.append(run)
     return created
 
 
@@ -128,6 +139,10 @@ def emit(session: Session, scope: Scope, event_name: str, payload: dict, dedupe:
 def _enqueue(session, client, defn, run_key, due_at, trigger) -> Optional[m.JobRun]:
     if session.scalar(select(m.JobRun.id).where(m.JobRun.run_key == run_key)):
         return None
+    return _insert(session, client, defn, run_key, due_at, trigger)
+
+
+def _insert(session, client, defn, run_key, due_at, trigger) -> Optional[m.JobRun]:
     run = m.JobRun(org_id=client.org_id, client_id=client.id, job_key=defn.key, run_key=run_key,
                    due_at=due_at, trigger=trigger)
     try:
@@ -176,6 +191,7 @@ def execute(factory: sessionmaker[Session], run_id: str, services: Optional[dict
             auth = authorize(s, scope, "job.run")
             if not auth.allowed:
                 raise NotPermitted(auth.reason)
+            s.commit()  # release the brand's event chain: its other jobs can't log until this commits
             ctx = JobContext(s, scope, run, services)
             outcome = defn.handler(ctx)
             produced_any = any(ctx.produced.get(k) for k in ctx.produced)

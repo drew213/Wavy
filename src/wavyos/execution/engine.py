@@ -80,6 +80,15 @@ def spent_today(session: Session, client_id: str) -> float:
         m.Execution.client_id == client_id, m.Execution.created_at >= start)) or 0.0)
 
 
+def spent_today_by_client(session: Session, client_ids) -> dict[str, float]:
+    """spent_today for many clients in one query; client_ids is a list or a subquery."""
+    start = datetime.combine(utcnow().date(), dtime.min, tzinfo=timezone.utc)
+    return {cid: float(total or 0.0) for cid, total in session.execute(
+        select(m.Execution.client_id, func.sum(m.Execution.cost_usd))
+        .where(m.Execution.client_id.in_(client_ids), m.Execution.created_at >= start)
+        .group_by(m.Execution.client_id))}
+
+
 def _agent_scope(session: Session, scope: Scope, role: str) -> Scope:
     agent = session.scalar(select(m.Agent).where(m.Agent.org_id == scope.org_id, m.Agent.role == role, m.Agent.active.is_(True)))
     if agent is None:

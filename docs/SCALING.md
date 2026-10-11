@@ -30,7 +30,11 @@ Render free web service (512 MB, sleeps after 15 idle minutes) with the worker i
 - **Shared rate limits.** Sign-up and sign-in limits are counted in the database (hashed keys, no IPs or emails stored), so they hold across any number of web instances.
 - **Several jobs at once.** `wavyos work --threads N` (and `serve --with-worker --worker-threads N`) runs jobs in parallel; claims are atomic, so any number of workers can share the queue. Jobs for one brand take turns on its event chain; different brands run in parallel.
 - **Crash recovery that tells a dead worker from a slow one.** Running jobs touch a heartbeat every minute. Only a job whose heartbeat has stopped for 10 minutes is put back in the queue (up to 3 tries, then marked failed with a reason). A two-hour audit that's still working is left alone.
-- **Event log safe under concurrency.** Two writers that take the same sequence number no longer fail; the loser links onto the winner.
+- **Event log safe under concurrency.** Two writers that take the same sequence number no longer fail; the loser links onto the winner. Event ids are 64-bit on Postgres (32-bit runs out at 2.1 billion rows). Allowed reads aren't logged, so viewing a page never writes; denials and every change still are.
+- **Queries that don't grow with brand count.** The staff console's lists (overview, approvals, jobs, executions, events) use one grouped query per table across all visible brands, and the scheduler checks which runs exist in batches of 100 brands. Tests assert the query count is the same at 1 brand and 25.
+- **Indexes for the hot paths.** The job queue is indexed on (status, due time); orders on (brand, order time).
+- **Short transactions.** The job runner commits its authorization before the job starts, so two jobs for the same brand run side by side instead of waiting on the brand's event chain.
+- **Connection pool size** is set per process with `WAVYOS_DB_POOL_SIZE` (default 5) and `WAVYOS_DB_MAX_OVERFLOW` (default 10). Keep (processes × (size + overflow)) under the database's connection limit, or use Neon's pooled connection string.
 - **Pruning.** The scheduler tick clears expired rate-limit rows and raw artifacts beyond each brand's last 3 runs.
 - **Error reporting.** Set `SENTRY_DSN` and errors, including failed jobs, go to Sentry (free plan). Nothing personal is sent.
 

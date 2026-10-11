@@ -8,6 +8,7 @@ import time
 from datetime import timedelta, timezone
 
 import pytest
+from sqlalchemy import event as sa_event
 from sqlalchemy import func, select
 
 from wavyos import events, housekeeping, jobs, tenancy
@@ -91,10 +92,14 @@ def test_a_running_job_keeps_its_heartbeat_fresh(file_factory):
     assert beat > utcnow() - timedelta(minutes=1)
 
 
+@pytest.mark.parametrize("same_brand", [False, True])
 @pytest.mark.skipif(not PG_URL, reason="concurrent writers need Postgres (set WAVYOS_TEST_POSTGRES_URL)")
-def test_threads_run_jobs_for_different_brands_at_the_same_time(file_factory, monkeypatch):
-    # Jobs for one brand take turns: each writes to the brand's event chain, which has one writer at a time.
+def test_threads_run_jobs_at_the_same_time(file_factory, monkeypatch, same_brand):
+    # Same brand too: the runner commits its job.run event before the handler starts, so the brand's
+    # event chain isn't held for the length of a job.
     factory, clients = file_factory
+    if same_brand:
+        clients = [clients[0]] * 3
     together = threading.Barrier(3, timeout=10)  # passes only if three jobs are inside their handlers at once
 
     def handler(ctx: jobs.JobContext) -> jobs.JobOutcome:
@@ -109,6 +114,80 @@ def test_threads_run_jobs_for_different_brands_at_the_same_time(file_factory, mo
         s.commit()
     done = jobs.run_pending(factory, limit=10, threads=3)
     assert sorted(r.status for r in done) == ["no_action"] * 3, [r.error for r in done]
+
+
+def test_allowed_reads_are_not_logged_but_denials_are(session, world):
+    from wavyos.policy import authorize
+    before = events.count(session, world.org.id, world.a.id)
+    assert authorize(session, world.user(world.lead), "data.read").allowed
+    assert events.count(session, world.org.id, world.a.id) == before
+    assert not authorize(session, world.user(world.approver, world.a), "standard.publish").allowed
+    assert events.count(session, world.org.id, world.a.id) == before + 1
+
+
+def _queries(engine, fn) -> int:
+    n = [0]
+
+    def tick(*_):
+        n[0] += 1
+
+    sa_event.listen(engine, "before_cursor_execute", tick)
+    try:
+        fn()
+    finally:
+        sa_event.remove(engine, "before_cursor_execute", tick)
+    return n[0]
+
+
+def test_the_scheduler_does_not_query_per_brand(session, world, monkeypatch):
+    def handler(ctx):
+        return jobs.JobOutcome("ok", no_action_reason="test")
+
+    monkeypatch.setattr(jobs, "REGISTRY", {
+        key: jobs.JobDefinition(key, key, key.split(".")[1], "analyst", "", "", "", handler)
+        for key in ("test.daily", "test.weekly")})
+    engine = session.get_bind()
+    few = _queries(engine, lambda: jobs.enqueue_due(session))
+    scope = world.user(world.admin, None)
+    for i in range(40):
+        tenancy.create_client(session, scope, name=f"Extra {i}", slug=f"extra-{i}")
+    session.flush()
+    assert len(jobs.enqueue_due(session)) == 80
+    many = _queries(engine, lambda: jobs.enqueue_due(session))
+    assert many <= few + 1 and jobs.enqueue_due(session) == []
+
+
+@pytest.fixture()
+def console(tmp_path):
+    from fastapi.testclient import TestClient
+    from wavyos import demo
+    from wavyos.api import create_app
+    engine = make_engine(f"sqlite:///{tmp_path / 'console.db'}")  # a file: requests run on another thread
+    create_all(engine)
+    factory = make_sessionmaker(engine)
+    token = demo.build(factory)
+    client = TestClient(create_app(factory=factory))
+    client.headers["Authorization"] = "Bearer " + token
+    yield engine, factory, client
+    engine.dispose()
+
+
+def test_console_lists_cost_the_same_queries_for_any_number_of_brands(console):
+    engine, factory, c = console
+    paths = ["/v1/ops/overview", "/v1/ops/approvals", "/v1/ops/jobs", "/v1/ops/executions", "/v1/ops/events"]
+
+    def cost() -> dict[str, int]:
+        return {p: _queries(engine, lambda p=p: c.get(p).raise_for_status()) for p in paths}
+
+    before = cost()
+    with factory() as s:
+        admin = s.scalar(select(m.User).where(m.User.email == "admin@demo.wavy.test"))
+        scope = scope_for_user(s, admin, None)
+        for i in range(25):
+            tenancy.create_client(s, scope, name=f"Brand {i}", slug=f"brand-{i}")
+        s.commit()
+    assert len(c.get("/v1/ops/overview").json()["clients"]) == 26
+    assert cost() == before
 
 
 def test_error_reporting_is_off_without_a_dsn(monkeypatch):
