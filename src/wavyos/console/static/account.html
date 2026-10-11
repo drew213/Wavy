@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wavy — Your retention audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0A0A0A; --bg2: #121212; --bg3: #1A1A1A; --line: #222222; --line2: #2E2E2E;
+  --text: #FFFFFF; --body: #C9CED6; --muted: #8A9099;
+  --lime: #C8FF00; --cyan: #38E1FF; --bad: #FF6B4A;
+  --display: 'Syne', system-ui, -apple-system, sans-serif;
+  --mono: 'Space Mono', ui-monospace, Menlo, monospace;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+* { box-sizing: border-box; }
+html { color-scheme: dark; }
+body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--body); font: 13px/1.6 var(--mono); display: grid; grid-template-rows: auto 1fr; }
+h1, h2 { font-family: var(--display); color: var(--text); margin: 0; letter-spacing: -0.02em; text-wrap: balance; }
+p { margin: 0; }
+a { color: var(--cyan); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+.header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 28px; border-bottom: 1px solid var(--line); }
+.brand { font-family: var(--display); font-size: 20px; font-weight: 800; color: var(--text); }
+.brand span { color: var(--lime); }
+.header .switch { font-size: 12px; color: var(--muted); }
+
+main { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 400px); gap: 64px; align-items: center;
+  max-width: 1120px; width: 100%; margin: 0 auto; padding: 56px 24px 80px; }
+.pitch h1 { font-size: clamp(38px, 5vw, 68px); font-weight: 800; line-height: .95; letter-spacing: -0.045em; }
+.pitch h1 em { font-style: normal; color: var(--lime); }
+.pitch .lede { margin-top: 22px; font-size: 14px; max-width: 50ch; }
+.path { margin: 36px 0 0; padding: 0; list-style: none; display: grid; gap: 0; max-width: 46ch; }
+.path li { display: grid; grid-template-columns: 36px 1fr; gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); }
+.path li:last-child { border-bottom: 1px solid var(--line); }
+.path .n { font-family: var(--display); font-weight: 700; font-size: 18px; color: var(--lime); line-height: 1.2; }
+.path b { display: block; color: var(--text); font-weight: 400; }
+.path span { color: var(--muted); font-size: 12px; }
+
+form { background: var(--bg2); border: 1px solid var(--line); border-radius: 16px; padding: 30px; display: grid; gap: 16px;
+  box-shadow: 0 30px 60px -30px rgba(0, 0, 0, .8); }
+form h2 { font-size: 22px; }
+form .sub { color: var(--muted); font-size: 12px; margin-top: -8px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.field input { width: 100%; background: var(--bg3); border: 1px solid var(--line2); border-radius: 8px; padding: 12px; color: var(--text); font-size: 13px; }
+.field input:focus { border-color: var(--cyan); outline: none; }
+.field small { color: var(--muted); font-size: 11px; }
+.row-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.cta { background: var(--lime); color: #0A0A0A; border: 0; border-radius: 10px; padding: 15px 24px; font-weight: 700; font-size: 14px;
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  box-shadow: 0 6px 16px -6px rgba(0, 0, 0, .7); transition: transform .2s var(--ease), opacity .2s; }
+.cta:hover { transform: translateY(-1px); }
+.cta:disabled { opacity: .55; cursor: progress; transform: none; }
+.cta svg { width: 16px; height: 16px; }
+.err { color: var(--bad); font-size: 12px; min-height: 1.6em; }
+.fine { color: var(--muted); font-size: 11px; }
+
+@media (max-width: 860px) {
+  main { grid-template-columns: 1fr; gap: 40px; padding-top: 32px; }
+  .path { display: none; }
+}
+@media (max-width: 480px) { .row-2 { grid-template-columns: 1fr; } form { padding: 22px; } }
+@media (prefers-reduced-motion: reduce) { .cta { transition: none; } }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="brand">Wavy <span>OS</span></div>
+  <span class="switch" id="switch"></span>
+</header>
+
+<main>
+  <div class="pitch">
+    <h1 id="headline"></h1>
+    <p class="lede" id="lede"></p>
+    <ol class="path" id="path">
+      <li><span class="n">1</span><div><b>Create your account</b><span>Thirty seconds. Your audit is saved to it.</span></div></li>
+      <li><span class="n">2</span><div><b>Connect Klaviyo</b><span>A read-only key. Nothing in your account can change.</span></div></li>
+      <li><span class="n">3</span><div><b>Answer a few questions</b><span>Voice, margins and guardrails, so the plan fits the brand.</span></div></li>
+      <li><span class="n">4</span><div><b>Get your audit</b><span>Twelve months of orders, every flow, and what email is leaving on the table.</span></div></li>
+    </ol>
+  </div>
+
+  <form id="signup" autocomplete="on" hidden>
+    <h2>Create your account</h2>
+    <p class="sub">Free. The audit is yours to keep.</p>
+    <div class="field"><label for="s-brand">Brand name</label><input id="s-brand" autocomplete="organization" required></div>
+    <div class="row-2">
+      <div class="field"><label for="s-name">Your name</label><input id="s-name" autocomplete="name" required></div>
+      <div class="field"><label for="s-site">Website</label><input id="s-site" type="url" placeholder="https://" autocomplete="url"></div>
+    </div>
+    <div class="field"><label for="s-email">Work email</label><input id="s-email" type="email" autocomplete="email" required></div>
+    <div class="field"><label for="s-pass">Password</label><input id="s-pass" type="password" autocomplete="new-password" minlength="10" required>
+      <small>At least 10 characters.</small></div>
+    <p class="err" id="s-err" role="alert"></p>
+    <button class="cta" type="submit" id="s-btn">Create account
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg></button>
+    <p class="fine">Already have an account? <a href="/login">Sign in</a></p>
+  </form>
+
+  <form id="login" autocomplete="on" hidden>
+    <h2>Sign in</h2>
+    <p class="sub">Your saved audit is waiting.</p>
+    <div class="field"><label for="l-email">Email</label><input id="l-email" type="email" autocomplete="email" required></div>
+    <div class="field"><label for="l-pass">Password</label><input id="l-pass" type="password" autocomplete="current-password" required></div>
+    <p class="err" id="l-err" role="alert"></p>
+    <button class="cta" type="submit" id="l-btn">Sign in</button>
+    <p class="fine">New here? <a href="/start">Get your free audit</a></p>
+    <p class="fine">Wavy team: set a password with <code>wavyos password --email you@wavy.studio</code>, or sign in with an API token on the <a href="/console">ops console</a>.</p>
+  </form>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const isLogin = location.pathname.startsWith("/login");
+const next = new URLSearchParams(location.search).get("next");
+const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+
+const COPY = isLogin
+  ? { title: "Wavy — Sign in", headline: 'Welcome <em>back.</em>',
+      lede: "Sign in to reopen your retention audit, see every version of it, and run a fresh one whenever your numbers move." }
+  : { title: "Wavy — Get your retention audit", headline: 'Your retention audit, from one <em>Klaviyo</em> key.',
+      lede: "We read twelve months of orders and every flow, score your retention, and show what email is leaving on the table, with a 30-day plan to fix it." };
+document.title = COPY.title;
+$("headline").innerHTML = COPY.headline;
+$("lede").textContent = COPY.lede;
+$(isLogin ? "login" : "signup").hidden = false;
+$("switch").innerHTML = isLogin ? 'New here? <a href="/start">Get your audit</a>' : 'Have an account? <a href="/login">Sign in</a>';
+
+async function post(path, body) {
+  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const detail = data.detail;
+    throw new Error(data.error || detail?.error || (Array.isArray(detail) ? "Check the highlighted fields." : "Something went wrong. Try again."));
+  }
+  return data;
+}
+
+async function land(token) {
+  sessionStorage.setItem("wos-token", token);
+  if (safeNext) return location.assign(safeNext);
+  const me = await fetch("/v1/ops/me", { headers: { Authorization: "Bearer " + token } }).then(r => r.json());
+  if (me.staff) return location.assign("/console");
+  const c = (me.clients || [])[0];
+  if (!c) return location.assign("/onboard");
+  location.assign(c.has_audit ? "/audit/" + encodeURIComponent(c.slug) : "/onboard?client=" + encodeURIComponent(c.slug));
+}
+
+$("signup").addEventListener("submit", async e => {
+  e.preventDefault();
+  $("s-err").textContent = "";
+  if ($("s-pass").value.length < 10) { $("s-err").textContent = "Use a password of at least 10 characters."; $("s-pass").focus(); return; }
+  $("s-btn").disabled = true;
+  try {
+    const made = await post("/v1/ops/signup", { brand_name: $("s-brand").value.trim(), name: $("s-name").value.trim(),
+      email: $("s-email").value.trim(), password: $("s-pass").value, website: $("s-site").value.trim() || null });
+    sessionStorage.setItem("wos-token", made.token);
+    location.assign("/onboard?client=" + encodeURIComponent(made.client_slug));
+  } catch (err) {
+    $("s-err").textContent = err.message;
+    $("s-btn").disabled = false;
+  }
+});
+
+$("login").addEventListener("submit", async e => {
+  e.preventDefault();
+  $("l-err").textContent = "";
+  $("l-btn").disabled = true;
+  try {
+    const { token } = await post("/v1/ops/login", { email: $("l-email").value.trim(), password: $("l-pass").value });
+    await land(token);
+  } catch (err) {
+    $("l-err").textContent = err.message;
+    $("l-btn").disabled = false;
+  }
+});
+
+$(isLogin ? "l-email" : "s-brand").focus();
+</script>
+</body>
+</html>

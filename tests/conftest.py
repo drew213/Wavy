@@ -1,12 +1,54 @@
 from __future__ import annotations
 
+import hashlib
+import os
+
 import pytest
 
+from wavyos import db as wdb
 from wavyos import models as m
 from wavyos import tenancy
 from wavyos.db import create_all, make_engine, make_sessionmaker
 from wavyos.scope import scope_for_agent, scope_for_user
 from wavyos.vault import LocalKeyProvider, Vault
+
+PG_URL = os.environ.get("WAVYOS_TEST_POSTGRES_URL")  # e.g. postgresql+psycopg://localhost/wavyos_test
+
+
+@pytest.fixture(autouse=True)
+def _postgres_instead_of_sqlite(monkeypatch, request):
+    """With WAVYOS_TEST_POSTGRES_URL set, every SQLite database a test opens becomes its own
+    Postgres schema, so the whole suite runs against Postgres unchanged."""
+    if not PG_URL:
+        yield
+        return
+    import sqlalchemy as sa
+    real = wdb.create_engine
+    admin = real(PG_URL, future=True, isolation_level="AUTOCOMMIT")
+    made: dict[str, str] = {}
+    engines = []
+
+    def fake_create_engine(url, **kw):
+        url = str(url)
+        if not url.startswith("sqlite"):
+            return real(url, **kw)
+        key = url if url != "sqlite://" else f"mem{len(made)}"
+        if key not in made:
+            made[key] = "t_" + hashlib.sha1(f"{request.node.nodeid}|{key}".encode()).hexdigest()[:20]
+            with admin.connect() as c:
+                c.execute(sa.text(f'DROP SCHEMA IF EXISTS "{made[key]}" CASCADE'))
+                c.execute(sa.text(f'CREATE SCHEMA "{made[key]}"'))
+        engines.append(real(PG_URL, future=True, connect_args={"options": f"-csearch_path={made[key]}"}))
+        return engines[-1]
+
+    monkeypatch.setattr(wdb, "create_engine", fake_create_engine)
+    yield
+    for e in engines:
+        e.dispose()
+    with admin.connect() as c:
+        for schema in made.values():
+            c.execute(sa.text(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'))
+    admin.dispose()
 
 
 @pytest.fixture()

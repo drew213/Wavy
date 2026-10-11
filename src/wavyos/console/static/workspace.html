@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Wavy Client Hub</title>
+<style>
+@font-face { font-family: Geist; src: url('/assets/geist-latin.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: GeistMono; src: url('/assets/geist-mono-latin.woff2') format('woff2'); font-display: swap; }
+:root {
+  --background: #0b0c0d; --foreground: #f6f6f3; --card: #121415; --muted: #1b1e20; --muted-foreground: #a0a5a8;
+  --primary: #c8ff00; --accent: #242a1a; --accent-foreground: #d6ff67; --destructive: #ff8069; --warn: #e9c485;
+  --border: #2b2e2f; --input: #404546; --sidebar: #101213; --sidebar-foreground: #b4b8ba; --sidebar-accent: #252e16;
+  --mono: GeistMono, ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+html { color-scheme: dark; }
+body { margin: 0; background: var(--background); color: var(--foreground); font: 16px/1.55 Geist, Arial, sans-serif; }
+button, a, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a { color: inherit; }
+a:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+h1, h2, h3, h4, p { margin: 0; }
+h1 { font-size: 40px; line-height: 1.15; letter-spacing: -1.6px; font-weight: 650; text-wrap: balance; }
+h2 { font-size: 20px; font-weight: 600; letter-spacing: -.4px; }
+h3 { font-weight: 600; line-height: 1.4; }
+h4 { font-size: 13px; font-weight: 500; color: #c0c8ca; }
+p { color: #b1b6b8; }
+small { font-size: 13px; }
+[hidden] { display: none !important; }
+svg.i { width: 17px; height: 17px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Shell */
+.shell { display: flex; min-height: 100dvh; }
+.sidebar { width: 245px; flex-shrink: 0; background: var(--sidebar); border-right: 1px solid var(--border); color: var(--sidebar-foreground);
+  position: sticky; top: 0; height: 100dvh; display: flex; flex-direction: column; overflow-y: auto; }
+.brand { padding: 31px 28px 22px; display: grid; gap: 18px; }
+.brand img { width: 158px; height: auto; }
+.eyebrow { font: 12px var(--mono); letter-spacing: 1.8px; color: #a2a9ab; }
+.client-block { margin: 10px 18px 31px; padding: 16px 10px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 13px; }
+.client-monogram { display: grid; place-items: center; width: 36px; height: 36px; background: #2b3022; color: #dcff72; font-weight: 650; font-size: 19px; flex-shrink: 0; }
+.client-block strong { display: block; color: var(--foreground); font-size: 16px; overflow-wrap: anywhere; }
+.client-block small { display: block; color: #92999c; font-size: 12px; }
+.nav-label { font: 12px var(--mono); letter-spacing: 1px; padding: 0 28px 12px; color: #777f83; }
+.nav { list-style: none; margin: 0; padding: 0 14px; display: grid; gap: 6px; }
+.nav button { width: 100%; height: 43px; display: flex; align-items: center; gap: 10px; padding: 0 14px; font-size: 14px; text-align: left;
+  background: none; border: 0; border-left: 2px solid transparent; color: var(--sidebar-foreground); }
+.nav button:hover { background: #1a1e1f; color: var(--foreground); }
+.nav button[aria-current="page"] { border-left-color: var(--primary); background: var(--sidebar-accent); color: var(--accent-foreground); }
+.sidebar-bottom { margin-top: auto; padding: 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 12px; color: #8e9699; }
+.fresh { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 0; margin-bottom: 10px; border: 0; border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border); background: none; color: #d8e3d0; text-align: left; }
+.fresh > svg { color: var(--primary); }
+.fresh strong { display: block; font-size: 14px; font-weight: 500; }
+.fresh small { display: block; font-size: 13px; line-height: 1.4; color: #9ca9af; margin-top: 3px; }
+.fresh:hover strong { color: var(--primary); }
+.sidebar-bottom .private { display: flex; align-items: center; gap: 8px; width: 100%; }
+.sidebar-bottom .private svg { width: 15px; height: 15px; }
+.exit { color: #c9cecf; text-decoration: underline; text-underline-offset: 3px; }
+.exit:hover { color: var(--primary); }
+.sidebar-bottom > small { width: 100%; margin-top: 14px; font: 10px var(--mono); letter-spacing: 1px; }
+.scrim { display: none; }
+
+.workspace { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.topbar { height: 75px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 18px; padding: 0 40px; position: sticky; top: 0; z-index: 5; background: var(--background); }
+.trigger { display: none; background: none; border: 0; color: #c9cecf; padding: 4px; }
+.breadcrumbs { display: flex; align-items: center; gap: 15px; font-size: 14px; color: #989fa2; min-width: 0; }
+.breadcrumbs span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.breadcrumbs strong { font-weight: 500; color: #e9ecec; white-space: nowrap; }
+.slash { color: #4b5558; }
+.snapshot { margin-left: auto; color: #b6bcbc; font-size: 12px; white-space: nowrap; }
+.version { background: var(--card); border: 1px solid var(--input); color: #e9ecec; font-size: 12px; padding: 6px 8px; border-radius: 0; }
+.avatar { width: 31px; height: 31px; border: 1px solid #454c3c; background: #242b1b; display: grid; place-items: center; font-size: 13px; color: var(--primary); flex-shrink: 0; }
+main { padding: 38px 40px; max-width: 1600px; width: 100%; margin: 0 auto; flex: 1; }
+.page-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 29px; gap: 15px; }
+.page-heading .eyebrow { color: #b5e833; margin-bottom: 12px; }
+.page-heading p:last-child { margin-top: 12px; font-size: 15px; }
+.outline-badge { border: 1px solid #41464a; padding: 9px 15px; font: 13px var(--mono); white-space: nowrap; color: #c9cecf; }
+.page-footer { border-top: 1px solid var(--border); padding: 22px 40px; display: flex; justify-content: space-between; gap: 16px; font-size: 13px; color: #8e9699; }
+
+/* Building blocks */
+.metrics-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--border); background: var(--card); margin-bottom: 24px; }
+.metrics-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.metric { padding: 22px; border-right: 1px solid var(--border); min-width: 0; }
+.metric:last-child { border-right: 0; }
+.metric-label { font-size: 14px; color: #c0c8ca; margin-bottom: 15px; }
+.metric strong { display: block; font-size: 34px; line-height: 1.1; font-weight: 600; letter-spacing: -1.2px; }
+.metric strong.lime { color: var(--primary); }
+.metric strong small { font-size: 15px; color: #9ba6ad; letter-spacing: 0; font-weight: 400; }
+.metric p { font-size: 13px; margin-top: 12px; line-height: 1.5; }
+.metric.pending { background: #191c15; }
+.metric.pending strong { font-size: 23px; color: #d9e7b3; letter-spacing: -.5px; }
+.panel { border: 1px solid var(--border); background: var(--card); padding: 26px; min-width: 0; }
+.panel-head { display: flex; justify-content: space-between; align-items: start; gap: 16px; margin-bottom: 20px; }
+.panel-head p { font-size: 13px; margin-top: 6px; }
+.grid-2 { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 24px; margin-bottom: 24px; }
+.grid-even { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; margin-bottom: 24px; }
+.notice { display: flex; gap: 14px; align-items: flex-start; padding: 17px 20px; background: #151a1d; border: 1px solid #2b363b; margin-bottom: 24px; }
+.notice > svg { margin-top: 3px; color: #9cafb7; }
+.notice p { font-size: 14px; line-height: 1.65; }
+.notice strong { color: var(--warn); font-weight: 500; }
+.tag { font: 11px var(--mono); letter-spacing: .6px; padding: 4px 8px; border: 1px solid var(--input); color: #c9cecf; white-space: nowrap; text-transform: uppercase; }
+.tag.live { color: #b9e86a; border-color: #4b5f2b; background: #1b2315; }
+.tag.off { color: var(--warn); border-color: #5c4a2c; background: #241e14; }
+.tag.missing { color: var(--destructive); border-color: #5c3128; background: #24150f; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 13px; padding: 4px 10px; background: var(--muted); border: 1px solid var(--border); color: #d9dddd; }
+.chip.no { color: #f0b3a6; border-color: #47302a; }
+.empty { color: #8e9699; font-size: 14px; }
+
+/* Opportunities board */
+.board { border: 1px solid var(--border); background: var(--card); }
+.board-heading { padding: 24px; }
+.board-heading .eyebrow { color: #b5db57; margin-bottom: 9px; }
+.board-heading h2 { font-size: 25px; }
+.board-heading p:last-child { font-size: 15px; margin-top: 8px; max-width: 760px; }
+.toolbar { padding: 0 24px 20px; display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; }
+.toolbar > span { color: #9fa9ad; font-size: 14px; }
+.sort { display: flex; gap: 7px; flex-wrap: wrap; }
+.sort button { background: var(--muted); border: 1px solid var(--input); color: #e9ecec; font-size: 14px; padding: 7px 13px; }
+.sort button[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: #0a0a0a; }
+.op-layout { display: grid; grid-template-columns: minmax(265px, .85fr) minmax(0, 1.65fr); border-top: 1px solid var(--border); }
+.op-list { border-right: 1px solid var(--border); background: #101213; }
+.op-item { width: 100%; border: 0; border-bottom: 1px solid var(--border); border-left: 3px solid transparent; background: none; display: flex; align-items: start; gap: 15px; text-align: left; padding: 23px 20px; color: inherit; }
+.op-item[aria-pressed="true"] { border-left-color: var(--primary); background: #1b2315; }
+.op-item:hover { background: #1c2220; }
+.op-rank { font: 18px var(--mono); color: var(--primary); line-height: 1.5; }
+.op-item h3 { font-size: 17px; color: #edf0e7; }
+.op-item p { font-size: 14px; margin: 8px 0 0; }
+.op-meta { display: flex; gap: 8px; flex-wrap: wrap; font-size: 14px; color: #b4c09f; margin-top: 6px; }
+.op-meta span + span::before { content: '·'; margin-right: 8px; }
+.op-detail { padding: 27px; min-width: 0; }
+.op-detail-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.op-label { font: 12px/1.5 var(--mono); letter-spacing: .7px; color: #a9c678; }
+.op-detail > h3 { font-size: 27px; letter-spacing: -.65px; line-height: 1.25; margin-bottom: 15px; }
+.op-observation { font-size: 16px; line-height: 1.65; }
+.op-outcome { border-left: 2px solid var(--primary); background: #171c12; padding: 18px 20px; margin: 22px 0; }
+.op-outcome p { color: #eef0e8; margin-top: 8px; font-size: 16px; }
+.op-outcome small { display: block; color: #9ba6ad; margin-top: 8px; font-size: 12px; }
+.op-reasons { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 20px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.op-reasons strong { display: block; font-size: 26px; font-weight: 600; letter-spacing: -.8px; margin: 6px 0 4px; }
+.op-reasons p { font-size: 14px; }
+.op-gate { padding-top: 20px; display: grid; gap: 8px; }
+.op-gate p { font-size: 15px; }
+
+/* Health */
+.score-big { font-size: 96px; line-height: 1; font-weight: 650; letter-spacing: -4px; color: var(--primary); }
+.score-big small { font-size: 22px; color: #9ba6ad; letter-spacing: 0; font-weight: 400; }
+.meter + .meter { margin-top: 22px; }
+.meter-head { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; }
+.meter-head b { font-weight: 500; color: #e9ecec; text-align: right; }
+.track { height: 8px; background: #263034; margin: 10px 0 8px; }
+.track i { display: block; height: 100%; }
+.meter small { color: #93a0a7; font-size: 12px; }
+
+/* Performance */
+.revenue-chart { display: flex; align-items: end; gap: 10px; height: 280px; border-bottom: 1px solid var(--border); }
+.chart-column { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: end; }
+.chart-value { font: 11px var(--mono); white-space: nowrap; color: #c9d0c0; margin-bottom: 8px; }
+.chart-track { height: 210px; width: 100%; display: flex; align-items: end; justify-content: center; }
+.chart-bar { background: var(--primary); width: 70%; max-width: 46px; min-height: 2px; }
+.chart-label { font: 11px var(--mono); margin: 12px 0; color: #9da7aa; white-space: nowrap; }
+.mix-total { font-size: 40px; font-weight: 550; letter-spacing: -1.5px; margin: 8px 0 20px; }
+.mix-total small { display: block; font-size: 13px; color: #9ba6ad; letter-spacing: 0; margin-top: 4px; font-weight: 400; }
+.mix-row + .mix-row { margin-top: 18px; }
+.mix-row > div:first-child { display: flex; justify-content: space-between; font-size: 14px; }
+.mix-track { height: 8px; background: #263034; margin: 9px 0; }
+.mix-track span { display: block; height: 100%; }
+.mix-row small { color: #93a0a7; font-size: 12px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; font: 12px var(--mono); letter-spacing: .6px; color: #9da7aa; font-weight: 400; padding: 0 12px 12px 0; border-bottom: 1px solid var(--border); }
+td { padding: 13px 12px 13px 0; border-bottom: 1px solid #222628; color: #d9dddd; vertical-align: top; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; padding-right: 0; }
+
+/* Journeys */
+.journey-track { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid var(--border); background: var(--card); margin-bottom: 24px; }
+.journey-stop { padding: 20px 16px; border-right: 1px solid var(--border); display: grid; gap: 10px; align-content: start; }
+.journey-stop:last-child { border-right: 0; }
+.journey-stop .n { font: 12px var(--mono); color: #777f83; }
+.journey-stop strong { font-size: 15px; font-weight: 500; line-height: 1.35; }
+.journey-stop small { color: #93a0a7; font-size: 12px; overflow-wrap: anywhere; }
+.flow-card { border: 1px solid var(--border); background: var(--card); margin-bottom: 16px; }
+.flow-card > header { padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+.flow-card > header p { font-size: 13px; margin-top: 4px; }
+.flow-msgs { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.flow-msg { padding: 18px 24px; border-right: 1px solid var(--border); }
+.flow-msg:last-child { border-right: 0; }
+.flow-msg .op-label { display: block; margin-bottom: 8px; }
+.flow-msg strong { display: block; color: #edf0e7; font-weight: 500; }
+.flow-msg p { font-size: 13px; margin-top: 4px; }
+.flow-qa { padding: 12px 24px; border-top: 1px solid var(--border); font-size: 13px; color: #9ba6ad; display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Plan */
+.plan-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); background: var(--card); }
+.plan-list li { display: grid; grid-template-columns: 52px 1fr auto; gap: 16px; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--border); }
+.plan-list li:last-child { border-bottom: 0; }
+.plan-list .op-rank { font-size: 16px; }
+.plan-list strong { display: block; font-weight: 500; color: #edf0e7; }
+.plan-list small { color: #93a0a7; }
+
+/* Campaign */
+.email { background: #f6f6f3; color: #1b1e20; padding: 28px; font: 15px/1.7 Georgia, serif; white-space: pre-wrap; max-height: 560px; overflow: auto; }
+.subject-list { list-style: none; margin: 0; padding: 0; }
+.subject-list li { padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 15px; color: #edf0e7; }
+.subject-list li:first-child { padding-top: 0; }
+.kv { display: grid; grid-template-columns: minmax(140px, 220px) 1fr; gap: 0; margin: 0; }
+.kv dt { padding: 14px 16px 14px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: #9ba6ad; }
+.kv dd { margin: 0; padding: 14px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: #e9ecec; overflow-wrap: anywhere; }
+.btn { background: var(--muted); border: 1px solid var(--input); color: #e9ecec; font-size: 14px; padding: 9px 15px; }
+.btn:hover { border-color: var(--primary); color: var(--primary); }
+
+.state { min-height: 60vh; display: grid; place-content: center; text-align: center; gap: 14px; }
+.state p { max-width: 46ch; }
+.state a { color: var(--primary); }
+
+@media (max-width: 1150px) {
+  .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .metrics-grid > .metric:nth-child(2n) { border-right: 0; }
+  .metrics-grid > .metric:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
+  .metrics-grid.three > .metric:last-child { grid-column: 1 / -1; border-bottom: 0; }
+  .grid-2, .grid-even { grid-template-columns: 1fr; }
+  .topbar { padding: 0 25px; } main { padding: 30px 25px; } .page-footer { padding: 20px 25px; }
+  .journey-track { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .journey-stop { border-bottom: 1px solid var(--border); }
+}
+@media (max-width: 900px) {
+  .sidebar { position: fixed; left: 0; top: 0; z-index: 30; transform: translateX(-100%); transition: transform .25s cubic-bezier(.16,1,.3,1); }
+  .shell.nav-open .sidebar { transform: none; }
+  .shell.nav-open .scrim { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 20; }
+  .trigger { display: inline-flex; }
+  .op-layout { grid-template-columns: 1fr; }
+  .op-list { border-right: 0; }
+  .op-detail { border-top: 1px solid var(--border); }
+}
+@media (max-width: 767px) {
+  .topbar { height: 64px; padding: 0 17px; gap: 10px; }
+  .snapshot { display: none; }
+  main { padding: 25px 17px; }
+  h1 { font-size: 32px; }
+  .page-heading { align-items: start; }
+  .outline-badge { padding: 7px 9px; font-size: 12px; }
+  .metric { padding: 17px 14px; }
+  .metric strong { font-size: 27px; }
+  .panel { padding: 21px; }
+  .page-footer { padding: 20px 17px; flex-direction: column; gap: 7px; }
+  .journey-track { grid-template-columns: 1fr 1fr; }
+  .op-reasons { grid-template-columns: 1fr; gap: 16px; }
+  .op-detail { padding: 20px 17px; }
+  .op-detail > h3 { font-size: 23px; }
+  .revenue-chart { gap: 4px; height: 230px; }
+  .chart-track { height: 170px; }
+  .chart-value { display: none; }
+  .chart-label { font-size: 10px; }
+  .plan-list li { grid-template-columns: 36px 1fr; }
+  .plan-list li > :last-child { grid-column: 2; justify-self: start; }
+  .kv { grid-template-columns: 1fr; }
+  .kv dt { border-bottom: 0; padding-bottom: 2px; }
+  .score-big { font-size: 72px; }
+}
+@media (max-width: 500px) {
+  .metrics-grid, .metrics-grid.three { grid-template-columns: 1fr; }
+  .metrics-grid > .metric { border-right: 0; border-bottom: 1px solid var(--border); }
+  .metrics-grid > .metric:last-child { border-bottom: 0; }
+  .journey-track { grid-template-columns: 1fr; }
+  .version { max-width: 120px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="shell" id="shell">
+  <aside class="sidebar" id="sidebar" aria-label="Workspace navigation">
+    <div class="brand"><img src="/assets/wavy-logo-white.png" alt="Wavy Studios"><span class="eyebrow">CLIENT WORKSPACE</span></div>
+    <div class="client-block"><span class="client-monogram" id="mono" aria-hidden="true"></span><div><strong id="client-name">Loading</strong><small>Growth &amp; retention</small></div></div>
+    <div class="nav-label">WORKSPACE</div>
+    <nav><ul class="nav" id="nav"></ul></nav>
+    <div class="sidebar-bottom">
+      <button class="fresh" type="button" id="fresh">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+        <span><strong>Run a fresh audit</strong><small>Reads Klaviyo again and saves a new version</small></span>
+      </button>
+      <span class="private"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Private client workspace</span>
+      <a class="exit" id="exit" href="/login">Sign out</a>
+      <small>WAVY STUDIOS · 2026</small>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+  <div class="workspace">
+    <header class="topbar">
+      <button class="trigger" type="button" id="trigger" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
+      </button>
+      <div class="breadcrumbs"><span id="crumb-client"></span><span class="slash">/</span><strong id="crumb-section"></strong></div>
+      <span class="snapshot" id="snapshot"></span>
+      <select class="version" id="version" hidden aria-label="Audit version"></select>
+      <span class="avatar" id="avatar" aria-hidden="true"></span>
+    </header>
+    <main id="main">
+      <div class="page-heading" id="heading" hidden>
+        <div><p class="eyebrow">03 / RETAIN</p><h1 id="title"></h1><p id="subtitle"></p></div>
+        <span class="outline-badge" id="badge"></span>
+      </div>
+      <div id="view"></div>
+    </main>
+    <footer class="page-footer"><span id="foot-client"></span><span>USD · Audit snapshot, not a live feed</span></footer>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const money = n => n == null ? "—" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+const compact = n => n == null ? "—" : n >= 1e6 ? "$" + (n / 1e6).toFixed(2) + "m" : n >= 1e3 ? "$" + (n / 1e3).toFixed(1) + "k" : "$" + Math.round(n);
+const pct = (n, d = 1) => n == null ? "—" : (n * 100).toFixed(d) + "%";
+const num = n => n == null ? "—" : Math.round(n).toLocaleString("en-US");
+const day = iso => iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
+const token = () => sessionStorage.getItem("wos-token") || "";
+const signIn = () => location.replace("/login?next=" + encodeURIComponent(location.pathname + location.search));
+const icon = paths => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
+const INFO = icon('<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>');
+
+const NAV = [
+  { id: "overview", label: "Opportunities", title: "Opportunity → outcome", sub: "What the audit found, ranked by value against the work to capture it.",
+    icon: '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>' },
+  { id: "health", label: "Retention health", sub: "One score from what Klaviyo shows today, and the parts that move it.",
+    icon: '<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>' },
+  { id: "performance", label: "Performance", sub: "Twelve months of orders, and what email earned.",
+    icon: '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>' },
+  { id: "journeys", label: "Customer journeys", sub: "The five core flows: what is live today, and what is built and ready.",
+    icon: '<line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>' },
+  { id: "plan", label: "30-day plan", sub: "The first month of work, in order.",
+    icon: '<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>' },
+  { id: "campaign", label: "Campaign draft", sub: "The first founder-voice campaign, checked against the brand's guardrails.",
+    icon: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>' },
+  { id: "brand", label: "Brand & guardrails", sub: "Voice, economics and the rules every message follows.",
+    icon: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>' },
+  { id: "answers", label: "Onboarding answers", sub: "Everything the brand told us in lifecycle onboarding, in their words.",
+    icon: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>' },
+  { id: "sources", label: "Sources & definitions", sub: "The evidence behind this workspace.",
+    icon: '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>' },
+];
+const CORE = [
+  ["browse_abandonment", "Browse abandonment"], ["added_to_cart", "Added to cart"], ["abandoned_checkout", "Abandoned checkout"],
+  ["replenishment", "Replenishment"], ["customer_winback", "Customer winback"],
+];
+
+const S = { audit: null, me: null, section: "overview", sort: "recommended", selected: 0 };
+const R = () => S.audit.result;
+const D = () => S.audit.result.dossier || {};
+const K = () => D().klaviyo || null;
+
+/* ---------------------------------------------------------------- shell */
+function renderNav() {
+  $("nav").innerHTML = NAV.map(n => `<li><button type="button" data-nav="${n.id}"${S.section === n.id ? ' aria-current="page"' : ""}>${icon(n.icon)}<span>${esc(n.label)}</span></button></li>`).join("");
+}
+function navigate(id, push = true) {
+  if (!NAV.some(n => n.id === id)) id = "overview";
+  S.section = id;
+  if (push) history.replaceState(null, "", location.pathname + location.search + "#" + id);
+  renderNav(); closeNav(); render();
+  window.scrollTo({ top: 0, behavior: "instant" });
+}
+function openNav() { $("shell").classList.add("nav-open"); $("trigger").setAttribute("aria-expanded", "true"); }
+function closeNav() { $("shell").classList.remove("nav-open"); $("trigger").setAttribute("aria-expanded", "false"); }
+
+function render() {
+  const n = NAV.find(x => x.id === S.section);
+  $("crumb-section").textContent = n.label;
+  $("heading").hidden = false;
+  $("title").textContent = n.title || n.label;
+  $("subtitle").textContent = n.sub;
+  $("view").innerHTML = VIEWS[S.section]();
+  wire();
+}
+
+/* ---------------------------------------------------------------- views */
+function benchNotice(what) {
+  return `<div class="notice">${INFO}<p><strong>Not measured.</strong> This audit ran on benchmark data, so ${esc(what)}. Run a fresh audit with a Klaviyo key to measure it.</p></div>`;
+}
+
+function opportunities() {
+  const ops = [...(R().sizing_report?.opportunities || [])];
+  const sorters = {
+    recommended: (a, b) => (b.value_effort_ratio || 0) - (a.value_effort_ratio || 0),
+    impact: (a, b) => (b.revenue_base || 0) - (a.revenue_base || 0),
+    easiest: (a, b) => (a.build_effort_days || 0) - (b.build_effort_days || 0) || (b.revenue_base || 0) - (a.revenue_base || 0),
+  };
+  return ops.sort(sorters[S.sort]);
+}
+const impactLabel = (o, max) => { const r = (o.revenue_base || 0) / (max || 1); return r >= .66 ? "High impact" : r >= .33 ? "Medium impact" : "Lower impact"; };
+const effortLabel = d => d <= 2 ? "Light" : d <= 5 ? "Straightforward" : "Substantial";
+const flowFor = key => (D().execution?.flows || []).find(f => f.flow_key === key);
+
+const VIEWS = {
+  overview() {
+    const k = K(), t = k?.totals_12m || {}, rev = k?.revenue_12m || {}, h = D().health || {}, s = R().sizing_report || {};
+    const ops = opportunities(), max = Math.max(...ops.map(o => o.revenue_base || 0), 1);
+    const sel = ops[Math.min(S.selected, ops.length - 1)];
+    const label = { recommended: "RECOMMENDED PRIORITY", impact: "HIGHEST IMPACT", easiest: "EASIEST TO BUILD" }[S.sort];
+    let detail = `<p class="empty">No opportunities were sized on this audit.</p>`;
+    if (sel) {
+      const f = flowFor(sel.lever_key), match = (f?.existing_matches || [])[0];
+      detail = `<div class="op-detail-heading"><span class="op-label">${label} / ${String(S.selected + 1).padStart(2, "0")}</span>
+          ${f ? `<span class="tag ${f.already_live ? "live" : match ? "off" : "missing"}">${f.already_live ? "Live in Klaviyo" : match ? "Built, not live" : "Not in Klaviyo"}</span>` : ""}</div>
+        <h3>${esc(sel.title)}</h3>
+        <p class="op-observation">${esc(sel.pool_description)}: ${num(sel.eligible_pool)} people${match ? `. Closest existing flow: <b>${esc(match.name)}</b> (${esc(match.status)}).` : "."}</p>
+        <div class="op-outcome"><span class="op-label">OUTCOME TO AIM FOR</span>
+          <p>${money(sel.monthly_run_rate_base)} a month once running: ${num(sel.eligible_pool)} people × ${pct(sel.rate_base)} conversion × ${money(sel.aov)} average order.</p>
+          <small>Modeled estimate, not measured lift. Each audience is counted once across all levers.</small></div>
+        <div class="op-reasons">
+          <div><h4>Annual value, base case</h4><strong>${money(sel.revenue_base)}</strong><p>Range ${money(sel.revenue_low)} to ${money(sel.revenue_high)}</p></div>
+          <div><h4>Remaining build work</h4><strong>${esc(sel.build_effort_days)} days</strong><p>${effortLabel(sel.build_effort_days)} implementation</p></div>
+        </div>
+        <div class="op-gate"><h4>What must be true first</h4><p>${esc(sel.dependency_gate || "Nothing outstanding.")}</p></div>`;
+    }
+    return `
+      ${k ? "" : benchNotice("these figures are modeled from category benchmarks rather than read from the account")}
+      <div class="metrics-grid three">
+        <div class="metric"><div class="metric-label">Recorded order value, 12 months</div><strong>${money(t.revenue)}</strong><p>${t.orders != null ? num(t.orders) + " orders · " : ""}Klaviyo Placed Order, all sources, before refunds.</p></div>
+        <div class="metric"><div class="metric-label">Email-attributed revenue</div><strong>${money(rev.email_total)}</strong><p>${rev.email_share != null ? pct(rev.email_share) + " of recorded value. " : ""}Klaviyo attribution, not incremental revenue.</p></div>
+        <div class="metric ${h.score == null ? "pending" : ""}"><div class="metric-label">Retention health</div>${h.score == null ? "<strong>Not measured</strong><p>Needs a Klaviyo read.</p>" : `<strong class="lime">${Math.round(h.score)}<small> / 100</small></strong><p>${esc((h.parts || []).map(p => p.label + ": " + p.value).join(" · "))}</p>`}</div>
+      </div>
+      <section class="board" aria-labelledby="board-title">
+        <div class="board-heading"><p class="eyebrow">DECIDE / DO / LEARN</p><h2 id="board-title">The highest-value work to pursue</h2>
+          <p>Every lever is sized on its own audience, so the totals don't double count. Recommended order weighs value against the work to build it.</p></div>
+        <div class="toolbar">
+          <div class="sort" role="group" aria-label="Order opportunities by">
+            ${[["recommended", "Recommended order"], ["impact", "Highest impact"], ["easiest", "Easiest to build"]].map(([k2, l]) => `<button type="button" data-sort="${k2}" aria-pressed="${S.sort === k2}">${l}</button>`).join("")}
+          </div>
+          <span>${ops.length} opportunities · ${money(s.total_monthly_leak_base)} a month left on the table</span>
+        </div>
+        <div class="op-layout">
+          <div class="op-list">${ops.map((o, i) => `<button type="button" class="op-item" data-op="${i}" aria-pressed="${i === S.selected}">
+            <span class="op-rank">${String(i + 1).padStart(2, "0")}</span>
+            <span><h3>${esc(o.title)}</h3><p>${impactLabel(o, max)} · ${effortLabel(o.build_effort_days)} implementation</p>
+            <span class="op-meta"><span>${money(o.monthly_run_rate_base)} / mo</span><span>${esc(o.build_effort_days)} days</span></span></span></button>`).join("")}</div>
+          <article class="op-detail" aria-label="Selected opportunity">${detail}</article>
+        </div>
+      </section>`;
+  },
+
+  health() {
+    const h = D().health || {};
+    if (h.score == null) return benchNotice("there is nothing to score yet");
+    const color = r => r >= .8 ? "#9fd356" : r >= .5 ? "#e9c485" : "#ff8069";
+    const why = { flow_coverage: "Five core flows catch shoppers at the moments they're most likely to buy. Each missing flow is revenue nobody is asking for.",
+      email_share: "How much of recorded order value Klaviyo attributes to email. Healthy retention programs sit around 30%.",
+      repeat_rate: "The share of customers who come back for a second order within the window." };
+    return `<div class="grid-2">
+      <div class="panel"><div class="panel-head"><div><h2>What makes up the score</h2><p>Each part is scored against a benchmark. Parts that couldn't be measured are left out rather than guessed.</p></div></div>
+        ${(h.parts || []).map(p => { const r = Math.max(0, Math.min(1, p.ratio)); return `<div class="meter"><div class="meter-head"><span>${esc(p.label)}</span><b>${esc(p.value)}</b></div>
+          <div class="track"><i style="width:${(r * 100).toFixed(0)}%;background:${color(r)}"></i></div><small>${esc(p.score.toFixed ? p.score.toFixed(1) : p.score)} of ${esc(p.max)} points. ${esc(why[p.key] || "")}</small></div>`; }).join("")}
+      </div>
+      <div class="panel"><h2>Retention health</h2><p style="margin:8px 0 24px;font-size:14px">Out of 100, from measured data.</p>
+        <div class="score-big">${Math.round(h.score)}<small> / 100</small></div>
+        <p style="margin-top:24px;font-size:14px">The opportunities list shows what would move it most, and the 30-day plan puts those in order.</p></div>
+    </div>`;
+  },
+
+  performance() {
+    const k = K(), e = D().economics || {};
+    if (!k) return benchNotice("there are no order or email figures for this account");
+    const t = k.totals_12m || {}, rev = k.revenue_12m || {}, months = t.months || [];
+    const peak = Math.max(...months.map(m => m.revenue || 0), 1);
+    const mlabel = (m, i) => { const [y, mo] = m.month.split("-"); const name = new Date(+y, +mo - 1, 1).toLocaleDateString("en-US", { month: "short" }); return i === 0 || mo === "01" ? `${name} ${y.slice(2)}` : name; };
+    const flowNames = Object.fromEntries((k.flows || []).map(f => [f.id, f.name]));
+    const byFlow = Object.entries(rev.by_flow || {}).sort((a, b) => b[1] - a[1]);
+    const share = (part) => rev.email_total ? part / rev.email_total : 0;
+    return `<div class="metrics-grid">
+        <div class="metric"><div class="metric-label">Recorded order value</div><strong class="lime">${compact(t.revenue)}</strong><p>${money(t.revenue)} gross Placed Order value, last 12 months, all sources.</p></div>
+        <div class="metric"><div class="metric-label">Orders</div><strong>${num(t.orders)}</strong><p>Placed Order events in the same window.</p></div>
+        <div class="metric"><div class="metric-label">Average order value</div><strong>${e.target_aov != null ? "$" + Number(e.target_aov).toFixed(2) : "—"}</strong><p>From the imported orders.</p></div>
+        <div class="metric"><div class="metric-label">Repeat purchase rate</div><strong>${pct(e.repeat_purchase_rate)}</strong><p>${e.median_repurchase_days != null ? `Median ${esc(e.median_repurchase_days)} days to a second order.` : "Customers with more than one order."}</p></div>
+      </div>
+      <div class="grid-2">
+        <div class="panel"><div class="panel-head"><div><h2>Recorded order value</h2><p>Complete calendar months · USD · all synced order sources</p></div></div>
+          ${months.length ? `<div class="revenue-chart" role="img" aria-label="Monthly recorded order value, last 12 months">${months.map((m, i) => `<div class="chart-column"><span class="chart-value">${compact(m.revenue)}</span><div class="chart-track"><div class="chart-bar" style="height:${Math.max(1, (m.revenue || 0) / peak * 100).toFixed(1)}%"></div></div><span class="chart-label">${esc(mlabel(m, i))}</span></div>`).join("")}</div>
+            <p style="font-size:13px;margin-top:16px">Gross order values, before refunds or a net-sales reconciliation.</p>` : `<p class="empty">Monthly totals weren't available from Klaviyo.</p>`}
+        </div>
+        <div class="panel"><div class="panel-head"><div><h2>Campaigns &amp; flows</h2><p>Last 365 days · Klaviyo email attribution</p></div></div>
+          <div class="mix-total">${money(rev.email_total)}<small>Attributed revenue · ${pct(rev.email_share)} of recorded value</small></div>
+          <div class="mix-row"><div><span>Flows</span><strong>${money(rev.flows)}</strong></div><div class="mix-track"><span style="width:${(share(rev.flows || 0) * 100).toFixed(1)}%;background:#c8ff00"></span></div><small>${pct(share(rev.flows || 0))} of attributed revenue</small></div>
+          <div class="mix-row"><div><span>Campaigns</span><strong>${money(rev.campaigns)}</strong></div><div class="mix-track"><span style="width:${(share(rev.campaigns || 0) * 100).toFixed(1)}%;background:#76a2d2"></span></div><small>${pct(share(rev.campaigns || 0))} of attributed revenue</small></div>
+          <p style="font-size:13px;margin-top:22px">Attribution is not incremental revenue. Don't add it to recorded order value.</p>
+        </div>
+      </div>
+      ${byFlow.length ? `<div class="panel"><div class="panel-head"><div><h2>Revenue by flow</h2><p>Last 365 days · Klaviyo attribution</p></div></div>
+        <table><thead><tr><th>Flow</th><th class="num">Attributed revenue</th><th class="num">Share of flows</th></tr></thead>
+        <tbody>${byFlow.map(([id, v]) => `<tr><td>${esc(flowNames[id] || id)}</td><td class="num">${money(v)}</td><td class="num">${pct(rev.flows ? v / rev.flows : 0)}</td></tr>`).join("")}</tbody></table></div>` : ""}`;
+  },
+
+  journeys() {
+    const flows = D().execution?.flows || [], qa = Object.fromEntries((D().execution?.qa?.flows || []).map(q => [q.flow_key, q]));
+    const state = f => !f ? ["missing", "Not checked"] : f.already_live === true ? ["live", "Live"] : (f.existing_matches || []).length ? ["off", "Not live"] : f.already_live === false ? ["missing", "Missing"] : ["", "Not checked"];
+    const timing = flows[0]?.timing || {};
+    return `${K() ? "" : benchNotice("live status couldn't be checked against Klaviyo")}
+      <div class="journey-track">${CORE.map(([key, label], i) => { const f = flows.find(x => x.flow_key === key), [cls, txt] = state(f), m = (f?.existing_matches || [])[0];
+        return `<div class="journey-stop"><span class="n">${String(i + 1).padStart(2, "0")}</span><strong>${esc(label)}</strong><span><span class="tag ${cls}">${txt}</span></span><small>${m ? esc(m.name) + " · " + esc(m.status) : f?.already_live === false ? "No matching flow in Klaviyo" : ""}</small></div>`; }).join("")}</div>
+      ${timing.median_repurchase_days ? `<div class="notice">${INFO}<p>Timing follows this brand's own buying rhythm: a median of <strong>${esc(timing.median_repurchase_days)} days</strong> to a second order, so replenishment fires at day ${esc(timing.replenishment_delay_days)} and winback at day ${esc(timing.winback_delay_days)}.</p></div>` : ""}
+      ${flows.map(f => { const [cls, txt] = state(f), q = qa[f.flow_key];
+        return `<section class="flow-card"><header><div><h2>${esc(f.name.split(" — ")[0])}</h2><p>${(f.message_drafts || []).length} prepared message${(f.message_drafts || []).length === 1 ? "" : "s"} · not sent, not scheduled</p></div><span class="tag ${cls}">${txt}</span></header>
+          <div class="flow-msgs">${(f.message_drafts || []).map((m, i) => `<div class="flow-msg"><span class="op-label">MESSAGE ${i + 1}</span><strong>${esc(m.subject_line)}</strong><p>${esc(m.preview_text)}</p></div>`).join("")}</div>
+          ${q ? `<div class="flow-qa"><span>Guardrail checks: ${q.passed ? "all passed" : "needs fixes"} (${esc(q.score)}/100)</span>${(q.checks || []).filter(c => !c.passed).map(c => `<span>· ${esc(c.label)}</span>`).join("")}</div>` : ""}
+        </section>`; }).join("") || `<p class="empty">No flows were prepared on this audit.</p>`}`;
+  },
+
+  plan() {
+    const plan = D().first_30_day_plan || {}, approved = !plan.status || plan.status === "approved";
+    const tasks = (R().tasks_created || []).length ? R().tasks_created : (plan.tasks || []).map(title => ({ title }));
+    const area = a => String(a || "").replace(/_/g, " ");
+    return `<div class="notice">${INFO}<p>${approved ? "<strong>Approved.</strong> These tasks are scheduled for the first 30 days." :
+        S.me?.staff ? "<strong>Proposed by the brand's own audit.</strong> Approve it in the ops console to start the work." :
+        "<strong>Proposed.</strong> Your Wavy strategist reviews and approves this plan before any work starts."}</p></div>
+      <ol class="plan-list">${tasks.map((t, i) => `<li><span class="op-rank">${String(i + 1).padStart(2, "0")}</span><div><strong>${esc(t.title)}</strong>${t.area ? `<small>${esc(area(t.area))} · ${esc(area(t.owner_role))}</small>` : ""}</div><span class="tag ${approved ? "live" : "off"}">${approved ? "Approved" : "Proposed"}</span></li>`).join("")}</ol>`;
+  },
+
+  campaign() {
+    const c = R().creative_draft;
+    if (!c) return `<p class="empty">No campaign draft on this audit.</p>`;
+    return `<div class="grid-2">
+      <div class="panel"><div class="panel-head"><div><h2>${esc(c.title || "Campaign #1")}</h2><p>${esc(c.theme || "")}</p></div><span class="tag ${c.compliance_passed ? "live" : "missing"}">${c.compliance_passed ? "Guardrails passed" : "Needs fixes"}</span></div>
+        <div class="email">${esc(c.body_markdown)}</div></div>
+      <div class="panel"><h2>Subject lines</h2><ul class="subject-list" style="margin:18px 0 26px">${(c.subject_line_options || []).map(s => `<li>${esc(s)}</li>`).join("")}</ul>
+        <dl class="kv"><dt>Preview text</dt><dd>${esc(c.preview_text)}</dd><dt>Call to action</dt><dd>${esc(c.cta_text)}</dd><dt>Audience</dt><dd>${esc(c.target_segment)}</dd><dt>Compliance</dt><dd>${esc(c.compliance_notes)}</dd></dl>
+        <p style="font-size:13px;margin-top:18px">A draft for review. Nothing has been sent or scheduled.</p></div>
+    </div>`;
+  },
+
+  brand() {
+    const b = D().brand_identity || {}, e = D().economics || {}, cd = D().campaign_directives || {};
+    const hero = (b.hero_products || []).map(h => typeof h === "string" ? h : h.name).filter(Boolean);
+    return `<div class="grid-even">
+      <div class="panel"><h2>Voice</h2><dl class="kv" style="margin-top:14px">
+        <dt>Archetype</dt><dd>${esc(b.voice_archetype || "—")}</dd>
+        <dt>Tone</dt><dd><div class="chips">${(b.tone_descriptors || []).map(t => `<span class="chip">${esc(t)}</span>`).join("") || "—"}</div></dd>
+        <dt>Never say</dt><dd><div class="chips">${(b.forbidden_words || []).map(t => `<span class="chip no">${esc(t)}</span>`).join("") || "—"}</div></dd>
+        <dt>Hero products</dt><dd>${hero.map(esc).join(", ") || "—"}</dd></dl></div>
+      <div class="panel"><h2>Economics &amp; sending rules</h2><dl class="kv" style="margin-top:14px">
+        <dt>Gross margin</dt><dd>${e.gross_margin_pct != null ? esc(e.gross_margin_pct) + "%" : "—"}</dd>
+        <dt>Free shipping at</dt><dd>${money(e.free_shipping_threshold)}</dd>
+        <dt>Repurchase cycle</dt><dd>${e.typical_consumption_days != null ? esc(e.typical_consumption_days) + " days (stated)" : "—"}${e.median_repurchase_days != null ? ` · ${esc(e.median_repurchase_days)} days (measured)` : ""}</dd>
+        <dt>Discounts</dt><dd>${esc(String(cd.allowed_discounts || "—").replace(/_/g, " ").toLowerCase())}</dd>
+        <dt>Campaigns per week</dt><dd>${esc(cd.weekly_frequency ?? "—")}</dd></dl></div>
+    </div>`;
+  },
+
+  answers() {
+    const a = S.intake?.answers || D().intake || {}, sections = S.intake?.sections || [];
+    if (!Object.keys(a).length) return `<div class="notice">${INFO}<p><strong>No answers yet.</strong> The brand hasn't filled in lifecycle onboarding. <a href="/onboard?client=${encodeURIComponent(S.audit.client_slug)}" style="color:#c8ff00">Open the questionnaire</a></p></div>`;
+    const show = v => Array.isArray(v) ? v.join(", ") : v;
+    return `${S.intake?.submitted_at ? "" : `<div class="notice">${INFO}<p><strong>Not submitted yet.</strong> These are the answers saved so far.</p></div>`}
+      ${sections.map(sec => { const rows = sec.questions.filter(q => a[q.key]);
+        return `<div class="panel" style="margin-bottom:24px"><div class="panel-head"><div><h2>${esc(sec.title)}</h2><p>${rows.length} of ${sec.questions.length} answered</p></div></div>
+          ${rows.length ? `<dl class="kv">${rows.map(q => `<dt>${esc(q.label)}</dt><dd style="white-space:pre-wrap">${esc(show(a[q.key]))}</dd>`).join("")}</dl>` : `<p class="empty">Nothing answered in this section.</p>`}</div>`; }).join("")}
+      ${a.submitted_by_name ? `<p class="empty">Submitted by ${esc(a.submitted_by_name)}${S.intake?.submitted_at ? " · " + esc(day(S.intake.submitted_at)) : ""}.</p>` : ""}`;
+  },
+
+  sources() {
+    const k = K(), src = D().data_sources || {}, o = k?.orders || {}, acct = k?.account || {};
+    const missing = Object.keys(k?.unavailable || {});
+    return `<div class="panel" style="margin-bottom:24px"><h2>Where the numbers come from</h2><dl class="kv" style="margin-top:14px">
+        <dt>Orders</dt><dd>${src.orders === "klaviyo" ? "Klaviyo Placed Order events" : src.orders === "shopify" ? "Shopify orders" : "Category benchmarks (not measured)"}</dd>
+        ${k ? `<dt>Klaviyo account</dt><dd>${esc(acct.name || "—")} · ${esc(acct.id || "")}${acct.timezone ? " · " + esc(acct.timezone) : ""}</dd>
+        <dt>Read at</dt><dd>${esc(day(k.read_at))}</dd>
+        <dt>Window</dt><dd>Last ${esc(o.window_days || 365)} days</dd>
+        <dt>Orders imported</dt><dd>${num(o.imported)}${o.backfill_complete === false ? " · the full history is still importing, and the next audit will include the rest" : " · complete"}</dd>
+        <dt>Not available</dt><dd>${missing.length ? missing.map(esc).join(", ") : "Everything requested was available"}</dd>` : ""}
+        <dt>Audit version</dt><dd>Version ${esc(S.audit.version)} · ${esc(day(S.audit.created_at))}</dd></dl></div>
+      <div class="panel"><h2>Definitions</h2><dl class="kv" style="margin-top:14px">
+        <dt>Recorded order value</dt><dd>Gross value of Placed Order events, all sources, before refunds, discounts or a net-sales reconciliation.</dd>
+        <dt>Email-attributed revenue</dt><dd>Klaviyo's conversion value for flows and campaigns under the account's attribution settings. Attribution is not incremental revenue.</dd>
+        <dt>Retention health</dt><dd>Core flow coverage (40 points), email share against a 30% benchmark (30) and repeat purchase rate against 30% (30). Parts that can't be measured are excluded, not estimated.</dd>
+        <dt>Opportunity sizing</dt><dd>Eligible audience × modeled conversion rate × average order value, with each audience assigned to one lever only. Modeled estimates, not forecasts or measured lift.</dd>
+      </dl><button class="btn" type="button" id="download" style="margin-top:22px">Download the audit data (JSON)</button></div>`;
+  },
+};
+
+function wire() {
+  document.querySelectorAll("[data-sort]").forEach(b => b.addEventListener("click", () => { S.sort = b.dataset.sort; S.selected = 0; render(); }));
+  document.querySelectorAll("[data-op]").forEach(b => b.addEventListener("click", () => {
+    S.selected = +b.dataset.op; render();
+    if (matchMedia("(max-width: 900px)").matches) document.querySelector(".op-detail")?.scrollIntoView({ block: "start" });
+  }));
+  $("download")?.addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(R(), null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = `${S.audit.client_slug}-audit-v${S.audit.version}.json`; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+}
+
+/* ---------------------------------------------------------------- load */
+function fail(title, body, link) {
+  $("heading").hidden = true;
+  $("view").innerHTML = `<div class="state"><h2>${esc(title)}</h2><p>${esc(body)}</p>${link ? `<a href="${esc(link[0])}">${esc(link[1])}</a>` : ""}</div>`;
+}
+
+async function init() {
+  const slug = decodeURIComponent((location.pathname.match(/^\/audit\/([^/]+)/) || [])[1] || "");
+  const version = new URLSearchParams(location.search).get("version");
+  if (!token()) return signIn();
+  const auth = { headers: { Authorization: "Bearer " + token() } };
+  const [meR, aR, iR] = await Promise.all([
+    fetch("/v1/ops/me", auth),
+    fetch(`/v1/ops/clients/${encodeURIComponent(slug)}/audit${version ? "?version=" + encodeURIComponent(version) : ""}`, auth),
+    fetch(`/v1/ops/intake?client=${encodeURIComponent(slug)}`, auth),
+  ]);
+  if (iR.ok) S.intake = await iR.json();
+  if (meR.status === 401 || aR.status === 401) { sessionStorage.removeItem("wos-token"); return signIn(); }
+  S.me = await meR.json();
+  $("avatar").textContent = (S.me.name || S.me.email || "?").slice(0, 1).toUpperCase();
+  $("avatar").title = S.me.name || "";
+  if (S.me.staff) { $("exit").textContent = "Ops console"; $("exit").href = "/console"; }
+  else $("exit").addEventListener("click", () => sessionStorage.removeItem("wos-token"));
+  $("fresh").addEventListener("click", () => location.assign("/onboard?client=" + encodeURIComponent(slug)));
+  renderNav();
+
+  if (aR.status === 404 && !version) return location.replace("/onboard?client=" + encodeURIComponent(slug));
+  if (!aR.ok) {
+    $("client-name").textContent = slug; $("crumb-client").textContent = slug;
+    return version ? fail(`There is no version ${version}`, "That version of the audit doesn't exist.", [`/audit/${encodeURIComponent(slug)}`, "Open the latest audit"])
+                   : fail("This workspace couldn't be opened", "It may not exist, or this account can't see it.", null);
+  }
+  S.audit = await aR.json();
+  const name = S.audit.client_name;
+  document.title = `${name} | Wavy Client Hub`;
+  $("client-name").textContent = name; $("crumb-client").textContent = name; $("foot-client").textContent = `${name} · Wavy Studios`;
+  $("mono").textContent = name.trim().slice(0, 1).toUpperCase();
+  $("snapshot").textContent = `Audit · ${day(S.audit.created_at)}`;
+  $("badge").textContent = `Audit v${S.audit.version}`;
+  const sel = $("version");
+  sel.innerHTML = S.audit.versions.map(v => `<option value="${v.version}"${v.version === S.audit.version ? " selected" : ""}>v${v.version} · ${esc(day(v.created_at))}${v.health_score == null ? "" : " · " + Math.round(v.health_score)}</option>`).join("");
+  sel.hidden = S.audit.versions.length < 2;
+  sel.addEventListener("change", () => location.assign(`/audit/${encodeURIComponent(slug)}?version=${sel.value}${location.hash}`));
+  navigate(location.hash.slice(1) || "overview", false);
+}
+
+$("nav").addEventListener("click", e => { const b = e.target.closest("[data-nav]"); if (b) navigate(b.dataset.nav); });
+$("trigger").addEventListener("click", openNav);
+$("scrim").addEventListener("click", closeNav);
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeNav(); });
+window.addEventListener("hashchange", () => { if (S.audit) navigate(location.hash.slice(1), false); });
+init();
+</script>
+</body>
+</html>

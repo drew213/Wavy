@@ -23,6 +23,29 @@ def env(tmp_path):
     return factory, client
 
 
+def test_onboard_queues_and_stores_a_dossier(env):
+    factory, c = env
+    queued = c.post("/v1/ops/onboard", json={"client_name": "Glow Lab", "client_slug": "glow-infra"})
+    assert queued.status_code == 200, queued.text
+    body = queued.json()
+    assert body["status"] == "queued" and body["job_run_id"]
+    waiting = c.get(f"/v1/ops/onboard/{body['job_run_id']}").json()
+    assert waiting["status"] == "queued" and waiting["result"] is None
+
+    from wavyos import jobs
+    import wavyos.jobmods  # noqa: F401
+    done = [run for run in jobs.run_pending(factory, limit=10) if run.job_key == "client.onboard"]
+    assert len(done) == 1 and done[0].status == "succeeded", done[0].error if done else "no run"
+    assert "shpat_" not in str(done[0].trigger) and "pk_" not in str(done[0].trigger)
+
+    finished = c.get(f"/v1/ops/onboard/{body['job_run_id']}").json()
+    assert finished["dossier_version"] == 1
+    assert finished["result"]["client_slug"] == "glow-infra"
+    assert finished["result"]["dossier"]["execution"]["qa"]["passed"] is True
+    with factory() as s:
+        assert s.query(m.Dossier).filter_by(client_id=body["client_id"]).count() == 1
+
+
 def test_console_page_and_auth(env):
     _, c = env
     page = c.get("/console")

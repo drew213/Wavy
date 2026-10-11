@@ -391,6 +391,31 @@ class KlaviyoClient:
         for page in self.iter_pages("/api/events/", params, max_pages):
             yield from page.get("data") or []
 
+    def event_pages(self, metric_id: str, since: datetime | str, until: datetime | str, *,
+                    start_url: Optional[str] = None, page_size: int = 200,
+                    max_pages: int = 100) -> Iterator[tuple[list[dict], Optional[str]]]:
+        """Yield (events, next_url) per page, oldest first. Pass a saved next_url as start_url to resume."""
+        if start_url:
+            target, params = start_url, None
+        else:
+            flt = (f'and(equals(metric_id,"{_safe_id(metric_id, "metric_id")}"),'
+                   f"greater-or-equal(datetime,{_utc_z(since)}),less-than(datetime,{_utc_z(until)}))")
+            target, params = "/api/events/", {"filter": flt, "page[size]": page_size, "sort": "datetime",
+                                              "include": "profile", "fields[profile]": "id"}
+        for page in self.iter_pages(target, params, max_pages):
+            yield page.get("data") or [], (page.get("links") or {}).get("next")
+
+    def metric_id(self, name: str) -> Optional[str]:
+        """A metric's id by name, preferring the Shopify integration's copy when several share the name."""
+        matches = [x for x in self.metrics() if (x.get("attributes") or {}).get("name") == name]
+        if not matches:
+            return None
+
+        def rank(x: dict) -> int:
+            integration = (x.get("attributes") or {}).get("integration") or {}
+            return 0 if str(integration.get("key") or integration.get("name") or "").lower() == "shopify" else 1
+        return str(sorted(matches, key=rank)[0].get("id"))
+
 
 def verify_account(api_key: str, transport: Optional[httpx.BaseTransport] = None, **kw) -> dict:
     """Connection setup: confirm the key works and say which account it opens. Returns {id, name, timezone}."""

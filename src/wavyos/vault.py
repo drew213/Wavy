@@ -6,12 +6,15 @@ belongs to, so a ciphertext copied onto another client's connection won't decryp
 
 Providers:
   LocalKeyProvider  a 32-byte master key in a 0600 file (dev, single-box installs)
-  (production)      a cloud KMS provider implementing wrap/unwrap; nothing else changes
+  EnvKeyProvider    the master key from the host's secret store (cloud hosting)
+  (later)           a cloud KMS provider implementing wrap/unwrap; nothing else changes
 
 Plaintext secrets exist only in memory, inside `with vault.open(...)`. Never log them.
 """
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import os
 import stat
@@ -34,7 +37,46 @@ class VaultError(Exception):
     pass
 
 
-class LocalKeyProvider:
+class _MasterKey:
+    _key: bytes
+    key_ref: str
+
+    def wrap(self, data_key: bytes, aad: bytes) -> tuple[bytes, str]:
+        nonce = os.urandom(12)
+        return nonce + AESGCM(self._key).encrypt(nonce, data_key, aad), self.key_ref
+
+    def unwrap(self, wrapped: bytes, key_ref: str, aad: bytes) -> bytes:
+        if key_ref != self.key_ref:
+            raise VaultError(f"secret was wrapped by {key_ref}, not this vault's key ({self.key_ref})")
+        return AESGCM(self._key).decrypt(wrapped[:12], wrapped[12:], aad)
+
+
+class EnvKeyProvider(_MasterKey):
+    """The master key as a secret string from the host's secret store (WAVYOS_MASTER_KEY).
+
+    A base64 value that decodes to 32 bytes is used as is; any other string of at least 32
+    characters is stretched with SHA-256. Changing the value makes stored secrets unreadable.
+    """
+
+    def __init__(self, secret: str):
+        secret = secret.strip()
+        if len(secret) < 32:
+            raise VaultError("WAVYOS_MASTER_KEY must be at least 32 characters")
+        try:
+            key = base64.b64decode(secret, validate=True)
+        except (binascii.Error, ValueError):
+            key = b""
+        self._key = key if len(key) == 32 else hashlib.sha256(secret.encode()).digest()
+        self.key_ref = "env:" + hashlib.sha256(self._key).hexdigest()[:16]
+
+
+def key_provider(settings) -> KeyProvider:
+    if settings.master_key:
+        return EnvKeyProvider(settings.master_key)
+    return LocalKeyProvider(settings.master_key_file)
+
+
+class LocalKeyProvider(_MasterKey):
     def __init__(self, path: str | os.PathLike):
         self.path = Path(path)
         if not self.path.exists():
@@ -49,15 +91,6 @@ class LocalKeyProvider:
         if len(self._key) != 32:
             raise VaultError("master key file must hold exactly 32 bytes")
         self.key_ref = "local:" + hashlib.sha256(self._key).hexdigest()[:16]
-
-    def wrap(self, data_key: bytes, aad: bytes) -> tuple[bytes, str]:
-        nonce = os.urandom(12)
-        return nonce + AESGCM(self._key).encrypt(nonce, data_key, aad), self.key_ref
-
-    def unwrap(self, wrapped: bytes, key_ref: str, aad: bytes) -> bytes:
-        if key_ref != self.key_ref:
-            raise VaultError(f"secret was wrapped by {key_ref}, not this vault's key ({self.key_ref})")
-        return AESGCM(self._key).decrypt(wrapped[:12], wrapped[12:], aad)
 
 
 def binding(org_id: str, client_id: str, provider: str, external_account_id: str) -> bytes:

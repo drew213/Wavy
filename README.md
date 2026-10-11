@@ -335,13 +335,24 @@ WAVYOS_TEST_SNAPSHOT_ROOT=/path/to/audit/output WAVYOS_TEST_AUDIT_OS_ROOT=/path/
 
 ## Deploying to production
 
-This release runs on one machine with SQLite. Before paying clients use it:
+`render.yaml` is a Render Blueprint: a web service (API, console, brand sign-up), one worker (audits, agent work, and the job scheduler every 5 minutes) and Postgres reachable only from those two. About $20 a month on the smallest paid plans.
 
-1. **Database.** Point `WAVYOS_DATABASE_URL` at Postgres and add migrations (Alembic). Tables are created with `init-db` today.
-2. **Secrets.** Replace the local master key file with a cloud KMS key provider (implement `wrap` and `unwrap` in `vault.py`).
-3. **Hosting.** Run `wavyos serve` behind HTTPS, and `wavyos work --loop` plus a scheduler for `wavyos schedule` as separate processes.
-4. **Sign-in.** Add SSO (OIDC) for staff and client stakeholders; API tokens stay for automation.
-5. **Backups.** Database, master key and event-hash anchors, together.
+1. Dashboard → **New → Blueprint**, pick this repository.
+2. Fill in `WAVYOS_ADMIN_EMAIL` and `WAVYOS_ADMIN_PASSWORD` (the first staff admin; set on the first deploy only, never overwritten) and optionally `ANTHROPIC_API_KEY`.
+3. Deploy. Each web deploy runs `wavyos init-db && wavyos ensure-admin` first. Brands sign up at `/start`; staff sign in at `/login`.
+4. Copy `WAVYOS_MASTER_KEY` from the `wavyos-shared` environment group somewhere safe. Without it, stored Klaviyo keys can't be opened.
+
+Cloud-specific settings: `WAVYOS_MASTER_KEY` (the master key from the host's secret store, used instead of the key file), `WAVYOS_ADMIN_EMAIL`, `WAVYOS_ADMIN_PASSWORD`, `WAVYOS_ADMIN_NAME`, `WAVYOS_ORG_NAME`. `postgres://` URLs are accepted as given.
+
+Run the suite against Postgres with `WAVYOS_TEST_POSTGRES_URL=postgresql+psycopg://localhost/wavyos_test`; each test gets its own schema.
+
+Still to do as usage grows:
+
+1. **Migrations.** Tables are created with `init-db` (`create_all`), which adds new tables but never alters existing ones. Add Alembic before the first column change.
+2. **Secrets.** Swap `EnvKeyProvider` for a cloud KMS provider (implement `wrap` and `unwrap` in `vault.py`).
+3. **Several web instances.** Sign-in rate limits are kept in memory per instance; move them to the database or Redis first.
+4. **Sign-in.** Password reset, email verification and SSO (OIDC) for staff; API tokens stay for automation.
+5. **Backups.** Render backs Postgres up daily; keep the master key and event-hash anchors with them.
 
 ---
 

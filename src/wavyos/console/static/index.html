@@ -162,6 +162,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
     const counts = { approvals: pendingAp, executions: running };
     $("#root").innerHTML = `<div class="app"><nav class="rail" aria-label="Sections"><div class="brand"><h1>Wavy <span>OS</span></h1><div class="label">Console</div></div>
       ${VIEWS.map(([k, l]) => `<a href="#${k}" data-v="${k}" aria-current="${S.view === k ? "page" : "false"}">${l}${counts[k] ? `<b class="${k === "approvals" ? "hot" : ""}">${counts[k]}</b>` : ""}</a>`).join("")}
+      <a href="/onboard" target="_blank" style="margin-top:12px; border:1px solid var(--lime); color:var(--lime); font-weight:700;">⚡ Onboard Client ↗</a>
       <div class="foot"><div class="t" style="color:var(--text)">${esc(S.me?.name || "")}</div><div class="muted">${esc(S.me?.email || "")}</div><button class="btn" id="so" style="margin-top:8px">Sign out</button></div></nav>
       <div class="main"><div class="top"><h2>${esc(VIEWS.find(v => v[0] === S.view)[1])}</h2>
       <label class="label" for="cf">Client</label><select id="cf"><option value="">All clients</option>${ov.map(c => `<option value="${esc(c.slug)}" ${S.client === c.slug ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>
@@ -188,7 +189,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
         ${c.approvals_pending ? `<a href="#approvals" class="chip s-review plain">${c.approvals_pending} approval${c.approvals_pending > 1 ? "s" : ""}</a>` : ""}</div>
         <div class="label" style="display:flex;justify-content:space-between"><span>Model spend today</span><span class="num">${usd(c.spend_today_usd)} / ${usd(c.budget_usd)}</span></div>
         <div class="bar"><i class="${pct >= 100 ? "over" : ""}" style="width:${pct}%"></i></div>
-        <div class="row" style="margin-top:12px"><button class="btn" data-open="${esc(c.slug)}">Open flow</button></div></div>`; }).join("")}</div>`;
+        <div class="row" style="margin-top:12px"><button class="btn" data-open="${esc(c.slug)}">Open flow</button><a class="btn" href="/audit/${encodeURIComponent(c.slug)}">Open audit</a></div></div>`; }).join("")}</div>`;
   }
 
   function vFlow() {

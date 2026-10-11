@@ -72,8 +72,8 @@ def _klaviyo_factory(api_key: str):
 
 def _job_services(settings: Settings) -> dict:
     """What job handlers find in ctx.services (see wavyos.jobmods)."""
-    from .vault import LocalKeyProvider, Vault
-    return {"vault": Vault(LocalKeyProvider(settings.master_key_file)), "klaviyo_factory": _klaviyo_factory,
+    from .vault import Vault, key_provider
+    return {"vault": Vault(key_provider(settings)), "klaviyo_factory": _klaviyo_factory,
             "settings": settings}
 
 
@@ -97,6 +97,37 @@ def cmd_bootstrap(args, settings: Settings) -> int:
     return 0
 
 
+def cmd_ensure_admin(args, settings: Settings) -> int:
+    """First-deploy setup from the host's environment, safe to run on every deploy: create the
+    organization and its admin if missing, and give the admin a password if they have none.
+    Never prints a token and never replaces an existing password."""
+    import os
+    from . import accounts
+    email = (os.environ.get("WAVYOS_ADMIN_EMAIL") or "").strip().lower()
+    if not email:
+        print("WAVYOS_ADMIN_EMAIL not set; nothing to do")
+        return 0
+    slug = settings.signup_org or "wavy"
+    with transaction(_factory(settings)) as s:
+        org = s.scalar(select(m.Organization).where(m.Organization.slug == slug))
+        if org is None:
+            org, _ = tenancy.bootstrap_org(s, name=os.environ.get("WAVYOS_ORG_NAME") or "Wavy Studios", slug=slug,
+                                           admin_email=email, admin_name=os.environ.get("WAVYOS_ADMIN_NAME") or "Admin")
+            print(f"organization {slug} created with admin {email}")
+        user = s.scalar(select(m.User).where(m.User.org_id == org.id, m.User.email == email))
+        if user is None:
+            raise CliError(f"{email} is not a user in {slug}; add them in the console")
+        has_password = s.scalar(select(m.PasswordCredential.id).where(m.PasswordCredential.user_id == user.id))
+        password = os.environ.get("WAVYOS_ADMIN_PASSWORD") or ""
+        if not has_password and password:
+            try:
+                accounts.set_password(s, user, password)
+            except ValueError as e:
+                raise CliError(f"WAVYOS_ADMIN_PASSWORD: {e}")
+            print(f"{email} can now sign in at /login")
+    return 0
+
+
 def cmd_token(args, settings: Settings) -> int:
     with transaction(_factory(settings)) as s:
         user = _user(s, args.email, args.org)
@@ -105,6 +136,22 @@ def cmd_token(args, settings: Settings) -> int:
         token = tenancy.issue_token(s, user, args.label)
     print(f"API token for {user.email} (shown once, store it now):")
     print(token)
+    return 0
+
+
+def cmd_password(args, settings: Settings) -> int:
+    import getpass
+    from . import accounts
+    password = getpass.getpass(f"New password for {args.email} (hidden): ")
+    if getpass.getpass("Again: ") != password:
+        raise CliError("the passwords don't match")
+    with transaction(_factory(settings)) as s:
+        user = _user(s, args.email, args.org)
+        try:
+            accounts.set_password(s, user, password)
+        except ValueError as e:
+            raise CliError(str(e))
+    print(f"{user.email} can now sign in at /login")
     return 0
 
 
@@ -169,7 +216,15 @@ def cmd_work(args, settings: Settings) -> int:
     services = _job_services(settings)
     adapters = adapter_factory(factory, services["vault"])
     failed, n_jobs, n_ex = False, 0, 0
+    next_schedule = 0.0
     while True:
+        if args.schedule_every and time.monotonic() >= next_schedule:
+            with transaction(factory) as s:
+                requeued = jobs.requeue_stuck(s)
+                queued = jobs.enqueue_due(s)
+            if queued or requeued:
+                print(f"scheduler  queued {len(queued)} job run(s), requeued {requeued} stuck")
+            next_schedule = time.monotonic() + args.schedule_every
         if not args.executions_only:
             for r in jobs.run_pending(factory, services, limit=args.limit):
                 n_jobs += 1
@@ -191,13 +246,13 @@ def cmd_work(args, settings: Settings) -> int:
 def cmd_provider_add(args, settings: Settings) -> int:
     import getpass
     from .execution.providers import store_key
-    from .vault import LocalKeyProvider, Vault
+    from .vault import Vault, key_provider
     secret = getpass.getpass(f"Paste the {args.provider} API key (hidden): ").strip()
     if not secret:
         raise CliError("no key entered")
     with transaction(_factory(settings)) as s:
         actor = _user(s, args.actor, args.org)
-        store_key(s, scope_for_user(s, actor, None), Vault(LocalKeyProvider(settings.master_key_file)), args.provider, secret)
+        store_key(s, scope_for_user(s, actor, None), Vault(key_provider(settings)), args.provider, secret)
     del secret
     print(f"{args.provider} key stored in the vault")
     return 0
@@ -237,7 +292,9 @@ def cmd_demo(args, settings: Settings) -> int:
 def cmd_serve(args, settings: Settings) -> int:
     import uvicorn
     from .api import create_app
-    uvicorn.run(create_app(services={"settings": settings}), host=args.host, port=args.port)
+    # Behind a host's TLS proxy, trust X-Forwarded-* so request.client is the visitor, not the proxy.
+    uvicorn.run(create_app(services={"settings": settings}), host=args.host, port=args.port,
+                proxy_headers=True, forwarded_allow_ips=args.forwarded_allow_ips)
     return 0
 
 
@@ -270,6 +327,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", required=True)
 
     sub.add_parser("init-db", help="create the database tables").set_defaults(fn=cmd_init_db)
+    sub.add_parser("ensure-admin", help="create the org and admin from WAVYOS_ADMIN_* if missing (for deploys)"
+                   ).set_defaults(fn=cmd_ensure_admin)
 
     b = sub.add_parser("bootstrap", help="create an organization and its first admin; prints a token once")
     b.add_argument("--org-name", required=True)
@@ -283,6 +342,11 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--org", help="organization slug (when the email exists in several)")
     t.add_argument("--label", default="cli")
     t.set_defaults(fn=cmd_token)
+
+    pw = sub.add_parser("password", help="set a user's browser sign-in password; prompts with hidden input")
+    pw.add_argument("--email", required=True)
+    pw.add_argument("--org", help="organization slug (when the email exists in several)")
+    pw.set_defaults(fn=cmd_password)
 
     c = sub.add_parser("client", help="client workspaces")
     csub = c.add_subparsers(dest="client_command", required=True)
@@ -321,6 +385,8 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("--limit", type=int, default=50)
     w.add_argument("--loop", action="store_true", help="keep running")
     w.add_argument("--interval", type=float, default=5.0, help="seconds between passes with --loop")
+    w.add_argument("--schedule-every", type=float, default=0, metavar="S",
+                   help="also queue due jobs (and requeue runs a dead worker left) every S seconds; 0 is off")
     g = w.add_mutually_exclusive_group()
     g.add_argument("--jobs-only", action="store_true")
     g.add_argument("--executions-only", action="store_true")
@@ -347,6 +413,8 @@ def build_parser() -> argparse.ArgumentParser:
     sv = sub.add_parser("serve", help="run the HTTP API")
     sv.add_argument("--host", default="127.0.0.1")
     sv.add_argument("--port", type=int, default=8000)
+    sv.add_argument("--forwarded-allow-ips", default="127.0.0.1",
+                    help="proxies whose X-Forwarded-For is trusted ('*' behind a host's load balancer)")
     sv.set_defaults(fn=cmd_serve)
 
     v = sub.add_parser("verify-events", help="check a client's event hash chain")

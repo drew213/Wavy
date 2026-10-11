@@ -16,7 +16,7 @@ from .policy import authorize
 from .scope import InvalidState, NotPermitted, Scope, get_scoped
 from .vault import Vault, binding
 
-PROVIDERS = ("klaviyo",)
+PROVIDERS = ("klaviyo", "shopify")
 
 
 def add(session: Session, scope: Scope, vault: Vault, *, provider: str, external_account_id: str,

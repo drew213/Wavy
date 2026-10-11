@@ -8,8 +8,8 @@ from __future__ import annotations
 from collections import Counter
 from typing import Callable, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from pydantic import BaseModel, SecretStr
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -19,6 +19,7 @@ from .. import tenancy
 from ..db import utcnow
 from ..execution import engine
 from ..jobs import REGISTRY
+from ..ratelimit import Limiter
 from ..scope import InvalidState, NotFound, NotPermitted, scope_for_user
 
 
@@ -31,6 +32,56 @@ class DispatchBody(BaseModel):
 class DecideBody(BaseModel):
     approve: bool
     note: str = ""
+
+
+class KlaviyoCheckBody(BaseModel):
+    api_key: SecretStr
+
+
+class SignupBody(BaseModel):
+    brand_name: str
+    name: str
+    email: str
+    password: SecretStr
+    website: Optional[str] = None
+
+
+class LoginBody(BaseModel):
+    email: str
+    password: SecretStr
+
+
+class OnboardBody(BaseModel):
+    client_name: str
+    client_slug: str
+    store_platform: str = "Shopify"
+    website: str = "https://example.com"
+    timezone_name: str = "America/New_York"
+    primary_goal_90d: str = "Scale email revenue attribution to 30%+"
+    messaging_tools: list[str] = ["Klaviyo"]
+    subscription_app: str = "none"
+    regulated_limits: str = "none"
+    gross_margin_pct: float = 65.0
+    free_shipping_threshold: float = 65.0
+    target_aov: float = 80.0
+    typical_consumption_days: int = 35
+    discount_rules: str = "MODERATE: Welcome 15%, cart 10%, no stackable coupons"
+    voice_archetype: str = "The Trusted Dermatologist Best Friend"
+    tone_descriptors: list[str] = ["elevated", "approachable", "science-backed", "reassuring"]
+    forbidden_words: list[str] = ["miracle", "cure", "cheap", "overnight fix", "toxic"]
+    hero_products: list[dict[str, str]] = [
+        {"name": "Barrier Recovery Complex", "sku": "SKU-BAR-01", "benefit": "Barrier hydration & repair"}
+    ]
+    shopify_domain: Optional[str] = None
+    shopify_access_token: Optional[str] = None
+    klaviyo_private_key: Optional[str] = None
+    use_intake: bool = False  # build from the saved questionnaire answers; they must be complete
+
+
+class IntakeBody(BaseModel):
+    client_slug: str
+    client_name: Optional[str] = None
+    answers: dict
 
 
 def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
@@ -54,11 +105,13 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
             raise HTTPException(401, {"error": "sign in with an API token"})
         return u
 
+    def org_wide(s: Session, u: m.User) -> bool:
+        return bool(s.scalar(select(func.count()).select_from(m.Membership).where(
+            m.Membership.user_id == u.id, m.Membership.client_id.is_(None))))
+
     def visible_clients(s: Session, u: m.User) -> list[m.Client]:
-        org_wide = s.scalar(select(func.count()).select_from(m.Membership).where(
-            m.Membership.user_id == u.id, m.Membership.client_id.is_(None))) or 0
         q = select(m.Client).where(m.Client.org_id == u.org_id)
-        if not org_wide:
+        if not org_wide(s, u):
             ids = s.scalars(select(m.Membership.client_id).where(m.Membership.user_id == u.id)).all()
             q = q.where(m.Client.id.in_(ids))
         return list(s.scalars(q.order_by(m.Client.name)))
@@ -238,6 +291,100 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
             raise HTTPException(404, {"error": "approval not found"})
         return guard(lambda: {"status": approvals_svc.decide(s, scope_for_user(s, u, ap.client_id), ap_id, body.approve, body.note).status})
 
+    def verify_klaviyo(request: Request, api_key: str) -> dict:
+        from ..api.deps import service
+        try:
+            account = service(request, "klaviyo_verify")(api_key.strip()) or {}
+        except Exception as e:  # never echo the provider's message: it may quote the key
+            status = getattr(e, "status", None)
+            reason = ("Klaviyo rejected this key. Create a private key with read-only access and paste it again."
+                      if status in (401, 403) else f"Klaviyo couldn't be reached ({type(e).__name__}). Try again.")
+            raise HTTPException(422, {"error": reason}) from None
+        if not account.get("id"):
+            raise HTTPException(422, {"error": "Klaviyo accepted the key but returned no account."})
+        return account
+
+    @r.post("/onboard/klaviyo-check")
+    def klaviyo_check(body: KlaviyoCheckBody, request: Request, u: m.User = Depends(user)):
+        account = verify_klaviyo(request, body.api_key.get_secret_value())
+        return {"account_id": account["id"], "name": account.get("name"), "timezone": account.get("timezone")}
+
+    @r.post("/onboard")
+    def onboard_account(body: OnboardBody, request: Request, u: m.User = Depends(user), s: Session = Depends(db)):
+        from ..onboarding import OnboardingIntakePayload, queue_onboarding
+        klaviyo_account = verify_klaviyo(request, body.klaviyo_private_key) if body.klaviyo_private_key else None
+        org = s.get(m.Organization, u.org_id)
+        payload = OnboardingIntakePayload(
+            org_slug=org.slug if org else "wavy",
+            client_name=body.client_name,
+            client_slug=body.client_slug,
+            store_platform=body.store_platform,
+            website=body.website,
+            timezone_name=body.timezone_name,
+            primary_goal_90d=body.primary_goal_90d,
+            messaging_tools=body.messaging_tools,
+            subscription_app=body.subscription_app,
+            regulated_limits=body.regulated_limits,
+            gross_margin_pct=body.gross_margin_pct,
+            free_shipping_threshold=body.free_shipping_threshold,
+            target_aov=body.target_aov,
+            typical_consumption_days=body.typical_consumption_days,
+            discount_rules=body.discount_rules,
+            voice_archetype=body.voice_archetype,
+            tone_descriptors=body.tone_descriptors,
+            forbidden_words=body.forbidden_words,
+            hero_products=body.hero_products,
+            shopify_domain=body.shopify_domain,
+            shopify_access_token=body.shopify_access_token,
+            klaviyo_private_key=body.klaviyo_private_key,
+        )
+        vault = None
+        if body.shopify_access_token or body.klaviyo_private_key:
+            from ..api.deps import service
+            vault = service(request, "vault")
+
+        def _queue():
+            nonlocal payload
+            if org_wide(s, u):
+                scope = scope_for_user(s, u, None)
+            else:  # a brand onboards only its own workspace
+                scope = scope_for_user(s, u, client_by_slug(s, u, body.client_slug).id)
+            if body.use_intake:
+                from dataclasses import replace
+                from .. import intake
+                row = intake_row(s, client_by_slug(s, u, body.client_slug))
+                answers = row.answers if row else {}
+                missing = intake.missing_required(answers)
+                if missing:
+                    raise ValueError("finish the onboarding questions first: " + "; ".join(missing))
+                payload = replace(payload, **intake.payload_fields(answers))
+                row.submitted_at = utcnow()
+            run = queue_onboarding(s, scope, payload, vault, klaviyo_account)
+            return {"status": "queued", "job_run_id": run.id, "client_id": run.client_id, "client_slug": body.client_slug}
+
+        return guard(_queue)
+
+    @r.get("/onboard/{run_id}")
+    def onboard_status(run_id: str, u: m.User = Depends(user), s: Session = Depends(db)):
+        from ..storage import progress_for
+        run = s.get(m.JobRun, run_id)
+        visible = {c.id: c for c in visible_clients(s, u)}
+        if run is None or run.client_id not in visible:
+            raise HTTPException(404, {"error": "onboarding run not found"})
+        row = s.scalar(select(m.Dossier).where(m.Dossier.job_run_id == run.id))
+        ready = row is not None and run.status == "succeeded"
+        return {
+            "status": run.status,
+            "job_run_id": run.id,
+            "client_slug": visible[run.client_id].slug,
+            "summary": run.summary,
+            "error": run.error.split("\n", 1)[0] if run.error else "",
+            "progress": progress_for(s, run.id),
+            "dossier_id": row.id if ready else None,
+            "dossier_version": row.version if ready else None,
+            "result": row.document if ready else None,
+        }
+
     @r.get("/events")
     def events_tail(after: int = 0, client: Optional[str] = None, limit: int = Query(100, le=500),
                     u: m.User = Depends(user), s: Session = Depends(db)):
@@ -252,7 +399,104 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
 
     @r.get("/me")
     def me(u: m.User = Depends(user), s: Session = Depends(db)):
+        from ..storage import latest_dossier
         roles = s.execute(select(m.Membership.role, m.Membership.client_id).where(m.Membership.user_id == u.id)).all()
-        return {"name": u.name, "email": u.email, "roles": [{"role": r_, "client_id": cid} for r_, cid in roles]}
+        clients = [] if org_wide(s, u) else [
+            {"slug": c.slug, "name": c.name, "has_audit": latest_dossier(s, c.id) is not None}
+            for c in visible_clients(s, u)]
+        return {"name": u.name, "email": u.email, "kind": u.kind, "staff": org_wide(s, u), "clients": clients,
+                "roles": [{"role": r_, "client_id": cid} for r_, cid in roles]}
+
+    # ---------------------------------------------------------------- brand accounts and saved audits
+
+    signup_limit = Limiter(5, 3600)
+    login_by_ip, login_by_email = Limiter(20, 900), Limiter(10, 900)
+
+    def too_many() -> HTTPException:
+        return HTTPException(429, {"error": "Too many attempts. Wait a few minutes and try again."})
+
+    def visitor(request: Request) -> str:
+        return request.client.host if request.client else "unknown"
+
+    @r.post("/signup")
+    def signup(body: SignupBody, request: Request, s: Session = Depends(db)):
+        from .. import accounts
+        from ..api.deps import service
+        if not signup_limit.allow(visitor(request)):
+            raise too_many()
+
+        def _create():
+            org = accounts.signup_org(s, service(request, "settings").signup_org)
+            client, _, token = accounts.signup_brand(
+                s, org, brand_name=body.brand_name, person_name=body.name, email=body.email,
+                password=body.password.get_secret_value(), website=body.website)
+            return {"token": token, "client_slug": client.slug, "client_name": client.name}
+        return guard(_create)
+
+    @r.post("/login")
+    def login(body: LoginBody, request: Request, s: Session = Depends(db)):
+        from .. import accounts
+        if not (login_by_ip.allow(visitor(request)) and login_by_email.allow(body.email.strip().lower())):
+            raise too_many()
+        try:
+            _, token = accounts.sign_in(s, body.email, body.password.get_secret_value())
+        except accounts.SignInFailed as e:
+            raise HTTPException(401, {"error": str(e)})
+        return {"token": token}
+
+    def intake_row(s: Session, c: m.Client) -> Optional[m.OnboardingIntake]:
+        return s.scalar(select(m.OnboardingIntake).where(m.OnboardingIntake.client_id == c.id))
+
+    def intake_view(c: Optional[m.Client], row: Optional[m.OnboardingIntake]) -> dict:
+        from .. import intake
+        answers = row.answers if row else {}
+        return {"client_slug": c.slug if c else None, "client_name": c.name if c else None,
+                "sections": intake.SECTIONS, "answers": answers, **intake.progress(answers),
+                "missing": intake.missing_required(answers),
+                "updated_at": row.updated_at.isoformat() if row and row.updated_at else None,
+                "submitted_at": row.submitted_at.isoformat() if row and row.submitted_at else None}
+
+    @r.get("/intake")
+    def get_intake(client: Optional[str] = None, u: m.User = Depends(user), s: Session = Depends(db)):
+        """The questionnaire, plus this client's saved answers when there is a client."""
+        c = client_by_slug(s, u, client) if client else None
+        return intake_view(c, intake_row(s, c) if c else None)
+
+    @r.put("/intake")
+    def save_intake(body: IntakeBody, u: m.User = Depends(user), s: Session = Depends(db)):
+        """Autosave. Staff can start a new client's questionnaire; it creates the workspace."""
+        from .. import intake
+
+        def _save():
+            c = next((x for x in visible_clients(s, u) if x.slug == body.client_slug), None)
+            if c is None:
+                if not org_wide(s, u) or not (body.client_name or "").strip():
+                    raise HTTPException(404, {"error": "client not found"})
+                c = tenancy.create_client(s, scope_for_user(s, u, None), name=body.client_name.strip(), slug=body.client_slug)
+            answers = intake.clean(body.answers)
+            row = intake_row(s, c)
+            if row is None:
+                row = m.OnboardingIntake(org_id=c.org_id, client_id=c.id, answers={})
+                s.add(row)
+            row.answers, row.updated_by, row.updated_at = answers, u.id, utcnow()
+            s.flush()
+            return intake_view(c, row)
+        return guard(_save)
+
+    @r.get("/clients/{slug}/audit")
+    def saved_audit(slug: str, version: Optional[int] = None, u: m.User = Depends(user), s: Session = Depends(db)):
+        c = client_by_slug(s, u, slug)
+        rows = s.scalars(select(m.Dossier).where(m.Dossier.client_id == c.id).order_by(m.Dossier.version.desc())).all()
+        if not rows:
+            raise HTTPException(404, {"error": "no audit yet for this brand"})
+        row = next((d for d in rows if d.version == version), None) if version else rows[0]
+        if row is None:
+            raise HTTPException(404, {"error": f"there is no version {version}"})
+        return {
+            "client_slug": c.slug, "client_name": c.name, "version": row.version,
+            "created_at": row.created_at.isoformat(), "result": row.document,
+            "versions": [{"version": d.version, "created_at": d.created_at.isoformat(),
+                          "health_score": (d.document or {}).get("overall_health_score")} for d in rows],
+        }
 
     return r

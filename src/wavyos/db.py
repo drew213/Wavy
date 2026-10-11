@@ -41,8 +41,11 @@ class IdMixin:
 
 
 def make_engine(url: str) -> Engine:
-    engine = create_engine(url, future=True)
     if url.startswith("sqlite"):
+        engine = create_engine(url, future=True)
+    else:  # managed Postgres drops idle connections; check each one before handing it out
+        engine = create_engine(url, future=True, pool_pre_ping=True, pool_recycle=1800)
+    if engine.dialect.name == "sqlite":
         @event.listens_for(engine, "connect")
         def _fk_on(dbapi_conn, _):  # SQLite ignores foreign keys unless asked
             dbapi_conn.execute("PRAGMA foreign_keys=ON")

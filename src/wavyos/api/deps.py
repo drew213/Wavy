@@ -110,8 +110,8 @@ def _default_compare() -> Callable[..., Any]:
 
 
 def _default_vault(services: dict):
-    from ..vault import LocalKeyProvider, Vault
-    return Vault(LocalKeyProvider(services["settings"].master_key_file))
+    from ..vault import Vault, key_provider
+    return Vault(key_provider(services["settings"]))
 
 
 DEFAULTS: dict[str, Callable[[dict], Any]] = {

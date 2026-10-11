@@ -68,7 +68,7 @@ ACTIONS: dict[str, Action] = {a.key: a for a in [
     _a("standard.publish", "autonomous", "Publish a new version of an agency standard",
        performers=frozenset({"org_admin"}), human_only=True),
     _a("connection.manage", "autonomous", "Add, check or revoke a connected account",
-       performers=LEADS, human_only=True),
+       performers=LEADS | {"client_owner"}, human_only=True),
     # ---- approved plan
     _a("campaign.build_draft", "approved_plan", "Build a draft campaign in the platform (not scheduled)"),
     _a("flow.build_draft", "approved_plan", "Build or edit a draft flow (not live)"),

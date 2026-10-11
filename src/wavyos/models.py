@@ -76,6 +76,24 @@ class ApiToken(IdMixin, Base):
     revoked_at: Mapped[Optional[datetime]]
 
 
+class OnboardingIntake(IdMixin, Base):
+    """A brand's lifecycle onboarding answers, saved as they type. One per client."""
+    __tablename__ = "onboarding_intakes"
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), unique=True)
+    answers: Mapped[dict] = mapped_column(default=dict)
+    updated_by: Mapped[Optional[str]] = mapped_column(ForeignKey("users.id"))
+    updated_at: Mapped[Optional[datetime]] = mapped_column()
+    submitted_at: Mapped[Optional[datetime]] = mapped_column()
+
+
+class PasswordCredential(IdMixin, Base):
+    """A browser sign-in password for a user. Only a salted scrypt hash is stored."""
+    __tablename__ = "password_credentials"
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), unique=True)
+    password_hash: Mapped[str] = mapped_column(String(300))
+
+
 AGENT_ROLES = ("account_lead", "analyst", "strategist", "creative", "qa")
 
 
@@ -300,6 +318,59 @@ class JobRun(IdMixin, Base):
     produced: Mapped[dict] = mapped_column(default=dict)   # {insights: [], tasks: [], approvals: []}
     error: Mapped[str] = mapped_column(Text, default="")
     cost_usd: Mapped[Optional[float]] = mapped_column(Float)
+
+
+# ---------------------------------------------------------------- durable onboard output and commerce ingest
+
+
+class Dossier(IdMixin, Base):
+    """One immutable version of a client's master dossier, including flow payloads and QA."""
+    __tablename__ = "dossiers"
+    __table_args__ = (UniqueConstraint("client_id", "version"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    version: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(40), default="ACTIVE_EXECUTION")
+    document: Mapped[dict] = mapped_column(default=dict)
+    job_run_id: Mapped[Optional[str]] = mapped_column(ForeignKey("job_runs.id"), index=True)
+
+
+class JobProgress(IdMixin, Base):
+    """Live stage-by-stage state of a long job, committed as it goes so a page can watch it."""
+    __tablename__ = "job_progress"
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    job_run_id: Mapped[str] = mapped_column(ForeignKey("job_runs.id"), unique=True)
+    state: Mapped[dict] = mapped_column(default=dict)
+
+
+class IngestCursor(IdMixin, Base):
+    """Where a paginated provider pull stopped, so the next run resumes instead of starting over."""
+    __tablename__ = "ingest_cursors"
+    __table_args__ = (UniqueConstraint("client_id", "source"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    source: Mapped[str] = mapped_column(String(40))
+    next_url: Mapped[Optional[str]] = mapped_column(Text)
+    watermark: Mapped[Optional[datetime]]
+    pages_pulled: Mapped[int] = mapped_column(Integer, default=0)
+    orders_stored: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class CommerceOrder(IdMixin, Base):
+    """One order from a store. Upserted by external id so pages can be retried."""
+    __tablename__ = "commerce_orders"
+    __table_args__ = (UniqueConstraint("client_id", "source", "external_id"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    source: Mapped[str] = mapped_column(String(40))
+    external_id: Mapped[str] = mapped_column(String(64))
+    customer_key: Mapped[str] = mapped_column(String(120), index=True)
+    ordered_at: Mapped[datetime] = mapped_column(index=True)
+    total: Mapped[float] = mapped_column(Float, default=0.0)
+    currency: Mapped[str] = mapped_column(String(8), default="USD")
+    gateway_sku: Mapped[str] = mapped_column(String(300), default="")
+    refunded: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 # ---------------------------------------------------------------- connectors

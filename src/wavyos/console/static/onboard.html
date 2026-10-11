@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wavy OS — Onboard a client</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0A0A0A; --bg2: #121212; --bg3: #1A1A1A; --line: #222222; --line2: #2E2E2E;
+  --text: #FFFFFF; --body: #C9CED6; --muted: #8A9099;
+  --lime: #C8FF00; --lime-dim: rgba(200, 255, 0, 0.14); --cyan: #38E1FF; --good: #14B8A6; --warn: #FFC24A; --bad: #FF6B4A;
+  --display: 'Syne', system-ui, -apple-system, sans-serif;
+  --mono: 'Space Mono', ui-monospace, Menlo, monospace;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+* { box-sizing: border-box; }
+html { color-scheme: dark; }
+body { margin: 0; background: var(--bg); color: var(--body); font: 13px/1.6 var(--mono); }
+h1, h2, h3 { font-family: var(--display); color: var(--text); margin: 0; letter-spacing: -0.02em; text-wrap: balance; }
+p { margin: 0; }
+a { color: var(--cyan); text-decoration: none; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+[hidden] { display: none !important; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Shell */
+.header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 28px;
+  border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10; background: var(--bg); }
+.brand { font-family: var(--display); font-size: 20px; font-weight: 800; color: var(--text); }
+.brand span { color: var(--lime); }
+.stepper { display: flex; gap: 6px; list-style: none; margin: 0; padding: 0; font-size: 11px; }
+.stepper li { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; color: var(--muted); border: 1px solid var(--line); }
+.stepper li b { font-weight: 400; }
+.stepper li[aria-current="step"] { color: #0A0A0A; background: var(--lime); border-color: var(--lime); font-weight: 700; }
+.stepper li.done { color: var(--lime); border-color: var(--line2); }
+.ghost { background: transparent; border: 1px solid var(--line2); color: var(--text); padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; transition: border-color .2s, color .2s; }
+.ghost:hover { border-color: var(--lime); color: var(--lime); }
+.container { max-width: 1180px; margin: 0 auto; padding: 40px 24px 96px; }
+
+/* Buttons and fields */
+.cta { background: var(--lime); color: #0A0A0A; border: 0; border-radius: 10px; padding: 15px 28px; font-weight: 700;
+  font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 10px;
+  box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.7); transition: transform .2s var(--ease), box-shadow .2s var(--ease), opacity .2s; }
+.cta:hover { transform: translateY(-1px); box-shadow: 0 10px 22px -8px rgba(0, 0, 0, 0.8); }
+.cta:disabled { opacity: .55; cursor: progress; transform: none; }
+.cta svg { width: 16px; height: 16px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.field input, .field select { background: var(--bg3); border: 1px solid var(--line2); border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 12.5px; min-width: 0; }
+.field input:focus, .field select:focus { border-color: var(--cyan); outline: none; }
+.row-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.field input, .field select { width: 100%; }
+.err { color: var(--bad); font-size: 12px; min-height: 1.6em; }
+
+/* Step 1: connect */
+.connect { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 56px; align-items: start; padding-top: 24px; }
+.connect h1 { font-size: clamp(40px, 6vw, 76px); font-weight: 800; line-height: .95; letter-spacing: -0.04em; }
+.connect h1 em { font-style: normal; color: var(--lime); }
+.connect .lede { margin-top: 22px; font-size: 14px; max-width: 52ch; color: var(--body); }
+.howto { margin: 28px 0 0; padding: 0; list-style: none; counter-reset: how; display: grid; gap: 10px; max-width: 52ch; }
+.howto li { counter-increment: how; display: grid; grid-template-columns: 28px 1fr; gap: 10px; color: var(--muted); font-size: 12px; }
+.howto li::before { content: counter(how); font-family: var(--display); font-weight: 700; color: var(--lime); font-size: 14px; }
+.howto b { color: var(--text); font-weight: 400; }
+.key-panel { background: var(--bg2); border: 1px solid var(--line); border-radius: 16px; padding: 28px; display: grid; gap: 16px;
+  box-shadow: 0 30px 60px -30px rgba(0,0,0,.8); }
+.key-panel h2 { font-size: 20px; }
+.key-row { display: flex; gap: 10px; }
+.key-row input { flex: 1; font-size: 14px; padding: 14px; letter-spacing: .02em; }
+.connected { display: grid; gap: 4px; padding: 16px; border-radius: 12px; background: var(--lime-dim); border: 1px solid rgba(200,255,0,.35); }
+.connected .who { font-family: var(--display); font-size: 22px; font-weight: 700; color: var(--text); }
+.connected .meta { font-size: 11.5px; color: var(--lime); }
+.skip { background: none; border: 0; color: var(--muted); font-size: 12px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; justify-self: start; padding: 0; }
+.skip:hover { color: var(--text); }
+
+/* Step 2: the lifecycle questionnaire */
+.q-wrap { max-width: 880px; margin: 0 auto; }
+.q-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 22px; flex-wrap: wrap; }
+.q-head h1 { font-size: 34px; font-weight: 800; }
+.q-head p { color: var(--muted); margin-top: 8px; max-width: 64ch; }
+.req { color: var(--lime); }
+.source-pill { display: inline-flex; align-items: center; gap: 8px; font-size: 11.5px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line2); color: var(--lime); }
+.source-pill.bench { color: var(--warn); }
+.who-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px; margin-bottom: 20px; }
+.q-progress { display: flex; align-items: center; gap: 14px; font-size: 11.5px; color: var(--muted); margin-bottom: 14px; }
+.q-bar { flex: 1; height: 4px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
+.q-bar i { display: block; height: 100%; background: var(--lime); transform-origin: left; transform: scaleX(0); transition: transform .4s var(--ease); }
+.q-saved.err { color: var(--bad); }
+.q-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+.q-tabs button { background: transparent; border: 1px solid var(--line2); color: var(--body); font-size: 11.5px; padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+.q-tabs button:hover { border-color: var(--muted); }
+.q-tabs button.complete { color: var(--lime); border-color: rgba(200, 255, 0, .35); }
+.q-tabs button[aria-current="step"] { background: var(--lime); color: #0A0A0A; border-color: var(--lime); font-weight: 700; }
+.q-card { background: var(--bg2); border: 1px solid var(--line); border-radius: 16px; padding: 30px; display: grid; gap: 28px; }
+.q-card .count { font-size: 11px; color: var(--muted); }
+.q-card h2 { font-size: 24px; margin-top: 4px; outline: none; }
+.q-card .intro { color: var(--muted); margin-top: 6px; }
+.q { display: grid; gap: 8px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.q > label, .q > legend { color: var(--text); font: 600 15px/1.45 var(--display); letter-spacing: -0.01em; padding: 0; margin-bottom: 8px; }
+.q .help { font-size: 11.5px; color: var(--muted); margin: -6px 0 4px; }
+.q textarea, .q input[type="text"] { width: 100%; background: var(--bg3); border: 1px solid var(--line2); border-radius: 8px; padding: 12px 14px; color: var(--text); font: 13px/1.6 var(--mono); }
+.q textarea { min-height: 104px; resize: vertical; }
+.q textarea:focus, .q input[type="text"]:focus { border-color: var(--cyan); outline: none; }
+.opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.opts label { position: relative; display: inline-flex; align-items: center; padding: 9px 15px; border: 1px solid var(--line2); border-radius: 999px; font-size: 12.5px; cursor: pointer; color: var(--body); transition: border-color .2s, background .2s; }
+.opts label:hover { border-color: var(--muted); }
+.opts input { position: absolute; opacity: 0; pointer-events: none; }
+.opts label:has(input:checked) { background: var(--lime-dim); border-color: var(--lime); color: var(--text); }
+.opts label:has(input:focus-visible) { outline: 2px solid var(--lime); outline-offset: 2px; }
+.review { display: grid; }
+.review-row { display: grid; grid-template-columns: 1fr auto auto; gap: 16px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.review-row b { color: var(--text); font-weight: 400; }
+.review-row small { display: block; color: var(--muted); font-size: 11.5px; }
+.review-row small.left { color: var(--warn); }
+.review-row .n { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.submit-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 22px; flex-wrap: wrap; }
+
+/* Step 3: the audit */
+.audit { position: fixed; inset: 0; z-index: 50; background: #050505; color: var(--body); display: grid;
+  grid-template-rows: auto 1fr auto; overflow: hidden; animation: audit-in .7s var(--ease) both; }
+.audit::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(1200px 600px at 20% 110%, rgba(200,255,0,.07), transparent 60%),
+              radial-gradient(900px 500px at 100% -10%, rgba(56,225,255,.05), transparent 60%); }
+@keyframes audit-in { from { opacity: 0; clip-path: inset(48% 0 48% 0); } to { opacity: 1; clip-path: inset(0 0 0 0); } }
+.audit-top { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 20px 32px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.audit-top .who { color: var(--muted); }
+.audit-top .who b { color: var(--text); font-weight: 400; }
+.clock { font-variant-numeric: tabular-nums; color: var(--muted); }
+.audit-main { position: relative; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); gap: 48px; padding: 36px 32px 20px; min-height: 0; overflow: auto; }
+.audit-stage { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.headline { font-size: clamp(34px, 5.2vw, 72px); font-weight: 800; line-height: .98; letter-spacing: -0.04em; }
+.headline.swap { animation: swap .6s var(--ease) both; }
+@keyframes swap { from { opacity: 0; transform: translateY(14px); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+.live { font-size: 13px; color: var(--lime); min-height: 1.6em; font-variant-numeric: tabular-nums; }
+.field-wrap { position: relative; border: 1px solid var(--line); border-radius: 14px; background: rgba(18,18,18,.6); padding: 18px 18px 10px; }
+.field-wrap canvas { display: block; width: 100%; height: 220px; }
+.months { display: grid; grid-template-columns: repeat(12, 1fr); font-size: 10px; color: var(--muted); text-align: center; margin-top: 6px; text-transform: uppercase; letter-spacing: .06em; }
+.field-cap { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 10px; gap: 12px; }
+.field-cap b { color: var(--text); font-weight: 400; font-variant-numeric: tabular-nums; }
+.figures { display: grid; grid-template-columns: repeat(auto-fill, minmax(172px, 1fr)); gap: 10px; margin: 0; }
+.figure { padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg2); animation: rise .6s var(--ease) both; }
+.figure dt { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.figure dd { margin: 4px 0 0; font-family: var(--display); font-size: 22px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; align-content: start; }
+.step { display: grid; grid-template-columns: 22px 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); color: var(--muted); transition: color .3s; }
+.step .mark { width: 18px; height: 18px; margin-top: 2px; }
+.step .label { font-size: 13px; }
+.step .detail { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.step.active { color: var(--text); }
+.step.active .mark { color: var(--lime); animation: spin 1s linear infinite; }
+.step.done { color: var(--text); }
+.step.done .mark { color: var(--lime); }
+.step.done .detail { color: var(--body); }
+.step.skipped { opacity: .55; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.audit-foot { position: relative; padding: 14px 32px 22px; border-top: 1px solid var(--line); display: grid; gap: 12px; }
+.bar { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 100%; background: var(--lime); transform: scaleX(0); transform-origin: left; transition: transform .8s var(--ease); }
+.log { list-style: none; margin: 0; padding: 0; font-size: 11.5px; color: var(--muted); display: grid; gap: 2px; height: 3.6em; overflow: hidden; }
+.log li { animation: rise .4s var(--ease) both; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.log li:last-child { color: var(--body); }
+.finale { display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap; }
+.score { font-family: var(--display); font-size: clamp(88px, 13vw, 168px); font-weight: 800; line-height: .82; color: var(--lime); letter-spacing: -0.05em; font-variant-numeric: tabular-nums; }
+.score small { font-size: .22em; color: var(--muted); letter-spacing: 0; font-weight: 600; }
+.failure { color: var(--bad); font-size: 13px; max-width: 70ch; }
+
+
+@media (max-width: 860px) {
+  .header { padding: 14px 16px; flex-wrap: wrap; }
+  .stepper b { display: none; }
+  .connect { grid-template-columns: 1fr; gap: 32px; padding-top: 0; }
+  .audit-main { grid-template-columns: 1fr; padding: 24px 18px; gap: 28px; }
+  .audit-top, .audit-foot { padding-left: 18px; padding-right: 18px; }
+  .field-wrap canvas { height: 160px; }
+  .row-2 { grid-template-columns: 1fr; }
+  .key-row { flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="brand">Wavy <span>OS</span></div>
+  <ol class="stepper" id="stepper" aria-label="Onboarding steps">
+    <li id="sp-1" aria-current="step">1 <b>Klaviyo key</b></li>
+    <li id="sp-2">2 <b>Questions</b></li>
+    <li id="sp-3">3 <b>Audit</b></li>
+  </ol>
+  <a href="/console" class="ghost" id="nav-link">Ops console</a>
+</header>
+
+<main class="container">
+
+  <!-- Step 1: connect Klaviyo -->
+  <section id="step-connect" class="connect" aria-labelledby="connect-title">
+    <div>
+      <h1 id="connect-title">Start with the client's <em>Klaviyo</em> key.</h1>
+      <p class="lede">The audit reads everything it needs from Klaviyo: twelve months of orders, every flow, and what email
+        actually earned. A read-only key is enough, and it can't change anything in the account.</p>
+      <ol class="howto">
+        <li><span>In Klaviyo, open <b>Settings → Account → API keys</b>.</span></li>
+        <li><span>Choose <b>Create Private API Key</b> and give it <b>Read-only access</b>.</span></li>
+        <li><span>Copy the key. It starts with <b>pk_</b>. Paste it here.</span></li>
+      </ol>
+    </div>
+    <form class="key-panel" id="key-form" autocomplete="off">
+      <h2>Connect Klaviyo</h2>
+      <div class="field">
+        <label for="f-klaviyo-key">Private API key (read-only)</label>
+        <div class="key-row">
+          <input type="password" id="f-klaviyo-key" placeholder="pk_••••••••••••••••••••" spellcheck="false" required>
+          <button class="cta" id="key-btn" type="submit">Connect</button>
+        </div>
+      </div>
+      <p class="err" id="key-err" role="alert"></p>
+      <div class="connected" id="key-ok" hidden>
+        <span class="meta">Connected</span>
+        <span class="who" id="key-account"></span>
+        <span class="sub" id="key-meta"></span>
+      </div>
+      <button class="cta" type="button" id="to-questions" hidden>Continue to the questions
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg></button>
+      <button class="skip" type="button" id="skip-key">No key yet? Run on benchmark data instead</button>
+    </form>
+  </section>
+
+  <!-- Step 2: the lifecycle questionnaire -->
+  <section id="step-questions" class="q-wrap" hidden aria-labelledby="q-title">
+    <div class="q-head">
+      <div>
+        <h1 id="q-title">Lifecycle onboarding</h1>
+        <p>About 15–20 minutes. Your answers save as you type, so you can stop and come back. Skip anything you don't know. Only questions marked <span class="req">*</span> are required.</p>
+      </div>
+      <span class="source-pill" id="source-pill"></span>
+    </div>
+    <div class="who-row" id="who-row" hidden>
+      <div class="field"><label for="f-name">Client name</label><input id="f-name" autocomplete="off"></div>
+      <div class="field"><label for="f-slug">Workspace slug</label><input id="f-slug" pattern="[a-z0-9-]+" autocomplete="off"></div>
+    </div>
+    <div class="q-progress"><div class="q-bar" aria-hidden="true"><i id="q-bar"></i></div><span id="q-count"></span><span class="q-saved" id="q-saved" role="status"></span></div>
+    <nav class="q-tabs" id="q-tabs" aria-label="Sections"></nav>
+    <div class="q-card" id="q-card"></div>
+    <p class="err" id="run-err" role="alert"></p>
+    <div class="submit-row">
+      <button type="button" class="ghost" id="back-to-key">Back to the key</button>
+      <button type="button" class="cta" id="q-next"></button>
+    </div>
+  </section>
+</main>
+
+<!-- Step 3: the live audit -->
+<section class="audit" id="audit" hidden aria-labelledby="a-headline">
+  <div class="audit-top">
+    <span class="brand" style="font-size:16px">Wavy <span>OS</span></span>
+    <span class="who">Auditing <b id="a-who"></b></span>
+    <span class="clock" id="a-clock" aria-label="Elapsed time">00:00</span>
+  </div>
+  <div class="audit-main">
+    <div class="audit-stage">
+      <h2 class="headline" id="a-headline" aria-live="polite">Queueing the audit</h2>
+      <p class="live" id="a-live"></p>
+      <div id="a-finale" class="finale" hidden>
+        <div class="score" id="a-score"></div>
+        <div style="display:grid; gap:14px; padding-bottom:12px">
+          <p class="sub" id="a-score-sub"></p>
+          <button class="cta" type="button" id="a-open">Open the audit
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg></button>
+        </div>
+      </div>
+      <p class="failure" id="a-failure" role="alert" hidden></p>
+      <button class="ghost" type="button" id="a-back" hidden style="justify-self:start">Back to the questions</button>
+      <div class="field-wrap" id="a-field-wrap">
+        <div class="field-cap"><span>Orders, last 12 months, oldest first</span><b id="a-field-count">waiting for Klaviyo</b></div>
+        <canvas id="a-field" aria-hidden="true"></canvas>
+        <div class="months" id="a-months" aria-hidden="true"></div>
+      </div>
+      <dl class="figures" id="a-figures"></dl>
+    </div>
+    <ol class="steps" id="a-steps" aria-label="Audit stages"></ol>
+  </div>
+  <div class="audit-foot">
+    <div class="bar"><i id="a-bar"></i></div>
+    <ul class="log" id="a-log" aria-hidden="true"></ul>
+  </div>
+</section>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const money = n => n == null ? "—" : "$" + Math.round(n).toLocaleString();
+const pct = n => n == null ? "—" : (n * 100).toFixed(1) + "%";
+const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const token = () => sessionStorage.getItem("wos-token") || "";
+const headers = () => ({ "Content-Type": "application/json", ...(token() ? { Authorization: "Bearer " + token() } : {}) });
+const slugify = s => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+
+let klaviyoKey = null;
+let klaviyoAccount = null;
+const Me = { staff: true, ready: false };
+let locked = null;  // {slug, name}: the one workspace this run is for (a brand's own, or one staff picked)
+const signIn = () => location.replace("/login?next=" + encodeURIComponent(location.pathname + location.search));
+
+$("f-name").addEventListener("input", e => { if (!$("f-slug").dataset.touched) $("f-slug").value = slugify(e.target.value); });
+$("f-slug").addEventListener("input", e => { e.target.dataset.touched = "1"; });
+
+function show(step) {
+  const map = { connect: 1, questions: 2 };
+  ["connect", "questions"].forEach(s => { $("step-" + s).hidden = s !== step; });
+  [1, 2, 3].forEach(n => {
+    const li = $("sp-" + n);
+    li.classList.toggle("done", n < map[step]);
+    if (n === map[step]) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current");
+  });
+  window.scrollTo({ top: 0, behavior: calm ? "auto" : "smooth" });
+}
+
+/* Step 1 */
+$("key-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const key = $("f-klaviyo-key").value.trim();
+  $("key-err").textContent = "";
+  if (!token()) return signIn();
+  if (!key.startsWith("pk_")) { $("key-err").textContent = "That isn't a private key. Private keys start with pk_."; return; }
+  $("key-btn").disabled = true; $("key-btn").textContent = "Checking";
+  try {
+    const r = await fetch("/v1/ops/onboard/klaviyo-check", { method: "POST", headers: headers(), body: JSON.stringify({ api_key: key }) });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.error || body.detail?.error || "Klaviyo didn't accept the key.");
+    klaviyoKey = key; klaviyoAccount = body;
+    $("key-account").textContent = body.name || body.account_id;
+    $("key-meta").textContent = [body.account_id, body.timezone].filter(Boolean).join(" · ");
+    $("key-ok").hidden = false; $("to-questions").hidden = false; $("skip-key").hidden = true;
+    $("to-questions").focus();
+  } catch (err) {
+    $("key-err").textContent = err.message;
+  } finally {
+    $("key-btn").disabled = false; $("key-btn").textContent = "Connect";
+  }
+});
+async function openQuestions() {
+  if (!locked) {
+    $("who-row").hidden = false;
+    if (!$("f-name").value && klaviyoAccount?.name) { $("f-name").value = klaviyoAccount.name; $("f-slug").value = slugify(klaviyoAccount.name); }
+  }
+  $("source-pill").textContent = klaviyoKey ? "Klaviyo: " + (klaviyoAccount?.name || klaviyoAccount?.account_id) : "Benchmark data: nothing will be measured";
+  $("source-pill").classList.toggle("bench", !klaviyoKey);
+  show("questions");
+  if (!Q.sections.length) await loadIntake(); else renderQ();
+}
+$("to-questions").addEventListener("click", openQuestions);
+$("skip-key").addEventListener("click", () => { klaviyoKey = null; klaviyoAccount = null; openQuestions(); });
+$("back-to-key").addEventListener("click", () => show("connect"));
+
+/* Step 2: the lifecycle questionnaire (questions come from the server, answers autosave) */
+const ARROW = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4"/></svg>';
+const Q = { sections: [], answers: {}, tab: 0, timer: 0, dirty: false };
+const REVIEW = () => Q.sections.length;
+const answered = v => Array.isArray(v) ? v.length > 0 : !!(v && String(v).trim());
+const qSlug = () => locked?.slug || $("f-slug").value.trim();
+const qName = () => locked?.name || $("f-name").value.trim();
+const sectionState = sec => ({
+  left: sec.questions.filter(q => q.required && !answered(Q.answers[q.key])).length,
+  done: sec.questions.filter(q => answered(Q.answers[q.key])).length, total: sec.questions.length,
+});
+
+async function loadIntake() {
+  const r = await fetch("/v1/ops/intake" + (locked ? "?client=" + encodeURIComponent(locked.slug) : ""), { headers: headers() });
+  if (r.status === 401) return signIn();
+  const body = await r.json();
+  Q.sections = body.sections; Q.answers = body.answers || {};
+  renderQ();
+}
+
+function renderQ(focus) {
+  const total = Q.sections.reduce((n, sec) => n + sec.questions.length, 0);
+  const done = Q.sections.reduce((n, sec) => n + sectionState(sec).done, 0);
+  $("q-count").textContent = `${done}/${total} answered`;
+  $("q-bar").style.transform = `scaleX(${total ? done / total : 0})`;
+  $("q-tabs").innerHTML = Q.sections.map((sec, i) => { const st = sectionState(sec);
+    return `<button type="button" data-tab="${i}" class="${st.done && !st.left ? "complete" : ""}"${i === Q.tab ? ' aria-current="step"' : ""}>${i + 1}. ${esc(sec.title)}</button>`; }).join("")
+    + `<button type="button" data-tab="${REVIEW()}"${Q.tab === REVIEW() ? ' aria-current="step"' : ""}>Review &amp; submit</button>`;
+  if (focus === false) return;
+  $("q-card").innerHTML = Q.tab === REVIEW() ? reviewHTML() : sectionHTML(Q.sections[Q.tab]);
+  $("q-next").innerHTML = (Q.tab === REVIEW() ? "Submit and generate the audit " : "Next section ") + ARROW;
+  if (focus) $("q-card").querySelector("h2").focus();
+}
+
+function fieldHTML(q) {
+  const id = "q-" + q.key, v = Q.answers[q.key];
+  const label = esc(q.label) + (q.required ? ' <span class="req">*</span>' : "");
+  const help = q.help ? `<p class="help" id="${id}-help">${esc(q.help)}</p>` : "";
+  const aria = (q.help ? ` aria-describedby="${id}-help"` : "") + (q.required ? ' aria-required="true"' : "");
+  if (q.kind === "text") {
+    const ctl = q.size === "short"
+      ? `<input type="text" id="${id}" data-q="${q.key}" value="${esc(v || "")}" placeholder="${esc(q.placeholder)}"${aria}>`
+      : `<textarea id="${id}" data-q="${q.key}" rows="4" placeholder="${esc(q.placeholder)}"${aria}>${esc(v || "")}</textarea>`;
+    return `<div class="q"><label for="${id}">${label}</label>${help}${ctl}</div>`;
+  }
+  const multi = q.kind === "multi", chosen = multi ? (v || []) : [v];
+  return `<fieldset class="q"${aria}><legend>${label}</legend>${help}<div class="opts">${q.options.map(o =>
+    `<label><input type="${multi ? "checkbox" : "radio"}" name="${id}" data-q="${q.key}" value="${esc(o)}"${chosen.includes(o) ? " checked" : ""}>${esc(o)}</label>`).join("")}</div></fieldset>`;
+}
+const sectionHTML = sec => `<div><p class="count">Section ${Q.tab + 1} of ${Q.sections.length}</p><h2 tabindex="-1">${esc(sec.title)}</h2><p class="intro">${esc(sec.intro)}</p></div>${sec.questions.map(fieldHTML).join("")}`;
+function reviewHTML() {
+  const rows = Q.sections.map((sec, i) => { const st = sectionState(sec);
+    return `<div class="review-row"><div><b>${esc(sec.title)}</b><small class="${st.left ? "left" : ""}">${st.left ? `${st.left} required question${st.left > 1 ? "s" : ""} left` : "Required questions done"}</small></div>
+      <span class="n">${st.done}/${st.total}</span><button type="button" class="ghost" data-tab="${i}">${st.done ? "Edit" : "Start"}</button></div>`; }).join("");
+  return `<div><p class="count">Review and submit</p><h2 tabindex="-1">Ready to generate the audit?</h2><p class="intro">Anything not required can be added later. Your strategist reads every answer.</p></div>
+    <div class="review">${rows}</div>
+    <div class="q"><label for="q-submitter">Your name <span class="req">*</span></label><input type="text" id="q-submitter" data-q="submitted_by_name" value="${esc(Q.answers.submitted_by_name || "")}" autocomplete="name" aria-required="true"></div>`;
+}
+
+$("q-card").addEventListener("input", e => {
+  const el = e.target.closest("[data-q]");
+  if (!el) return;
+  const key = el.dataset.q;
+  if (el.type === "checkbox") {
+    const boxes = [...$("q-card").querySelectorAll(`input[name="${el.name}"]`)], none = /^None/;
+    boxes.forEach(b => { if (b !== el && el.checked && (none.test(el.value) || none.test(b.value))) b.checked = false; });
+    Q.answers[key] = boxes.filter(b => b.checked).map(b => b.value);
+  } else Q.answers[key] = el.value;
+  queueSave();
+  renderQ(false);
+});
+const goTab = i => { Q.tab = i; renderQ(true); window.scrollTo({ top: 0, behavior: calm ? "auto" : "smooth" }); };
+$("q-tabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (b) goTab(+b.dataset.tab); });
+$("q-card").addEventListener("click", e => { const b = e.target.closest("button[data-tab]"); if (b) goTab(+b.dataset.tab); });
+$("q-next").addEventListener("click", () => Q.tab < REVIEW() ? goTab(Q.tab + 1) : submitIntake());
+
+function queueSave() { Q.dirty = true; $("q-saved").textContent = ""; clearTimeout(Q.timer); Q.timer = setTimeout(save, 700); }
+async function save() {
+  clearTimeout(Q.timer);
+  if (!Q.dirty) return true;
+  const slug = qSlug(), name = qName();
+  if (!slug || !name) { $("q-saved").textContent = "Name the client to start saving"; return false; }
+  Q.dirty = false;
+  $("q-saved").classList.remove("err"); $("q-saved").textContent = "saving";
+  try {
+    if (!locked) {  // a slug that already exists continues that client's answers rather than replacing them
+      const ex = await fetch("/v1/ops/intake?client=" + encodeURIComponent(slug), { headers: headers() });
+      if (ex.ok) { const prior = (await ex.json()).answers || {}; Q.answers = { ...prior, ...Q.answers }; }
+    }
+    const r = await fetch("/v1/ops/intake", { method: "PUT", headers: headers(), body: JSON.stringify({ client_slug: slug, client_name: name, answers: Q.answers }) });
+    const body = await r.json().catch(() => ({}));
+    if (r.status === 401) { signIn(); return false; }
+    if (!r.ok) throw new Error(body.error || body.detail?.error || "Couldn't save. Your answers are still here.");
+    if (!locked) { locked = { slug: body.client_slug, name: body.client_name }; $("f-name").readOnly = true; $("f-slug").readOnly = true; renderQ(false); }
+    $("q-saved").textContent = "saved";
+    return true;
+  } catch (err) {
+    Q.dirty = true; $("q-saved").classList.add("err"); $("q-saved").textContent = err.message;
+    return false;
+  }
+}
+
+async function submitIntake() {
+  $("run-err").textContent = "";
+  const missing = Q.sections.flatMap(sec => sec.questions.filter(q => q.required && !answered(Q.answers[q.key])).map(q => q.label));
+  if (!answered(Q.answers.submitted_by_name)) missing.push("Your name");
+  if (!qSlug() || !qName()) missing.unshift("Client name");
+  if (missing.length) {
+    $("run-err").textContent = `${missing.length} required answer${missing.length > 1 ? "s" : ""} left: ${missing.slice(0, 2).join("; ")}${missing.length > 2 ? "; and more" : ""}.`;
+    return;
+  }
+  $("q-next").disabled = true;
+  try {
+    Q.dirty = true;
+    if (!(await save())) throw new Error("Your answers couldn't be saved, so the audit wasn't started. Try again.");
+    const payload = { client_name: qName(), client_slug: qSlug(), klaviyo_private_key: klaviyoKey, use_intake: true };
+    const r = await fetch("/v1/ops/onboard", { method: "POST", headers: headers(), body: JSON.stringify(payload) });
+    const body = await r.json().catch(() => ({}));
+    if (r.status === 401) return signIn();
+    if (!r.ok) throw new Error(body.error || body.detail?.error || "The audit couldn't be started.");
+    Audit.start(body.job_run_id, payload, klaviyoAccount);
+  } catch (err) {
+    $("run-err").textContent = err.message;
+  } finally {
+    $("q-next").disabled = false;
+  }
+}
+
+/* Step 3: the live audit */
+const ICONS = {
+  pending: '<svg class="mark" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="9" r="6.5" opacity=".5"/></svg>',
+  active: '<svg class="mark" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 2.5a6.5 6.5 0 1 1-6.5 6.5"/></svg>',
+  done: '<svg class="mark" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="7.5" stroke-width="1.2" opacity=".5"/><path d="M5.5 9.2l2.3 2.3 4.7-4.9"/></svg>',
+  skipped: '<svg class="mark" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5.5 9h7"/></svg>',
+};
+const HEADLINES = {
+  queued: "Waiting for a worker", connect: "Opening the Klaviyo account", orders: "Reading every order",
+  flows: "Reading every flow", performance: "Following the money", analyze: "Studying the customers",
+  sizing: "Sizing the leaks", plan: "Writing the plan", build: "Drafting the flows", qa: "Checking compliance", save: "Saving the audit",
+};
+
+const Field = {
+  months: [], target: 0, shown: 0, raf: 0,
+  init() {
+    const c = $("a-field"), dpr = window.devicePixelRatio || 1, r = c.getBoundingClientRect();
+    c.width = Math.max(1, r.width * dpr); c.height = Math.max(1, r.height * dpr);
+    this.ctx = c.getContext("2d"); this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0); this.w = r.width; this.h = r.height;
+    if (!this.raf) this.loop();
+  },
+  setMonths(months) {
+    this.months = months || [];
+    $("a-months").innerHTML = this.months.map(m => `<span>${esc(new Date(m.month + "-15").toLocaleString("en", { month: "short" }))}</span>`).join("");
+  },
+  loop() {
+    const tick = t => {
+      this.shown += (this.target - this.shown) * (calm ? 1 : 0.06);
+      this.draw(t / 1000);
+      this.raf = requestAnimationFrame(tick);
+    };
+    this.raf = requestAnimationFrame(tick);
+  },
+  draw(t) {
+    const { ctx, w, h } = this;
+    if (!ctx) return;
+    ctx.clearRect(0, 0, w, h);
+    const SUB = 3, cols = 12 * SUB, rows = 18, gx = w / cols, gy = h / rows, rad = Math.min(gx / 3.4, gy / 3.4, 3.2);
+    const counts = this.months.length ? this.months.map(m => m.orders) : null;
+    const peak = counts ? Math.max(1, ...counts) : 1;
+    const monthH = counts ? counts.map(n => n > 0 ? Math.max(1, Math.round(rows * n / peak)) : 0) : Array(12).fill(rows);
+    const heights = Array.from({ length: cols }, (_, c) => monthH[Math.floor(c / SUB)] || 0);
+    const total = heights.reduce((a, b) => a + b, 0) || 1;
+    let lit = Math.round(this.shown * total), seen = 0;
+    for (let c = 0; c < cols; c++) {
+      for (let r = 0; r < rows; r++) {
+        const x = gx * c + gx / 2, y = h - gy * r - gy / 2;
+        const inShape = r < heights[c];
+        let alpha, color;
+        if (!counts) {
+          const wave = 0.5 + 0.5 * Math.sin(t * 2.2 - c * 0.22 - r * 0.18);
+          color = "200,255,0"; alpha = 0.05 + (calm ? 0.05 : 0.14 * wave * wave);
+        } else if (!inShape) {
+          color = "255,255,255"; alpha = 0.035;
+        } else {
+          seen++;
+          const on = seen <= lit, edge = on && seen > lit - 4;
+          color = on ? "200,255,0" : "255,255,255";
+          alpha = on ? (edge ? 1 : 0.82) : 0.13;
+        }
+        ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${color},${alpha})`; ctx.fill();
+      }
+    }
+    if (counts && this.shown > 0.001 && this.shown < 0.999) {
+      const col = heights.reduce((acc, hgt, i) => { if (acc.left > 0) { acc.left -= hgt; acc.i = i; } return acc; }, { left: lit, i: 0 }).i;
+      const x = gx * col + gx, trail = gx * 4;
+      const g = ctx.createLinearGradient(x - trail, 0, x, 0);
+      g.addColorStop(0, "rgba(200,255,0,0)"); g.addColorStop(1, "rgba(200,255,0,0.18)");
+      ctx.fillStyle = g; ctx.fillRect(x - trail, 0, trail, h);
+      ctx.fillStyle = "rgba(200,255,0,0.9)"; ctx.fillRect(x - 1, 0, 2, h);
+    }
+  },
+};
+
+const Audit = {
+  runId: null, started: 0, timer: 0, payload: null, stages: [], figures: {},
+  start(runId, payload, account) {
+    Object.assign(this, { runId, payload, started: Date.now(), figures: {}, lastHeadline: "", lastLog: "" });
+    $("a-who").textContent = account?.name || payload.client_name;
+    $("a-headline").textContent = HEADLINES.queued; $("a-live").textContent = "";
+    $("a-finale").hidden = true; $("a-failure").hidden = true; $("a-back").hidden = true; $("a-field-wrap").hidden = false;
+    $("a-figures").innerHTML = ""; $("a-log").innerHTML = ""; $("a-steps").innerHTML = ""; $("a-bar").style.transform = "scaleX(0.02)";
+    $("a-field-count").textContent = payload.klaviyo_private_key ? "waiting for Klaviyo" : "benchmark run: no orders to read";
+    $("sp-1").classList.add("done"); $("sp-2").classList.add("done"); $("sp-2").removeAttribute("aria-current"); $("sp-3").setAttribute("aria-current", "step");
+    $("audit").hidden = false; document.body.style.overflow = "hidden";
+    Field.months = []; Field.target = 0; Field.shown = 0; $("a-months").innerHTML = "";
+    requestAnimationFrame(() => Field.init());
+    clearInterval(this.timer);
+    this.timer = setInterval(() => {
+      const s = Math.floor((Date.now() - this.started) / 1000);
+      $("a-clock").textContent = String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+    }, 500);
+    this.poll();
+  },
+  async poll() {
+    let quiet = 0;
+    while (this.runId) {
+      try {
+        const r = await fetch("/v1/ops/onboard/" + this.runId, { headers: headers() });
+        if (r.ok) {
+          const body = await r.json();
+          this.render(body);
+          if (body.status === "succeeded" && body.result) return this.finish(body.result);
+          if (body.status === "failed") return this.fail(body.error || "The audit stopped.");
+          if (body.status === "queued" && ++quiet === 25) $("a-live").textContent = "No worker has picked this up yet. Start one with: wavyos work --loop";
+        }
+      } catch (_) { /* a dropped poll is retried */ }
+      await new Promise(res => setTimeout(res, 700));
+    }
+  },
+  render(body) {
+    const p = body.progress;
+    if (!p) return;
+    const stages = p.stages || [], m = p.metrics || {};
+    $("a-steps").innerHTML = stages.map(s => `<li class="step ${esc(s.status)}">${ICONS[s.status] || ICONS.pending}<div><div class="label">${esc(s.label)}</div>${s.detail ? `<div class="detail">${esc(s.detail)}</div>` : ""}</div></li>`).join("");
+    const finished = stages.filter(s => s.status === "done" || s.status === "skipped").length;
+    $("a-bar").style.transform = `scaleX(${Math.max(0.02, finished / Math.max(1, stages.length))})`;
+    const active = stages.find(s => s.status === "active") || stages.find(s => s.status === "pending");
+    const head = HEADLINES[active?.key] || HEADLINES.save;
+    if (head !== this.lastHeadline) {
+      this.lastHeadline = head;
+      const el = $("a-headline"); el.textContent = head; el.classList.remove("swap"); void el.offsetWidth; el.classList.add("swap");
+    }
+    if (m.account_name) $("a-who").textContent = m.account_name;
+    if (m.months && !Field.months.length) Field.setMonths(m.months);
+    if (m.orders_expected) {
+      const got = m.orders_imported || 0;
+      Field.target = Math.min(1, got / m.orders_expected);
+      $("a-field-count").textContent = `${got.toLocaleString()} of ${m.orders_expected.toLocaleString()}`;
+      if (active?.key === "orders") $("a-live").textContent = `${got.toLocaleString()} orders read${m.pages ? " · page " + m.pages : ""}`;
+    } else if (m.orders_imported != null) {
+      Field.target = 1; $("a-field-count").textContent = m.orders_imported.toLocaleString() + " orders";
+    }
+    if (active && active.key !== "orders" && active.detail) $("a-live").textContent = active.detail;
+    const fig = (key, label, value) => {
+      if (value == null || value === "—" || this.figures[key] === value) return;
+      const exists = this.figures[key] !== undefined;
+      this.figures[key] = value;
+      if (exists) { $("fig-" + key).querySelector("dd").textContent = value; return; }
+      const d = document.createElement("div"); d.className = "figure"; d.id = "fig-" + key;
+      d.innerHTML = `<dt>${esc(label)}</dt><dd>${esc(value)}</dd>`; $("a-figures").appendChild(d);
+    };
+    if (m.revenue_12m != null) fig("rev", "Store revenue, 12 mo", money(m.revenue_12m));
+    if (m.orders_expected != null) fig("orders", "Orders, 12 mo", m.orders_expected.toLocaleString());
+    if (m.flows_total != null) fig("flows", "Core flows live", `${m.core_live} of 5`);
+    if (m.email_share != null) fig("share", "Email share", pct(m.email_share));
+    if (m.aov != null) fig("aov", "AOV", "$" + Number(m.aov).toFixed(2));
+    if (m.repeat_rate != null) fig("rpr", "Repeat rate", pct(m.repeat_rate));
+    if (m.median_days != null) fig("days", "Days to 2nd order", String(m.median_days));
+    if (m.monthly_leak != null) fig("leak", "Leaking per month", money(m.monthly_leak));
+    const log = (p.log || []).slice(-3);
+    if (log.join("|") !== this.lastLog) {
+      this.lastLog = log.join("|");
+      $("a-log").innerHTML = log.map(l => `<li>${esc(l)}</li>`).join("");
+    }
+  },
+  finish(result) {
+    this.runId = null; clearInterval(this.timer);
+    Field.target = 1; $("a-bar").style.transform = "scaleX(1)";
+    const el = $("a-headline"); el.textContent = "Audit ready"; el.classList.remove("swap"); void el.offsetWidth; el.classList.add("swap");
+    $("a-live").textContent = "";
+    const score = result.overall_health_score;
+    $("a-finale").hidden = false;
+    $("a-score-sub").textContent = score == null ? "No score on benchmark data. Connect Klaviyo to measure this account." : "Retention health, out of 100, from measured data.";
+    if (score == null) { $("a-score").innerHTML = "—"; }
+    else {
+      const t0 = performance.now(), dur = calm ? 0 : 1400;
+      const step = now => {
+        const k = dur ? Math.min(1, (now - t0) / dur) : 1, e = 1 - Math.pow(1 - k, 4);
+        $("a-score").innerHTML = `${(score * e).toFixed(0)}<small> / 100</small>`;
+        if (k < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }
+    this.result = result;
+    $("a-open").focus();
+  },
+  fail(message) {
+    this.runId = null; clearInterval(this.timer);
+    const el = $("a-headline"); el.textContent = "The audit stopped"; el.classList.remove("swap"); void el.offsetWidth; el.classList.add("swap");
+    $("a-live").textContent = "";
+    $("a-failure").textContent = message; $("a-failure").hidden = false; $("a-back").hidden = false;
+  },
+  close() { $("audit").hidden = true; document.body.style.overflow = ""; cancelAnimationFrame(Field.raf); Field.raf = 0; },
+};
+$("a-open").addEventListener("click", () => {
+  location.assign(`/audit/${encodeURIComponent(Audit.payload.client_slug)}?version=${Audit.result.dossier_version}`);
+});
+$("a-back").addEventListener("click", () => { Audit.close(); show("questions"); });
+window.addEventListener("resize", () => { if (!$("audit").hidden) Field.init(); });
+
+/* Who is here, and which workspace this run is for: /onboard, or /onboard?client=<slug> */
+function lockTo(client) {
+  locked = client;
+  $("who-row").hidden = true;
+  if (Me.staff) return;
+  $("skip-key").hidden = true;
+  $("connect-title").innerHTML = "Start with your <em>Klaviyo</em> key.";
+}
+
+async function init() {
+  if (!token()) return signIn();
+  const r = await fetch("/v1/ops/me", { headers: headers() });
+  if (r.status === 401) { sessionStorage.removeItem("wos-token"); return signIn(); }
+  const me = await r.json();
+  Me.staff = !!me.staff;
+  if (!Me.staff) {
+    const nav = $("nav-link");
+    nav.textContent = "Sign out"; nav.href = "/login";
+    nav.addEventListener("click", () => sessionStorage.removeItem("wos-token"));
+  }
+  const want = new URLSearchParams(location.search).get("client");
+  if (!Me.staff) {
+    const mine = (me.clients || []).find(c => c.slug === want) || (me.clients || [])[0];
+    if (mine) lockTo(mine);
+  } else if (want) {
+    const a = await fetch("/v1/ops/intake?client=" + encodeURIComponent(want), { headers: headers() });
+    if (a.ok) { const body = await a.json(); lockTo({ slug: body.client_slug, name: body.client_name }); }
+  }
+}
+init();
+</script>
+</body>
+</html>

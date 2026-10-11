@@ -1,7 +1,8 @@
 """Settings, read from the environment when asked (never at import time).
 
-No secret ever has a default here: the master key lives in its own 0600 file and API keys
-only ever arrive through the API, into the vault.
+No secret ever has a default here: the master key lives in its own 0600 file (or, in the
+cloud, in WAVYOS_MASTER_KEY from the host's secret store) and API keys only ever arrive
+through the API, into the vault.
 """
 from __future__ import annotations
 
@@ -22,6 +23,8 @@ class Settings:
     master_key_file: Path = Path(DEFAULT_MASTER_KEY_FILE)
     audit_output_root: Path = Path(DEFAULT_AUDIT_OUTPUT_ROOT)
     audit_os_root: Path = Path(DEFAULT_AUDIT_OS_ROOT)
+    signup_org: Optional[str] = None  # the org self-serve brand sign-ups join; None means "the only org"
+    master_key: Optional[str] = None  # when set, used instead of master_key_file
 
     def __repr__(self) -> str:  # the URL may carry a database password: show the scheme only
         scheme = self.database_url.split(":", 1)[0]
@@ -32,11 +35,21 @@ class Settings:
 def load_settings(env: Optional[Mapping[str, str]] = None) -> Settings:
     env = os.environ if env is None else env
     return Settings(
-        database_url=env.get("WAVYOS_DATABASE_URL") or DEFAULT_DATABASE_URL,
+        database_url=normalize_database_url(env.get("WAVYOS_DATABASE_URL") or DEFAULT_DATABASE_URL),
         master_key_file=Path(env.get("WAVYOS_MASTER_KEY_FILE") or DEFAULT_MASTER_KEY_FILE),
         audit_output_root=Path(env.get("WAVYOS_AUDIT_OUTPUT_ROOT") or DEFAULT_AUDIT_OUTPUT_ROOT),
         audit_os_root=Path(env.get("WAVYOS_AUDIT_OS_ROOT") or DEFAULT_AUDIT_OS_ROOT),
+        signup_org=env.get("WAVYOS_SIGNUP_ORG") or None,
+        master_key=env.get("WAVYOS_MASTER_KEY") or None,
     )
+
+
+def normalize_database_url(url: str) -> str:
+    """Hosts hand out postgres:// URLs; SQLAlchemy wants a dialect+driver name."""
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg://" + url[len(prefix):]
+    return url
 
 
 def ensure_sqlite_dir(database_url: str) -> None:
