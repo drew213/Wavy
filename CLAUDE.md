@@ -36,7 +36,7 @@ The suite also runs against Postgres: `WAVYOS_TEST_POSTGRES_URL=postgresql+psyco
 - **Every action is a policy action.** New things people can do get an entry in `policy.ACTIONS` with who may perform them, and are checked with `authorize()`.
 - **No migrations yet.** Tables are made with `create_all`, which adds new tables but never changes existing ones. Add new tables, not new columns, until Alembic is in. If a column change is unavoidable, add Alembic first.
 - **Secrets.** Klaviyo and model keys only go into the vault (`vault.py`, `connections.py`). Never log, return or store a key in plain text; tests assert this. `WAVYOS_MASTER_KEY` must never change in a running environment, or every stored key becomes unreadable.
-- **Never commit** `var/`, `.env` files, keys, database files or client data. The repository is private and must stay private. Test fixtures are synthetic only.
+- **Never commit** `var/`, `.env` files, keys, database files or client data. The repository is public: anything pushed can be read and copied by anyone. Test fixtures are synthetic only.
 - **Every change is an event.** Use `events.record(...)` for state changes, as the existing services do.
 - **Jobs produce something or say why not.** A job handler that does nothing must return a `no_action_reason`.
 - **Console pages** are static HTML served with a strict Content Security Policy: inline script and style only, no CDNs, fonts and images from `/assets/` (allowlisted in `console/__init__.py`). The visual language is the Wavy Client Hub: Geist and Geist Mono, near-black `#0b0c0d`, lime `#c8ff00`, square corners.
@@ -47,26 +47,18 @@ The suite also runs against Postgres: `WAVYOS_TEST_POSTGRES_URL=postgresql+psyco
 
 **Now (free):** one Render free web service (`--with-worker` runs the job worker and scheduler inside it) plus a free Neon Postgres database (project `wavy-os`, Oregon). Free services sleep after 15 idle minutes, so an audit only runs while someone has the page open.
 
-- Neon: created, schema and the staff admin (`drew@wavystudios.com`) set up.
-- Render: blocked until Render's GitHub app is installed on `drew213/Wavy` (github.com/apps/render). Then create the service from a machine that holds the secrets:
-
-  ```bash
-  render services create --name wavyos-web --type web_service --plan free --region oregon --runtime python \
-    --repo https://github.com/drew213/Wavy --branch main --build-command "pip install ." \
-    --start-command "wavyos init-db && wavyos serve --host 0.0.0.0 --port \$PORT --forwarded-allow-ips '*' --with-worker" \
-    --health-check-path /healthz --env-var PYTHON_VERSION=3.12.8 --env-var WAVYOS_SIGNUP_ORG=wavy \
-    --env-var "WAVYOS_DATABASE_URL=<neon url>" --env-var "WAVYOS_MASTER_KEY=<master key>"
-  ```
-
-  The Neon URL, master key and admin password live only on Andrew's Mac, in `wavy-os/var/` (git-ignored). Ask him; never put them in the repo, an issue or a PR.
+- Live at **https://wavyos-web.onrender.com** (Render service `wavyos-web`, `srv-db5uj7p42hec73a8tfdg`, workspace Wavy Studios). Brands start at `/start`; staff sign in at `/login`.
+- Neon project `wavy-os`: schema and the staff admin (`drew@wavystudios.com`) are set up.
+- The Neon URL, master key and admin password are set on the Render service and kept on Andrew's Mac in `wavy-os/var/` (git-ignored). Ask him if you need them; never put them in the repo, an issue or a PR.
+- Render builds with `pip install .` and starts with `wavyos init-db && wavyos serve --host 0.0.0.0 --port $PORT --forwarded-allow-ips '*' --with-worker`.
 
 **Later (paid, about $20/month):** `render.yaml` is a Blueprint with a separate worker, Render Postgres and a generated master key. Moving there means migrating the Neon data and carrying the same master key over.
 
-Every push to `main` redeploys once the Render service exists. Work on branches and open pull requests.
+Every push to `main` redeploys the live site. Work on branches and open pull requests; merge only with `pytest -q` green.
 
 ## Backlog, in priority order
 
-1. **Finish the first deploy** (above) and smoke-test on the live URL: sign up at `/start`, connect a key, complete the questionnaire, open `/audit/<slug>`, sign in as staff at `/login`.
+1. **First real brand on the live site:** sign up at `/start` with a real read-only Klaviyo key, complete the questionnaire, and confirm the audit finishes on the free plan (the service must stay awake while it runs) and `/audit/<slug>` shows it. Staff sign-in, pages and headers are already verified live.
 2. **Approving a proposed plan should create its tasks.** Today a brand-started audit stores proposed task titles (`onboarding.py`, `first_30_day_plan.status == "proposed"`); a lead's approval needs to turn them into tasks through `operations.py`.
 3. **Don't make a returning brand re-enter its Klaviyo key.** If the client already has a live Klaviyo connection, skip step 1 of `/onboard` and run the audit with the stored key (`connections.py`, vault).
 4. **Account basics:** password reset and email verification (needs an email provider), and session tokens that survive a new browser tab (today they're in `sessionStorage`).
