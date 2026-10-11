@@ -145,6 +145,20 @@ details.basis dt { color: #7f898d; } details.basis dd { margin: 0; overflow-wrap
 .finding dt { font: 11px/1.9 var(--mono); letter-spacing: .6px; color: #8f9a9e; text-transform: uppercase; }
 .finding dd { margin: 0; color: #d9dddd; overflow-wrap: anywhere; }
 .finding dd.action { color: #eef0e8; }
+.finding.read { border-left-color: var(--primary); }
+
+/* The strategist's read: approved written analysis */
+.story { border: 1px solid #3a4a17; background: linear-gradient(180deg, #171d0f, var(--card)); padding: 24px; margin-bottom: 24px; }
+.story-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.story-head .eyebrow { color: #b5db57; }
+.story h2 { font-size: 23px; line-height: 1.35; color: #f2f5ea; max-width: 880px; }
+.story .findings { margin: 20px 0 0; }
+.story .owner { font: 11px/1.9 var(--mono); letter-spacing: .6px; color: #9ba6ad; text-transform: uppercase; }
+.weeks-list { display: grid; gap: 10px; margin-top: 18px; }
+.week { display: grid; grid-template-columns: 74px 1fr; gap: 14px; padding: 14px 0; border-top: 1px solid var(--border); }
+.week b { font: 12px/1.6 var(--mono); color: #c8ff00; letter-spacing: .6px; }
+.week ul { margin: 6px 0 0; padding-left: 18px; font-size: 14px; color: #d9dddd; }
+@media (max-width: 500px) { .story { padding: 18px; } .story h2 { font-size: 19px; } .week { grid-template-columns: 1fr; gap: 4px; } }
 
 /* Opportunities board */
 .board { border: 1px solid var(--border); background: var(--card); margin-bottom: 24px; }
@@ -372,7 +386,7 @@ const NAV = [
     icon: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>' },
   { id: "deliverability", eyebrow: "08 / PROTECT", title: "Deliverability & messages", sub: "Where complaints and unsubscribes come from, and what's wrong inside the live emails.",
     icon: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>' },
-  { id: "plan", eyebrow: "09 / ACT", title: "First 30 days", sub: "The first month of work and the drafts prepared for it. Proposed until your strategist approves.",
+  { id: "plan", eyebrow: "09 / ACT", title: "90-day plan", sub: "The phases and week-by-week plan, the first month of work and the drafts prepared for it. Proposed until you approve it.",
     icon: '<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>' },
   { id: "answers", eyebrow: "10 / CONTEXT", title: "Onboarding answers", sub: "Everything the brand told us in lifecycle onboarding, in their words.",
     icon: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>' },
@@ -489,7 +503,26 @@ function findingCards(list, title = "What we found") {
     ${(f.facts || []).filter(F).length ? `<div class="chips" style="margin-top:12px">${f.facts.filter(F).map(id => `<span class="chip">${esc(F(id).label)}: ${esc(fmtFact(F(id)) ?? "unavailable")}</span>`).join("")}</div>` : ""}
   </article>`).join("")}</div>`;
 }
-const head = s => stateBar(s) + reviewBar(s);
+function story(s) {
+  const n = s.narrative_state === "approved" ? s.narrative : null;
+  if (!n) return "";
+  const when = n.reviewed_at ? ` · ${esc(day(n.reviewed_at))}` : "";
+  const insights = (n.insights || []).map((x, i) => `<article class="finding read">
+      <header><h3>${String(i + 1).padStart(2, "0")}</h3><span class="chips">${x.owner ? `<span class="tag">Owner ${esc(x.owner)}</span>` : ""}${x.when ? `<span class="tag">${esc(x.when)}</span>` : ""}<span class="tag">Proposed</span></span></header>
+      <dl><dt>Finding</dt><dd>${esc(x.finding)}</dd><dt>Evidence</dt><dd>${esc(x.evidence)}</dd><dt>Action</dt><dd class="action">${esc(x.action)}</dd></dl>
+      ${(x.facts || []).filter(F).length ? `<div class="chips" style="margin-top:12px">${x.facts.filter(F).map(id => `<span class="chip">${esc(F(id).label)}: ${esc(fmtFact(F(id)) ?? "unavailable")}</span>`).join("")}</div>` : ""}
+    </article>`).join("");
+  let extra = "";
+  if (n.ultimate_journey?.length) extra += table("story.journey", n.ultimate_journey, [["stage", "Stage", "text"], ["node", "Flow or message", "text"], ["trigger", "Trigger", "text"], ["status", "Build", "text"], ["detail", "What changes", "text"]], { title: "The ultimate journey", note: "Proposed: live means keep, fix means change what's running, build means new." });
+  if (n.calendar_90d?.length) extra += `<div class="panel"><div class="panel-head"><div><h2>The next 90 days of sends</h2><p>Proposed. Nothing is scheduled until you approve it.</p></div></div>
+      <div class="weeks-list">${n.calendar_90d.map(w => `<div class="week"><b>WEEK ${esc(w.week)}</b><div><strong>${esc(w.theme)}</strong><ul>${(w.sends || []).map(x => `<li>${esc(x.channel)} · ${esc(x.segment)}: ${esc(x.idea)}${x.offer && x.offer !== "none" ? ` · ${esc(x.offer)}` : ""}</li>`).join("")}</ul></div></div>`).join("")}</div></div>`;
+  if (n.phases?.length) extra += n.phases.map(p => table(`story.phase.${p.name}`, p.items || [], [["week", "Week", "text"], ["ships", "What ships", "text"], ["owner", "Owner", "text"], ["depends_on", "Needs", "text"], ["kpi", "KPI", "text"], [r => F(r.baseline_fact) ? fmtFact(F(r.baseline_fact)) ?? "unavailable" : "—", "Baseline", "text"]],
+    { title: `${p.name} · weeks ${p.weeks}`, note: p.goal })).join("");
+  return `<section class="story" aria-label="Strategist's read"><div class="story-head"><span class="eyebrow">STRATEGIST'S READ</span><span class="tag live">${n.status === "edited" ? "Reviewed and edited" : "Reviewed"}${when}</span></div>
+    <h2>${esc(n.headline)}</h2>${insights ? `<div class="findings">${insights}</div>` : ""}</section>${extra}`;
+}
+const head = s => stateBar(s) + reviewBar(s) + story(s);
+const readCard = id => (sec("opportunities").narrative_state === "approved" ? sec("opportunities").narrative?.cards || [] : []).find(c => c.id === id);
 const waiting = s => s.state === "queued" || s.state === "collecting" || (s.state === "unavailable" && !Object.keys(s.tables || {}).length && !s.findings?.length);
 
 /* ---------------------------------------------------------------- shell */
@@ -535,7 +568,9 @@ const VIEWS = {
     };
     cards.sort(sorters[S.sort]);
     let idx = Math.max(0, cards.findIndex(c => c.id === S.sub));
-    const sel = cards[idx];
+    const rc = cards[idx] && readCard(cards[idx].id);
+    const sel = rc ? { ...cards[idx], observation: rc.observation || cards[idx].observation, outcome: rc.outcome || cards[idx].outcome,
+      steps: rc.steps?.length ? rc.steps : cards[idx].steps, effort_days: rc.effort_days ?? cards[idx].effort_days, readout: rc.readout || cards[idx].readout, reviewed: true } : cards[idx];
     const sized = c => c.sizing && c.sizing.status === "sized";
     const total = d.total?.annual;
     const kpis = lead.length ? metrics(lead.length >= 5 ? "five" : lead.length === 3 ? "three" : "", lead.slice(0, 5).map(k => metric(`kpi_scorecard.${k.kpi}.last_month`, `${k.label}, last full month`, "", { delta: `kpi_scorecard.${k.kpi}.yoy_3m`, compact: true }))) : "";
@@ -544,7 +579,7 @@ const VIEWS = {
     if (sel) {
       const z = sel.sizing;
       detail = `<div class="op-detail-heading"><span class="op-label">${String(sel.rank).padStart(2, "0")} · ${esc(label(sel.category)).toUpperCase()}${sel.check_id ? " · " + esc(sel.check_id) : ""}</span>
-          <span class="chips"><span class="tag ${esc(sel.severity)}">${esc(sel.severity)}</span><span class="tag">${esc(sel.status)}</span><span class="tag">Owner ${esc(sel.owner)}</span></span></div>
+          <span class="chips"><span class="tag ${esc(sel.severity)}">${esc(sel.severity)}</span><span class="tag">${esc(sel.status)}</span><span class="tag">Owner ${esc(sel.owner)}</span>${sel.reviewed ? `<span class="tag live">Strategist detail</span>` : ""}</span></div>
         <h3>${esc(sel.title)}</h3>
         <p class="op-observation">${esc(sel.observation)}</p>
         ${sel.evidence_text ? `<p class="op-evidence">${esc(sel.evidence_text)}</p>` : (sel.evidence || []).length ? `<p class="op-evidence">${(sel.evidence || []).slice(0, 4).map(e => esc(e.note || e.detail || e.ref || "")).filter(Boolean).join(" · ")}</p>` : ""}
@@ -699,9 +734,14 @@ const VIEWS = {
   plan(s) {
     const d = s.data || {}, plan = d.plan || {}, approved = plan.status === "approved", c = d.campaign;
     const tasks = (plan.tasks || []).map(t => typeof t === "string" ? { title: t } : t);
-    S.md = `# ${S.b.client.name}: first 30 days\n\nStatus: ${approved ? "approved" : "proposed"}\n\n` + tasks.map((t, i) => `${i + 1}. ${t.title}`).join("\n") + "\n";
+    const phases = s.narrative_state === "approved" ? s.narrative?.phases || [] : [];
+    S.md = `# ${S.b.client.name}: plan\n\nStatus: proposed until approved\n\n`
+      + (phases.length ? `## 90 days\n\n${s.narrative.headline}\n\n` + phases.map(p => `### ${p.name} (weeks ${p.weeks})\n\n${p.goal}\n\n`
+        + (p.items || []).map(it => `- Week ${it.week}: ${it.ships} (owner: ${it.owner}${it.depends_on ? `; needs: ${it.depends_on}` : ""}${it.kpi ? `; KPI: ${it.kpi}` : ""})`).join("\n")).join("\n\n") + "\n\n" : "")
+      + (tasks.length ? `## First 30 days\n\n` + tasks.map((t, i) => `${i + 1}. ${t.title}`).join("\n") + "\n" : "");
     return `${head(s)}<div class="notice">${INFO}<p>${approved ? "<strong>Approved.</strong> These tasks are scheduled." : "<strong>Proposed.</strong> Your Wavy strategist reviews and approves this plan before any work starts."}</p></div>
-      ${tasks.length ? `<div class="panel-head"><h2>The plan</h2><button class="btn small" type="button" id="plan-md">Export Markdown</button></div><ol class="plan-list">${tasks.map((t, i) => `<li><span class="op-rank">${String(i + 1).padStart(2, "0")}</span><div><strong>${esc(t.title)}</strong></div><span class="tag ${approved ? "live" : "off"}">${approved ? "Approved" : "Proposed"}</span></li>`).join("")}</ol>` : ""}
+      ${phases.length && !tasks.length ? `<button class="btn small" type="button" id="plan-md" style="margin-bottom:24px">Export Markdown</button>` : ""}
+      ${tasks.length ? `<div class="panel-head"><h2>First 30 days</h2><button class="btn small" type="button" id="plan-md">Export Markdown</button></div><ol class="plan-list">${tasks.map((t, i) => `<li><span class="op-rank">${String(i + 1).padStart(2, "0")}</span><div><strong>${esc(t.title)}</strong></div><span class="tag ${approved ? "live" : "off"}">${approved ? "Approved" : "Proposed"}</span></li>`).join("")}</ol>` : ""}
       ${(d.flows || []).map(f => `<div class="panel"><div class="panel-head"><div><h2>${esc(String(f.name || "").split(" — ")[0])}</h2><p>${f.messages.length} prepared message${f.messages.length === 1 ? "" : "s"} · not sent, not scheduled</p></div><span class="tag ${f.already_live ? "live" : "off"}">${f.already_live ? "Live in Klaviyo" : "Not live"}</span></div>
         ${f.messages.map((m, i) => `<p style="margin-top:8px"><span class="op-label">MESSAGE ${i + 1}</span> <b style="color:#edf0e7;font-weight:500">${esc(m.subject)}</b> · ${esc(m.preview)}</p>`).join("")}</div>`).join("")}
       ${c ? `<div class="grid-2"><div class="panel"><div class="panel-head"><div><h2>${esc(c.title || "Campaign draft")}</h2><p>${esc(c.theme || "")}</p></div><span class="tag ${c.compliance_passed ? "live" : "missing"}">${c.compliance_passed ? "Guardrails passed" : "Needs fixes"}</span></div><div class="email">${esc(c.body_markdown)}</div></div>

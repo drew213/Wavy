@@ -122,7 +122,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
 <div id="root"></div>
 <script>
 (() => {
-  const VIEWS = [["overview","Overview"],["flow","Flow"],["executions","Executions"],["jobs","Jobs"],["approvals","Approvals"],["events","Events"]];
+  const VIEWS = [["overview","Overview"],["flow","Flow"],["review","Review"],["executions","Executions"],["jobs","Jobs"],["approvals","Approvals"],["events","Events"]];
   const S = { token: null, me: null, view: "overview", client: "", sel: null, data: {}, live: false, last: null, err: "", after: 0, events: [] };
   try { S.token = sessionStorage.getItem("wos-token"); S.client = localStorage.getItem("wos-client") || ""; } catch {}
   const $ = (q) => document.querySelector(q);
@@ -159,7 +159,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
     const ov = S.data.overview?.clients || [];
     const pendingAp = ov.reduce((a, c) => a + c.approvals_pending, 0);
     const running = ov.reduce((a, c) => a + (c.executions.running || 0), 0);
-    const counts = { approvals: pendingAp, executions: running };
+    const counts = { approvals: pendingAp, executions: running, review: (S.data.review?.drafts || []).filter(d => d.status === "draft" || d.status === "needs_rewrite").length };
     $("#root").innerHTML = `<div class="app"><nav class="rail" aria-label="Sections"><div class="brand"><h1>Wavy <span>OS</span></h1><div class="label">Console</div></div>
       ${VIEWS.map(([k, l]) => `<a href="#${k}" data-v="${k}" aria-current="${S.view === k ? "page" : "false"}">${l}${counts[k] ? `<b class="${k === "approvals" ? "hot" : ""}">${counts[k]}</b>` : ""}</a>`).join("")}
       <a href="/onboard" target="_blank" style="margin-top:12px; border:1px solid var(--lime); color:var(--lime); font-weight:700;">⚡ Onboard Client ↗</a>
@@ -279,6 +279,46 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
       <div class="row" style="margin-top:8px"><button class="btn primary" data-ap="${esc(a.id)}" data-ok="1">Approve</button><button class="btn danger" data-ap="${esc(a.id)}" data-ok="0">Reject</button></div></div>`).join("")}</div>`;
   }
 
+  function vReview() {
+    const ds = S.data.review?.drafts || [];
+    const redraft = S.client ? `<div class="row" style="justify-content:space-between;margin-bottom:12px"><span class="muted">Drafts are written from the fact ledger, held to it by the facts check, and scored by a second model. Nothing reaches the brand until you approve it.</span><button class="btn" data-redraft="${esc(S.client)}">Redraft open sections</button></div>` : "";
+    const list = ds.length ? `<div class="tbl"><table><thead><tr><th>Section</th><th>Status</th><th>Score</th><th>Facts check</th><th>Cost</th><th>Updated</th></tr></thead><tbody>
+      ${ds.map(d => `<tr class="click ${S.selN === d.id ? "sel" : ""}" data-nd="${esc(d.id)}" tabindex="0"><td><div class="t">${esc(d.section.replace(/_/g, " "))}</div><div class="muted">${esc(d.client_name)}</div>${d.headline ? `<div style="font-size:11.5px;max-width:380px">${esc(d.headline)}</div>` : ""}</td>
+      <td>${chip(d.status === "draft" ? "review" : d.status === "needs_rewrite" ? "blocked" : d.status === "edited" ? "approved" : d.status, d.status.replace(/_/g, " "))}${d.reason ? `<div class="muted" style="font-size:11px;max-width:280px">${esc(d.reason)}</div>` : ""}</td>
+      <td class="num">${d.score == null ? "—" : esc(d.score) + "/10"}<div class="muted">${d.rounds} round${d.rounds === 1 ? "" : "s"}${d.independent === false ? " · same provider" : ""}</div></td>
+      <td>${d.facts_ok == null ? "—" : d.facts_ok ? chip("ok", "clean") : chip("failed", d.problems + " problem" + (d.problems === 1 ? "" : "s"))}${d.cut ? `<div class="muted">${d.cut} cut</div>` : ""}</td>
+      <td class="num">${usd(d.cost_usd)}<div class="muted">${esc(d.drafter)}${d.critic_by ? " → " + esc(d.critic_by) : ""}</div></td><td class="muted">${esc(ago(d.updated_at))}</td></tr>`).join("")}</tbody></table></div>`
+      : `<div class="empty"><h3>No drafts${S.client ? " for this client" : ""}</h3><p class="muted">Sections are drafted after each scored audit, for brands whose settings allow a model provider.</p></div>`;
+    const d = S.data.nd;
+    if (!S.selN || !d) return redraft + list;
+    const fact = (id) => (d.evidence || []).find(e => e.id === id);
+    const val = (e) => e ? (e.missing ? "not in the ledger" : e.value == null ? "unavailable" : `${e.value}${e.unit ? " " + e.unit : ""}`) : "—";
+    const p = d.payload || {}, fc = d.facts_check || {}, rounds = d.critic?.rounds || [];
+    const open = d.approval && d.approval.status === "pending";
+    const panel = `<aside class="panel" aria-label="Draft review"><div class="head"><div class="row" style="justify-content:space-between"><span class="label">${esc(d.client_name)} · ${esc(d.section)}</span><button class="btn" id="closeNd">Close</button></div>
+      <h3 style="font-size:18px;margin-top:4px">${esc(p.headline || "(no headline)")}</h3>
+      <div class="kv"><div><span class="label">Status</span><b>${chip(d.status)}</b></div><div><span class="label">Score</span><b>${d.score == null ? "—" : esc(d.score) + "/10"}</b></div>
+      <div><span class="label">Writer → critic</span><b class="exec">${esc(d.drafter)} → ${esc(d.critic_by)}</b></div><div><span class="label">Cost</span><b class="num">${usd(d.cost_usd)}</b></div></div>
+      ${d.reason ? `<p class="err" style="margin:10px 0 0">${esc(d.reason)}</p>` : ""}</div>
+      <div class="art">${(p.insights || []).map((x, i) => `<div style="padding:10px 0;border-top:1px solid var(--line)"><span class="label">Insight ${i + 1}${x.owner ? " · " + esc(x.owner) : ""}${x.when ? " · " + esc(x.when) : ""}</span>
+        <div style="color:var(--text);margin-top:4px">${esc(x.finding)}</div><div><span class="muted">Evidence:</span> ${esc(x.evidence)}</div><div><span class="muted">Action:</span> <span style="color:var(--text)">${esc(x.action)}</span></div>
+        ${(x.facts || []).length ? `<table style="margin-top:6px"><tbody>${x.facts.map(id => { const e = fact(id); return `<tr><td class="muted" style="padding:3px 8px 3px 0">${esc(id)}</td><td style="padding:3px 0">${esc(e?.label || "")}</td><td class="num" style="padding:3px 0 3px 8px;color:var(--text)">${esc(val(e))}</td></tr>`; }).join("")}</tbody></table>` : `<div class="err" style="font-size:11.5px">Cites no facts.</div>`}</div>`).join("")}
+        ${["cards", "ultimate_journey", "calendar_90d", "phases"].filter(k => p[k]).map(k => `<details><summary>${esc(k.replace(/_/g, " "))} (${p[k].length})</summary><pre class="j">${pretty(p[k])}</pre></details>`).join("")}</div>
+      <div class="art"><span class="label">Facts check</span> ${fc.ok ? chip("ok", "every number is in the ledger") : chip("failed", (fc.problems || []).length + " problem(s)")} <span class="muted">${fc.numbers_checked ?? 0} numbers checked</span>
+        ${(fc.problems || []).map(x => `<div class="err" style="font-size:11.5px">${esc(x.path)}: ${esc(x.reason)}${x.token ? ` (${esc(x.token)})` : ""}</div>`).join("")}
+        ${(fc.cut || []).map(x => `<div class="muted" style="font-size:11.5px">Cut ${esc(x.path)}: ${esc(x.reason)}</div>`).join("")}
+        ${(fc.warnings || []).map(x => `<div style="font-size:11.5px;color:var(--warn)">${esc(x.path)}: ${esc(x.reason)}</div>`).join("")}</div>
+      <div class="art"><span class="label">Critic${d.critic?.independent === false ? " (same provider: not independent)" : ""}</span>${rounds.map(r => `<details ${r === rounds[rounds.length - 1] ? "open" : ""}><summary>Round ${r.round}: ${esc(r.total)}/10 · ${r.problems} facts problem(s)</summary>
+        <div class="muted" style="font-size:11.5px">${Object.entries(r.scores || {}).map(([k, v]) => `${esc(k)} ${esc(v)}`).join(" · ")}</div>${(r.notes || []).map(n => `<div style="font-size:12px">• ${esc(n)}</div>`).join("")}</details>`).join("") || '<div class="muted">Not critiqued.</div>'}</div>
+      ${(d.diff || []).length ? `<div class="art"><span class="label">Strategist edits (${d.diff.length})</span><pre class="j">${pretty(d.diff)}</pre></div>` : ""}
+      ${["approved", "edited", "rejected"].includes(d.status) ? `<div class="art muted">${esc(d.status)} by ${esc(d.reviewer || "")} ${esc(ago(d.reviewed_at))}${d.review_note ? ": " + esc(d.review_note) : ""}</div>` : ""}
+      ${d.status === "skipped" || d.status === "drafting" ? "" : `<div class="art" data-k="nd-${esc(d.id)}"><details><summary>Edit the draft (JSON). Saving runs the facts check and publishes it as edited.</summary>
+        <textarea id="nj-${esc(d.id)}" rows="14" style="width:100%;margin-top:6px">${esc(JSON.stringify(p, null, 2))}</textarea></details>
+        <label class="label" for="nn-${esc(d.id)}" style="display:block;margin-top:10px">Note</label><textarea id="nn-${esc(d.id)}" rows="2" style="width:100%"></textarea>
+        <div class="row" style="margin-top:8px">${open ? `<button class="btn primary" data-ndok="1" data-id="${esc(d.id)}">Approve</button>` : ""}<button class="btn" data-ndedit="${esc(d.id)}">Save edit</button>${d.status !== "rejected" ? `<button class="btn danger" data-ndok="0" data-id="${esc(d.id)}">Reject</button>` : ""}</div></div>`}</aside>`;
+    return redraft + `<div class="split"><div>${list}</div>${panel}</div>`;
+  }
+
   function vEvents() {
     const ev = S.events.filter(e => !S.client || e.client === S.client).slice(-300).reverse();
     if (!ev.length) return `<div class="empty"><h3>No events yet</h3><p class="muted">Every change in Wavy OS is written here, chained by hash.</p></div>`;
@@ -289,7 +329,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
 
   function render() {
     shell();
-    const v = { overview: vOverview, flow: vFlow, executions: vExecutions, jobs: vJobs, approvals: vApprovals, events: vEvents }[S.view];
+    const v = { overview: vOverview, flow: vFlow, review: vReview, executions: vExecutions, jobs: vJobs, approvals: vApprovals, events: vEvents }[S.view];
     $("#content").innerHTML = v();
   }
 
@@ -302,6 +342,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
       if (S.view === "executions") { S.data.executions = await api("/v1/ops/executions?" + qc()); if (S.sel) S.data.exec = await api("/v1/ops/executions/" + S.sel); }
       if (S.view === "jobs") S.data.jobs = await api("/v1/ops/jobs");
       if (S.view === "approvals") S.data.approvals = await api("/v1/ops/approvals");
+      if (S.view === "review" && S.me?.staff) { S.data.review = await api("/v1/ops/narrative?" + qc()); S.data.nd = S.selN ? await api("/v1/ops/narrative/" + S.selN) : null; }
       const ev = await api("/v1/ops/events?after=" + S.after);
       if (ev.events.length) { S.events = S.events.concat(ev.events).slice(-1000); S.after = ev.events[ev.events.length - 1].id; }
       S.live = true; S.last = new Date().toISOString();
@@ -310,7 +351,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
     // Redraw only when something changed, so open details, scroll and typing survive the live refresh.
     const sig = JSON.stringify([S.view, S.client, S.sel, S.data.overview?.clients, S.view === "flow" && S.data.flow,
       S.view === "executions" && [S.data.executions, S.data.exec], S.view === "jobs" && S.data.jobs,
-      S.view === "approvals" && S.data.approvals, S.view === "events" && S.after, S.live]);
+      S.view === "approvals" && S.data.approvals, S.view === "review" && [S.data.review, S.data.nd], S.view === "events" && S.after, S.live]);
     if (!redraw && sig === S.sig) { const l = document.querySelector(".live"); if (l) l.lastChild.textContent = "Live · " + ago(S.last); return; }
     S.sig = sig;
     const a = document.activeElement; const keep = a && a.id && a.tagName === "TEXTAREA" ? [a.id, a.value] : null;
@@ -324,7 +365,21 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
   }
 
   document.addEventListener("click", async (e) => {
-    const t = e.target.closest("[data-v],[data-open],[data-ex],[data-dispatch],[data-ap],[data-cancel],#closeEx"); if (!t) return;
+    const t = e.target.closest("[data-v],[data-open],[data-ex],[data-dispatch],[data-ap],[data-cancel],#closeEx,[data-nd],[data-ndok],[data-ndedit],[data-redraft],#closeNd"); if (!t) return;
+    if (t.id === "closeNd") { S.selN = null; S.data.nd = null; render(); return; }
+    if (t.dataset.nd) { S.selN = t.dataset.nd; refresh(true); return; }
+    if (t.dataset.ndok) { const ok = t.dataset.ndok === "1", id = t.dataset.id, note = document.getElementById("nn-" + id)?.value || "";
+      try { const r = await api(`/v1/ops/narrative/${id}/decide`, { method: "POST", body: JSON.stringify({ approve: ok, note }) }); toast(r.status === "rejected" ? "Rejected" : "Approved and published"); } catch (err) { toast(err.message); }
+      refresh(true); return; }
+    if (t.dataset.ndedit) { const id = t.dataset.ndedit; let payload;
+      try { payload = JSON.parse(document.getElementById("nj-" + id).value); } catch { toast("That isn't valid JSON"); return; }
+      const note = document.getElementById("nn-" + id)?.value || "";
+      const r = await fetch(`/v1/ops/narrative/${id}/edit`, { method: "POST", headers: { "Authorization": "Bearer " + S.token, "Content-Type": "application/json" }, body: JSON.stringify({ payload, note }) });
+      const body = await r.json().catch(() => ({}));
+      if (r.ok) toast("Saved and published as edited");
+      else toast((body.problems || []).slice(0, 3).map(p => `${p.path}: ${p.reason}${p.token ? " (" + p.token + ")" : ""}`).join(" · ") || body.error || "Not saved");
+      refresh(true); return; }
+    if (t.dataset.redraft) { try { await api(`/v1/ops/clients/${encodeURIComponent(t.dataset.redraft)}/narrative`, { method: "POST", body: "{}" }); toast("Drafting queued; reviewed sections are kept"); } catch (err) { toast(err.message); } refresh(); return; }
     if (t.dataset.v) { e.preventDefault(); location.hash = t.dataset.v; return; }
     if (t.dataset.open) { S.client = t.dataset.open; location.hash = "flow"; return; }
     if (t.id === "closeEx") { S.sel = null; S.data.exec = null; render(); return; }
@@ -337,7 +392,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
       try { const r = await api(`/v1/ops/approvals/${t.dataset.ap}/decide`, { method: "POST", body: JSON.stringify({ approve: ok, note }) }); toast(ok ? "Approved" : "Rejected"); } catch (err) { toast(err.message); }
       refresh(); }
   });
-  document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("tr[data-ex]")) e.target.click(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("tr[data-ex],tr[data-nd]")) e.target.click(); });
   window.addEventListener("hashchange", () => { const v = location.hash.slice(1); if (VIEWS.some(x => x[0] === v)) { S.view = v; refresh(true); } });
 
   let timer;

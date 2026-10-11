@@ -34,7 +34,7 @@ SECTIONS: tuple[tuple[str, str, tuple[str, ...], bool], ...] = (
     ("calendar", "Send history", ("program", "promotions"), True),
     ("capture", "Capture & reach", ("capture_reach", "subscriptions"), True),
     ("deliverability", "Deliverability & messages", ("complaints", "messages"), True),
-    ("plan", "First 30 days", (), False),
+    ("plan", "90-day plan", (), True),
     ("answers", "Onboarding answers", (), False),
     ("brand", "Brand & guardrails", (), False),
     ("sources", "Sources & definitions", (), False),
@@ -168,11 +168,15 @@ def build(session: Session, client: m.Client, run: Optional[m.AuditRun] = None) 
     dossier = session.scalar(select(m.Dossier).where(m.Dossier.client_id == client.id).order_by(m.Dossier.version.desc()).limit(1))
     doc = ((dossier.document or {}).get("dossier") or dossier.document or {}) if dossier else {}
 
+    from .narrative.review import narrative_for, published
+    drafts = narrative_for(session, run.id) if run is not None else {}
     sections = []
     for sid, title, modules, written in SECTIONS:
         state, reason = _module_state(run, sc is not None, analysis, modules)
         s = Section(id=sid, title=title, state=state, reason=reason, modules=list(modules),
                     narrative_state="awaiting_review" if written else "none")
+        if written and (story := published(drafts.get(sid))) is not None:
+            s.narrative, s.narrative_state = story, "approved"
         s.facts = [fid for fid, f in facts.items() if f["module"] in modules]
         s.findings = [f for f in findings if f["module"] in modules]
         s.tables = {f"{mod}.{name}": rows for mod in modules for name, rows in (tables.get(mod) or {}).items()}
@@ -191,7 +195,8 @@ def build(session: Session, client: m.Client, run: Optional[m.AuditRun] = None) 
                                  "messages": [{"subject": d.get("subject_line"), "preview": d.get("preview_text")}
                                               for d in f.get("message_drafts") or []]}
                                 for f in (doc.get("execution") or {}).get("flows") or []]}
-            s.state, s.reason = ("ready", "") if plan or s.data["campaign"] else ("queued", "No plan has been drafted yet.")
+            s.state, s.reason = (("ready", "") if plan or s.data["campaign"] or s.narrative
+                                 else ("queued", "No plan has been drafted yet."))
         elif sid == "answers":
             s.data = {"sections": [{"title": sec["title"], "questions": [{"key": q["key"], "label": q["label"]}
                                                                          for q in sec["questions"]]} for sec in intake_mod.SECTIONS],
@@ -210,8 +215,10 @@ def build(session: Session, client: m.Client, run: Optional[m.AuditRun] = None) 
                       "gaps": summary.get("gaps") or []}
             s.state, s.reason = "ready", ""
         sections.append(s)
+    written = [s for s in sections if s.narrative_state != "none"]
     return Bundle(client={"slug": client.slug, "name": client.name, "timezone": client.timezone},
                   run=_run_view(run) if run is not None else None, generated_at=datetime.now(timezone.utc).isoformat(),
+                  status="reviewed" if written and all(s.narrative_state == "approved" for s in written) else "measured",
                   facts=facts, sections=sections)
 
 

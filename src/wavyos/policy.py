@@ -83,6 +83,8 @@ ACTIONS: dict[str, Action] = {a.key: a for a in [
     _a("decision.approve", "explicit_approval", "Approve a decision and its plan scope",
        approvers=LEADS | CLIENT_DECIDERS),
     _a("client.message.send", "explicit_approval", "Send a communication to the client", approvers=LEADS),
+    _a("narrative.approve", "explicit_approval", "Publish a written audit section to the brand's workspace",
+       approvers=LEADS | {"strategist"}),
     _a("campaign.publish", "explicit_approval", "Schedule or send a campaign", approvers=LEADS | CLIENT_DECIDERS),
     _a("flow.change_live", "explicit_approval", "Activate, pause or change a live flow", approvers=LEADS | CLIENT_DECIDERS),
     _a("discount.change", "explicit_approval", "Create or change a discount or offer",

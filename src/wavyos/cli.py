@@ -227,10 +227,12 @@ def cmd_work(args, settings: Settings) -> int:
     import traceback
     from .execution import engine
     from .execution.providers import adapter_factory
+    from .narrative.writers import writer_factory
     _load_jobmods()
     factory = _factory(settings)
     services = _job_services(settings)
     adapters = adapter_factory(factory, services["vault"])
+    services["writers"] = writer_factory(factory, services["vault"])
     threads = getattr(args, "threads", 1)
     if threads > 1 and settings.database_url.startswith("sqlite"):
         print("worker     SQLite allows one writer at a time; running jobs on 1 thread")

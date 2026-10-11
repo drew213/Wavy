@@ -515,6 +515,46 @@ class WorkspaceBundle(IdMixin, Base):
     updated_at: Mapped[Optional[datetime]]
 
 
+NARRATIVE_STATUSES = ("drafting", "draft", "needs_rewrite", "skipped", "approved", "edited", "rejected")
+
+
+class NarrativeDraft(IdMixin, Base):
+    """The written half of one workspace section for one audit run (wavyos.narrative).
+
+    draft          passed the facts check and the critic; waiting in the strategist queue (approval_id)
+    needs_rewrite  still failing after the last round; a strategist must edit it before it can publish
+    skipped        not drafted (spend cap reached, no provider allowed); reason says why
+    approved       published to the brand as drafted; edited: published after a strategist's edit (diff)
+    rejected       never shown to the brand
+    """
+    __tablename__ = "narrative_drafts"
+    __table_args__ = (UniqueConstraint("run_id", "section"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("audit_runs.id"), index=True)
+    section: Mapped[str] = mapped_column(String(40))
+    status: Mapped[str] = mapped_column(String(20), default="drafting", index=True)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    payload: Mapped[dict] = mapped_column(default=dict)
+    original: Mapped[Optional[dict]]
+    packet_hash: Mapped[str] = mapped_column(String(64), default="")
+    facts_check: Mapped[dict] = mapped_column(default=dict)
+    critic: Mapped[dict] = mapped_column(default=dict)       # {independent, rounds: [{scores, total, notes}]}
+    score: Mapped[Optional[float]] = mapped_column(Float)
+    rounds: Mapped[int] = mapped_column(Integer, default=0)
+    drafter: Mapped[str] = mapped_column(String(80), default="")
+    critic_by: Mapped[str] = mapped_column(String(80), default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    approval_id: Mapped[Optional[str]] = mapped_column(String(32))
+    reviewer: Mapped[Optional[str]] = mapped_column(String(120))
+    reviewed_at: Mapped[Optional[datetime]]
+    review_note: Mapped[str] = mapped_column(Text, default="")
+    diff: Mapped[list] = mapped_column(default=list)
+    updated_at: Mapped[Optional[datetime]]
+
+
 class AuditOrder(IdMixin, Base):
     """One Placed Order event, compact. Profile ids are Klaviyo's pseudonymous ids: never emails or names.
 

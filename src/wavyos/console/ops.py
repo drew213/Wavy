@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Callable, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, SecretStr
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -81,6 +82,15 @@ class IntakeBody(BaseModel):
     client_slug: str
     client_name: Optional[str] = None
     answers: dict
+
+
+class NarrativeEditBody(BaseModel):
+    payload: dict
+    note: str = ""
+
+
+class RedraftBody(BaseModel):
+    sections: Optional[list[str]] = None
 
 
 def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
@@ -531,5 +541,88 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
         if out is None:
             raise HTTPException(404, {"error": f"there is no version {version}"})
         return out
+
+    # ---------------------------------------------------------------- narrative review (staff only)
+
+    QUEUE_ORDER = {"draft": 0, "needs_rewrite": 1, "drafting": 2, "skipped": 3, "edited": 4, "approved": 5, "rejected": 6}
+
+    def staff(s: Session, u: m.User) -> None:
+        if not org_wide(s, u):  # brands see only approved sections, through their workspace
+            raise HTTPException(404, {"error": "not found"})
+
+    def visible_draft(s: Session, u: m.User, draft_id: str) -> tuple[m.NarrativeDraft, m.Client]:
+        staff(s, u)
+        row = s.get(m.NarrativeDraft, draft_id)
+        c = visible_client(s, u, row.client_id if row else None)
+        if c is None:
+            raise HTTPException(404, {"error": "draft not found"})
+        return row, c
+
+    @r.get("/narrative")
+    def narrative_queue(client: Optional[str] = None, status: Optional[str] = None, limit: int = Query(200, le=500),
+                        u: m.User = Depends(user), s: Session = Depends(db)):
+        staff(s, u)
+        q = (select(m.NarrativeDraft, m.Client).join(m.Client, m.Client.id == m.NarrativeDraft.client_id)
+             .where(m.NarrativeDraft.client_id.in_(visible_ids(s, u))))
+        if client:
+            q = q.where(m.Client.slug == client)
+        if status:
+            q = q.where(m.NarrativeDraft.status.in_(status.split(",")))
+        rows = s.execute(q.order_by(m.NarrativeDraft.created_at.desc()).limit(limit)).all()
+        rows.sort(key=lambda rc: (QUEUE_ORDER.get(rc[0].status, 9), rc[1].name, rc[0].section))
+        return {"drafts": [{
+            "id": d.id, "client": c.slug, "client_name": c.name, "run_id": d.run_id, "section": d.section,
+            "status": d.status, "reason": d.reason, "score": d.score, "rounds": d.rounds, "drafter": d.drafter,
+            "critic_by": d.critic_by, "independent": (d.critic or {}).get("independent"),
+            "facts_ok": (d.facts_check or {}).get("ok"), "problems": len((d.facts_check or {}).get("problems") or []),
+            "cut": len((d.facts_check or {}).get("cut") or []), "cost_usd": d.cost_usd, "approval_id": d.approval_id,
+            "headline": (d.payload or {}).get("headline"),
+            "updated_at": (d.updated_at or d.created_at).isoformat()} for d, c in rows]}
+
+    @r.get("/narrative/{draft_id}")
+    def narrative_draft(draft_id: str, u: m.User = Depends(user), s: Session = Depends(db)):
+        from .. import workspace
+        from ..narrative.review import view
+        row, c = visible_draft(s, u, draft_id)
+        modules = next((mods for sid, _, mods, _ in workspace.SECTIONS if sid == row.section), ())
+        findings = (workspace._artifact(s, row.run_id, "analysis") or {}).get("findings") or []
+        return {**view(s, row), "client": c.slug, "client_name": c.name,
+                "findings": [f for f in findings if row.section in ("opportunities", "plan") or f.get("module") in modules]}
+
+    @r.post("/narrative/{draft_id}/edit")
+    def narrative_edit(draft_id: str, body: NarrativeEditBody, u: m.User = Depends(user), s: Session = Depends(db)):
+        from ..narrative import review
+        row, c = visible_draft(s, u, draft_id)
+
+        def go():
+            try:
+                return {"status": review.edit(s, scope_for_user(s, u, c.id), row.id, body.payload, body.note).status}
+            except review.FactsCheckFailed as e:
+                return JSONResponse({"error": str(e), "problems": e.problems}, status_code=422)
+        return guard(go)
+
+    @r.post("/narrative/{draft_id}/decide")
+    def narrative_decide(draft_id: str, body: DecideBody, u: m.User = Depends(user), s: Session = Depends(db)):
+        from ..narrative import review
+        row, c = visible_draft(s, u, draft_id)
+        return guard(lambda: {"status": review.decide(s, scope_for_user(s, u, c.id), row.id, body.approve, body.note).status})
+
+    @r.post("/clients/{slug}/narrative")
+    def narrative_redraft(slug: str, body: RedraftBody, u: m.User = Depends(user), s: Session = Depends(db)):
+        """Queue drafting for the latest scored run; reviewed sections are kept."""
+        from .. import jobs
+        from ..narrative.prompts import SECTIONS as DRAFTED
+        staff(s, u)
+        c = client_by_slug(s, u, slug)
+        if any(x not in DRAFTED for x in body.sections or []):
+            raise HTTPException(422, {"error": f"sections must be among: {', '.join(DRAFTED)}"})
+        run = s.scalar(select(m.AuditRun).where(m.AuditRun.client_id == c.id, m.AuditRun.scorecard_id.is_not(None))
+                       .order_by(m.AuditRun.created_at.desc()).limit(1))
+        if run is None:
+            raise HTTPException(409, {"error": "this brand has no scored audit to draft from"})
+        sc = guard(lambda: scope_for_user(s, u, c.id))
+        queued = jobs.emit(s, sc, "narrative.draft", {"run_id": run.id, "sections": body.sections},
+                           dedupe=f"{run.id}:{utcnow().isoformat()}")
+        return {"run_id": run.id, "job_run_ids": [j.id for j in queued]}
 
     return r
