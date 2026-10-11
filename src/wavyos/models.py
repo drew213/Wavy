@@ -464,6 +464,8 @@ class AuditRun(IdMixin, Base):
     started_at: Mapped[Optional[datetime]]
     finished_at: Mapped[Optional[datetime]]
     error: Mapped[str] = mapped_column(Text, default="")
+    # Client-confirmed facts the account can't tell us (store_platform, ...), for metric choice and checks.
+    context: Mapped[dict] = mapped_column(default=dict)
 
 
 class AuditArtifact(IdMixin, Base):

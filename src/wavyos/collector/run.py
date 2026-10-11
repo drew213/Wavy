@@ -48,7 +48,7 @@ def _now() -> datetime:
 
 
 def start(session: Session, scope: Scope, connection: m.Connection, *, started_by: str,
-          track: str = "snapshot", now: Optional[datetime] = None) -> m.AuditRun:
+          track: str = "snapshot", now: Optional[datetime] = None, context: Optional[dict] = None) -> m.AuditRun:
     """Create a run and queue its collection job. A client already being audited gets its active run back."""
     client_id = scope.require_client()
     if connection.client_id != client_id or connection.provider != "klaviyo" or connection.status != "active":
@@ -63,7 +63,8 @@ def start(session: Session, scope: Scope, connection: m.Connection, *, started_b
                                     "reporting calls; start the audit after midnight UTC")
     run = m.AuditRun(org_id=scope.org_id, client_id=client_id, connection_id=connection.id,
                      account_id=connection.external_account_id, track=track, started_by=started_by,
-                     stages={key: {"status": "pending", "label": label} for key, label in LABELS.items()})
+                     stages={key: {"status": "pending", "label": label} for key, label in LABELS.items()},
+                     context={k: v for k, v in (context or {}).items() if v not in (None, "")})
     session.add(run)
     events.record(session, scope, "audit.started", run, f"{track} audit queued")
     jobs.emit(session, scope, JOB_KEY, {"run_id": run.id}, dedupe=run.id)
@@ -84,7 +85,8 @@ def collect(session: Session, scope: Scope, run: m.AuditRun, client, *, pins: Op
     run.status = "collecting"
     run.started_at = run.started_at or _now()
     session.commit()
-    ctx = st.Collect(session, scope, run, client, now or run.started_at, pins or {}, sleep, report_limit)
+    ctx = st.Collect(session, scope, run, client, now or run.started_at, pins or {}, sleep, report_limit,
+                     context=dict(run.context or {}))
     if ctx.now.tzinfo is None:
         ctx.now = ctx.now.replace(tzinfo=timezone.utc)
     for key, label, fn, needs, _ in STAGES:

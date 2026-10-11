@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import time
 
-from .. import connections
+from .. import connections, jobs
 from .. import models as m
 from ..collector import run as collector
 from ..jobs import JobContext, JobOutcome, job
@@ -38,4 +38,6 @@ def audit_collect(ctx: JobContext) -> JobOutcome:
         if callable(close):
             close()
     ctx.note("audit_runs", run.id)
+    if run.status in ("ready", "partial"):
+        jobs.emit(ctx.session, ctx.scope, "audit.analyze", {"run_id": run.id}, dedupe=run.id)
     return JobOutcome(f"audit run {run.id}: {run.status}")

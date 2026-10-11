@@ -12,7 +12,10 @@ Enforces the core agency guardrails:
 from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
+from datetime import timedelta
 from typing import Any, Dict, List, Optional
+
+from .snapshot import MissingData, Snapshot, last_full, parse_dt, ref
 
 
 @dataclass
@@ -225,3 +228,156 @@ class OpportunitySizingEngine:
             dependency_gate=dependency,
             dedupe_assigned_pool=dedupe_pool,
         )
+
+
+# ---------------------------------------------------------------- measured sizing (audit runs)
+#
+# Every lever is  pool x rate x value per order x months, with the pool and the value measured from the
+# account and the rate an explicit assumption range (attributed recovery is not incremental, so these
+# are conservative incremental rates). A lever whose pool or value can't be measured is "not_sized",
+# never filled in. Funnel pools are nested so no shopper is counted twice: checkout abandoners exclude
+# buyers, cart abandoners exclude checkout starters, browsers exclude cart adders.
+
+MIN_ORDERS_FOR_AOV = 30
+RECENT_MONTHS = 3
+
+# lever: (label, pool key, rate low/base/high, months, rate basis)
+LEVERS: dict[str, tuple[str, str, tuple[float, float, float], int, str]] = {
+    "abandoned_checkout": ("Abandoned checkout recovery", "checkout_abandoners", (0.02, 0.035, 0.05), 12,
+                           "incremental orders per checkout abandoner reached by a 3-message flow"),
+    "abandoned_cart": ("Added-to-cart recovery", "cart_abandoners", (0.008, 0.015, 0.025), 12,
+                       "incremental orders per cart abandoner who didn't start checkout"),
+    "browse_abandonment": ("Browse abandonment", "browsers", (0.002, 0.004, 0.007), 12,
+                           "incremental orders per identified product viewer who didn't add to cart"),
+    "welcome": ("Welcome series", "new_subscribers", (0.02, 0.04, 0.06), 12,
+                "incremental first orders per new email subscriber"),
+    "post_purchase": ("Post-purchase second order", "first_time_buyers", (0.01, 0.02, 0.03), 12,
+                      "added second orders per first-time buyer"),
+    "replenishment": ("Reorder timing", "first_time_buyers", (0.005, 0.01, 0.02), 12,
+                      "added reorders per first-time buyer from timing follow-ups to the measured reorder gap"),
+    "winback": ("Lapsed buyer winback", "lapsed_buyers", (0.01, 0.02, 0.04), 1,
+                "reactivated buyers per lapsed buyer, once a year"),
+}
+
+
+def _monthly_unique(snap: Snapshot, key: str) -> tuple[Optional[float], str, str]:
+    """(average unique profiles a month over the last full months, basis, ref) or (None, reason, ref)."""
+    try:
+        buckets = [b for b in last_full(snap.monthly(key, "unique"), RECENT_MONTHS) if b.value is not None]
+    except MissingData as e:
+        return None, e.reason, e.ref
+    if not buckets:
+        return None, f"no full month of {key} uniques", ref("totals", "aggregates", key)
+    avg = sum(b.value for b in buckets) / len(buckets)
+    return avg, f"{key} unique profiles a month, average of {', '.join(b.label for b in buckets)}", \
+        ref("totals", "aggregates", key, "current")
+
+
+def _orders_12m(snap: Snapshot) -> tuple[list[dict], Optional[Any]]:
+    data = snap.load("orders")
+    end = parse_dt(data.get("end")) or snap.as_of
+    if end is None:
+        raise MissingData("placed-orders-24mo.json has no end date", ref("orders", "end"))
+    seen: set = set()
+    rows = []
+    for r in data.get("orders") or []:
+        t = parse_dt(r.get("t"))
+        if t is None or t < end - timedelta(days=365) or (r.get("o") is not None and r["o"] in seen):
+            continue
+        seen.add(r.get("o"))
+        rows.append(r)
+    return rows, end
+
+
+def measured_inputs(snap: Snapshot) -> dict[str, dict]:
+    """Every sizing input as {value, unit, basis, ref} or {value: None, reason, ref}."""
+    out: dict[str, dict] = {}
+
+    def put(key, value, unit, basis, where):
+        out[key] = ({"value": round(value, 2), "unit": unit, "basis": basis, "ref": where} if value is not None
+                    else {"value": None, "unit": unit, "reason": basis, "ref": where})
+
+    try:
+        rows, end = _orders_12m(snap)
+        valued = [float(r.get("v") or 0) for r in rows if float(r.get("v") or 0) > 0]
+        if len(valued) >= MIN_ORDERS_FOR_AOV:
+            put("aov", sum(valued) / len(valued), "USD", f"mean of {len(valued)} orders with a value, last 12 months",
+                ref("orders", "orders"))
+        else:
+            put("aov", None, "USD", f"only {len(valued)} valued orders in 12 months (needs {MIN_ORDERS_FOR_AOV})",
+                ref("orders", "orders"))
+        hist = snap.order_history()
+        firsts = [t[0] for t in hist.by_profile.values() if t and t[0] >= end - timedelta(days=365)]
+        put("first_time_buyers", len(firsts) / 12 if firsts else None, "buyers/month",
+            f"profiles whose first observed order is in the last 12 months ({len(firsts)}), per month"
+            if firsts else "no first-time buyers in the last 12 months", ref("orders", "orders"))
+        median, _, n = snap.median_repeat_gap()
+        if median is not None and n >= 10:
+            lo = end - timedelta(days=365)
+            hi = end - timedelta(days=2 * median)
+            lapsed = sum(1 for t in hist.by_profile.values() if t and lo <= t[-1] <= hi)
+            put("lapsed_buyers", lapsed or None, "buyers/year",
+                f"buyers whose last order is 2x the median reorder gap ({median:.0f} days) to 12 months old"
+                if lapsed else "no buyers in the lapsed window", ref("orders", "orders"))
+        else:
+            put("lapsed_buyers", None, "buyers/year",
+                f"the reorder gap needs 10 repeat buyers ({n} observed)", ref("orders", "orders"))
+    except MissingData as e:
+        for key, unit in (("aov", "USD"), ("first_time_buyers", "buyers/month"), ("lapsed_buyers", "buyers/year")):
+            put(key, None, unit, e.reason, e.ref)
+
+    funnel = {k: _monthly_unique(snap, k) for k in ("placed_order", "started_checkout", "added_to_cart", "viewed_product")}
+    for pool, (upper, lower) in {"checkout_abandoners": ("started_checkout", "placed_order"),
+                                 "cart_abandoners": ("added_to_cart", "started_checkout"),
+                                 "browsers": ("viewed_product", "added_to_cart")}.items():
+        (top, top_basis, top_ref), (below, below_basis, _) = funnel[upper], funnel[lower]
+        if top is None or below is None:
+            put(pool, None, "profiles/month", top_basis if top is None else below_basis, top_ref)
+        else:
+            put(pool, max(top - below, 0.0) or None, "profiles/month",
+                f"{upper} minus {lower} unique profiles a month (nested, so nobody is counted twice)"
+                if top > below else f"{upper} uniques don't exceed {lower}", top_ref)
+    subs, basis, where = _monthly_unique(snap, "subscribed_email")
+    put("new_subscribers", subs, "subscribers/month", basis, where)
+    return out
+
+
+def size_levers(snap: Snapshot, levers: list[str]) -> dict[str, dict]:
+    """Each requested lever, sized from measured inputs or marked not_sized with the reason.
+    Levers sharing a pool are sized once each but flagged so totals count the pool once (see total_of)."""
+    inputs = measured_inputs(snap)
+    out: dict[str, dict] = {}
+    for lever in levers:
+        if lever not in LEVERS:
+            continue
+        label, pool_key, (lo, base, hi), months, rate_basis = LEVERS[lever]
+        pool, aov = inputs[pool_key], inputs["aov"]
+        row = {"lever": lever, "label": label, "pool_key": pool_key, "pool": pool, "value_per_order": aov,
+               "rate": {"low": lo, "base": base, "high": hi, "basis": f"assumption: {rate_basis}"},
+               "months": months, "formula": "pool x rate x value per order x months", "evidence_class": "inferred"}
+        missing = [n for n, x in (("pool", pool), ("value per order", aov)) if x.get("value") is None]
+        if missing:
+            row.update(status="not_sized", reason="; ".join(f"{n}: {x.get('reason')}" for n, x in
+                                                            (("pool", pool), ("value per order", aov)) if x.get("value") is None))
+        else:
+            calc = lambda r: round(pool["value"] * r * aov["value"] * months, 2)  # noqa: E731
+            row.update(status="sized", annual={"low": calc(lo), "base": calc(base), "high": calc(hi)},
+                       monthly_base=round(calc(base) / 12, 2))
+        out[lever] = row
+    return out
+
+
+def total_of(sized: list[dict]) -> dict:
+    """Low/base/high totals over sized levers in rank order, counting each pool once."""
+    used: set = set()
+    total = {"low": 0.0, "base": 0.0, "high": 0.0}
+    counted = []
+    for s in sized:
+        if s.get("status") != "sized" or s["pool_key"] in used:
+            continue
+        used.add(s["pool_key"])
+        counted.append(s["lever"])
+        for k in total:
+            total[k] = round(total[k] + s["annual"][k], 2)
+    return {"annual": total, "levers_counted": counted,
+            "rule": "each customer pool counted once, by the highest-ranked lever that uses it"}

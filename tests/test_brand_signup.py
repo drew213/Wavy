@@ -140,6 +140,8 @@ def test_brand_questionnaire_autosaves_and_feeds_the_audit(env):
     jobs.run_pending(factory, _services(vault, httpx.MockTransport(fake_klaviyo())), limit=10)
     d = brand.get(f"/v1/ops/clients/{slug}/audit").json()["result"]["dossier"]
     assert d["intake"]["success"] == ANSWERS["success"]
+    with factory() as s:
+        assert s.get(m.AuditRun, d["klaviyo"]["full_audit"]["run_id"]).context == {"store_platform": "WooCommerce"}
     assert d["brand_identity"]["tone_descriptors"] == ["calm", "expert", "warm"]
     assert d["campaign_directives"]["allowed_discounts"] == "VALUE_ADD_ONLY"
     assert d["economics"]["free_shipping_threshold"] == 60

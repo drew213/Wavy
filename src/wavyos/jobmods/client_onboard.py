@@ -11,6 +11,8 @@ import uuid
 
 from .. import connections, jobs, klaviyo_intake
 from .. import models as m
+from ..collector import budget
+from ..collector import run as collector
 from ..connectors.shopify import ShopifyClient
 from ..jobs import JobContext, JobOutcome, job
 from ..onboarding import ClientOnboardingService, OnboardingIntakePayload
@@ -55,7 +57,7 @@ def _human_scope(ctx: JobContext, requested_by: str | None):
     return scope if scope.actor.roles & {"org_admin", "account_lead"} else ctx.scope
 
 
-def _klaviyo(ctx: JobContext, progress: Progress, platform: str | None = None):
+def _klaviyo(ctx: JobContext, progress: Progress, platform: str | None = None, continuation: bool = False):
     """(klaviyo section, cohort) from the client's connected Klaviyo account, or (None, None)."""
     vault, make_client = ctx.services.get("vault"), ctx.services.get("klaviyo_factory")
     conns = connections.active(ctx.session, ctx.scope, "klaviyo")
@@ -74,8 +76,20 @@ def _klaviyo(ctx: JobContext, progress: Progress, platform: str | None = None):
             close = getattr(client, "close", None)
             if callable(close):
                 close()
+    if not continuation:
+        section["full_audit"] = _start_full_audit(ctx, conn, platform)
     label = section["account"].get("name") or conn.external_account_id
     return section, cohort_from_orders(ctx.session, ctx.scope, label, source=KLAVIYO)
+
+
+def _start_full_audit(ctx: JobContext, conn: m.Connection, platform: str | None) -> dict:
+    """Queue the collector run (audit.collect, then audit.analyze) behind this first look."""
+    try:
+        run = collector.start(ctx.session, ctx.scope, conn, started_by=f"job:{ctx.run.id}"[:80],
+                              context={"store_platform": platform})
+    except budget.BudgetExceeded as e:
+        return {"run_id": None, "status": "deferred", "reason": str(e)}
+    return {"run_id": run.id, "status": run.status}
 
 
 def _shopify_cohort(ctx: JobContext, payload: OnboardingIntakePayload):
@@ -105,7 +119,8 @@ def client_onboard(ctx: JobContext) -> JobOutcome:
     raw = (ctx.run.trigger or {}).get("payload") or {}
     payload, requested_by = _payload(raw)
     progress = Progress(ctx.session, ctx.scope, ctx.run.id, STAGES)
-    klaviyo, klaviyo_cohort = _klaviyo(ctx, progress, (payload.intake or {}).get("store_platform"))
+    klaviyo, klaviyo_cohort = _klaviyo(ctx, progress, (payload.intake or {}).get("store_platform"),
+                                       continuation=bool(raw.get("continuation")))
     shopify_cohort = _shopify_cohort(ctx, payload)
     cohort = shopify_cohort or klaviyo_cohort
     source = "shopify" if shopify_cohort else KLAVIYO if klaviyo_cohort else ""

@@ -71,9 +71,9 @@ ORDERS = [_order(n) for n in range(30)]
 
 
 class FakeKlaviyo:
-    def __init__(self, *, account="ACC1", page=5, crash_on_event_page=None, reports_fail=False):
+    def __init__(self, *, account="ACC1", page=5, crash_on_event_page=None, reports_fail=False, dormant="WOO"):
         self.account, self.page, self.crash_on = account, page, crash_on_event_page
-        self.reports_fail = reports_fail
+        self.reports_fail, self.dormant = reports_fail, dormant
         self.calls: list[tuple[str, str, dict]] = []
         self.event_pages = 0
         self.since = None
@@ -142,7 +142,8 @@ class FakeKlaviyo:
             dates = [(start + timedelta(days=31 * k)).replace(day=1).isoformat() for k in range(12)]
             dims = {"$attributed_channel": ["$email_channel", "$sms_channel", ""], "Inbox Provider": ["Gmail", "Yahoo"],
                     "Bounce Type": ["hard", "soft"]}.get((attrs.get("by") or [None])[0], [None])
-            rows = [{"dimensions": [d] if d is not None else [], "measurements": {k: [10.0] * 12 for k in attrs["measurements"]}}
+            level = 0.0 if attrs["metric_id"] == self.dormant else 10.0
+            rows = [{"dimensions": [d] if d is not None else [], "measurements": {k: [level] * 12 for k in attrs["measurements"]}}
                     for d in dims]
             return httpx.Response(200, json={"data": {"type": "metric-aggregate", "attributes": {"dates": dates, "data": rows}}})
         if path in ("/api/flow-values-reports", "/api/campaign-values-reports", "/api/form-values-reports"):
@@ -197,6 +198,8 @@ def test_full_run_produces_every_snapshot_file_and_the_engine_scores_it(session,
     assert snap.missing("snapshot") == []
     assert snap.timezone_name == "America/New_York"
     assert snap.metric_choice("placed_order")["id"] == "PO1"
+    assert "dormant" in snap.at("totals", "metricChoices", "placed_order", "reason")
+    assert snap.at("totals", "activity") == {"PO1": 120, "WOO": 0}
     assert len(snap.order_history().by_profile) == 12 and snap.order_history().orders == 30
     assert snap.at("templates", "overGmailClipThreshold") == 1  # T2 is over 102,400 bytes; T4 is in a draft flow
     assert {t["templateId"] for t in snap.at("templates", "templates")} == {"T1", "T2", "T3"}
@@ -205,6 +208,8 @@ def test_full_run_produces_every_snapshot_file_and_the_engine_scores_it(session,
     assert not [k for k, r in results.items() if r.verdict == "error"], {k: r.message for k, r in results.items() if r.verdict == "error"}
     assert results["DAT-05"].verdict == "pass", results["DAT-05"].message
     assert results["CRV-01"].verdict in ("warn", "fail")
+    assert results["DAT-01"].verdict == "warn" and "dormant" in results["DAT-01"].message
+    assert results["DAT-01"].value["dormant_candidates"] == ["WOO"]
 
     first = run.stages["first_look"]["summary"]
     assert first["preliminary"] and first["flows"] == {
@@ -354,9 +359,13 @@ def test_the_job_runs_the_audit_with_the_vaulted_key(factory, session, shop, vau
     fake = FakeKlaviyo()
     done = jobs.run_pending(factory, {"vault": vault, "klaviyo_factory": lambda key: KlaviyoClient(
         key, transport=fake.transport(), pace=False, sleep=lambda s: None), "sleep": lambda s: None})
-    assert [(j.job_key, j.status) for j in done] == [("audit.collect", "succeeded")], [j.error for j in done]
+    assert [(j.job_key, j.status) for j in done] == [("audit.collect", "succeeded"), ("audit.analyze", "succeeded")], \
+        [j.error for j in done]
     session.expire_all()
-    assert session.get(m.AuditRun, run.id).status == "ready"
+    run = session.get(m.AuditRun, run.id)
+    assert run.status == "ready" and run.scorecard_id
+    summary = session.get(m.Scorecard, run.scorecard_id).summary
+    assert summary["audit_run_id"] == run.id and summary["opportunities"][0]["check_id"] == "DAT-01"
     again = jobs.run_pending(factory, {"vault": vault, "klaviyo_factory": lambda key: fake.client()})
     assert again == []
     actions = list(session.scalars(select(m.Event.action).where(m.Event.client_id == world.a.id)))

@@ -28,7 +28,7 @@ from ..connectors.klaviyo import REVISION, KlaviyoError
 from ..scope import Scope
 from . import budget
 from .boundaries import boundary_to_utc, month_start, window_to_utc
-from .metrics import PinError, describe, flatten, pick_metric
+from .metrics import PinError, describe, ecommerce_candidates, flatten, pick_metric, recent_activity
 from .order_items import item_names
 
 STATISTICS = [
@@ -148,6 +148,7 @@ class Collect:
     sleep: Callable[[float], None] = time.sleep
     report_limit: int = budget.REPORT_DAILY_LIMIT
     stage: str = ""
+    context: dict = field(default_factory=dict)
 
     # artifacts --------------------------------------------------------------
 
@@ -234,6 +235,17 @@ class Collect:
     def metrics(self) -> list[dict]:
         return self.artifact("totals").get("metrics") or []
 
+    @property
+    def platform(self) -> Optional[str]:
+        return self.context.get("store_platform") or None
+
+    def choose(self, metrics: list[dict], names: list[str], prefer: Optional[str]) -> dict:
+        """pick_metric with this run's pins, store platform and measured activity (ecommerce metrics only)."""
+        if prefer != "ecommerce":
+            return pick_metric(metrics, names, prefer, self.pins)
+        activity = self.artifact("totals").get("activity") or None
+        return pick_metric(metrics, names, prefer, self.pins, activity=activity, platform=self.platform)
+
 
 # ---------------------------------------------------------------- stage 0: verify
 
@@ -273,11 +285,14 @@ def first_look(c: Collect) -> dict:
     metrics = [flatten(r) for r in res["rows"]]
     c.merge("api", metrics={"ok": True, "count": len(metrics), "truncated": res["truncated"],
                             "items": [compact(r) for r in res["rows"]]})
-    choice = pick_metric(metrics, "Placed Order", "ecommerce", c.pins)
-    placed = choice["metric"]
     totals = c.artifact("totals")
     totals["metrics"] = metrics
-    totals["metricChoices"]["placed_order"] = describe(choice)
+    totals["activity"] = commerce_activity(c, metrics)
+    c.save("totals", totals)
+    choice = c.choose(metrics, ["Placed Order"], "ecommerce")
+    placed = choice["metric"]
+    totals = c.artifact("totals")
+    totals["metricChoices"]["placed_order"] = describe(choice, totals["activity"])
     c.save("totals", totals)
 
     flows = get_all(c.client, "/api/flows/", {"page[size]": 50}, 40)
@@ -302,6 +317,17 @@ def first_look(c: Collect) -> dict:
     c.save("perf", perf)
     summary = first_look_summary(c.artifact("api"), perf, c.artifact("totals"), choice)
     return {"detail": summary["headline"], "summary": summary}
+
+
+def commerce_activity(c: Collect, metrics: list[dict]) -> dict[str, Optional[int]]:
+    """Last-90-day event counts for every ecommerce metric that has a same-named twin from another
+    integration (a platform switch leaves the old store's copy behind). One aggregate call each."""
+    ids: list[str] = []
+    for names in {tuple(s["names"]) for s in AGGREGATES if s.get("prefer") == "ecommerce"}:
+        cands = ecommerce_candidates(metrics, list(names))
+        if len(cands) > 1:
+            ids += [str(x["id"]) for x in cands if str(x["id"]) not in ids]
+    return recent_activity(c.client, ids, c.now, tz=c.timezone) if ids else {}
 
 
 def _sum_series(rows: list[dict], measurement: str) -> dict[str, float]:
@@ -515,12 +541,12 @@ def totals(c: Collect) -> dict:
                       "reason": "Explicit metric ID"}
         else:
             try:
-                choice = pick_metric(metrics, spec["names"], spec.get("prefer"), c.pins)
+                choice = c.choose(metrics, spec["names"], spec.get("prefer"))
             except PinError as e:
                 t["aggregates"][key] = {"error": str(e)}
                 t["errors"].append({"ok": False, "label": key, "error": {"message": str(e)}})
                 continue
-        t["metricChoices"][key] = describe(choice)
+        t["metricChoices"][key] = describe(choice, t.get("activity") if spec.get("prefer") == "ecommerce" else None)
         metric = choice["metric"]
         if metric is None:
             t["aggregates"][key] = ({"ambiguous": True, "error": choice["reason"]} if choice["status"] == "ambiguous"

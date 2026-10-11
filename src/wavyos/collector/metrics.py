@@ -86,9 +86,11 @@ def resolve_pinned(metrics: list[dict], names: Iterable[str], pins: Optional[dic
 
 
 ACTIVITY_DAYS = 90
+DOMINANT_SHARE = 0.8  # DAT-01's fail line: below this share the source is genuinely split
 
 
-def recent_activity(client, metric_ids: Iterable[str], now: datetime, days: int = ACTIVITY_DAYS) -> dict[str, Optional[int]]:
+def recent_activity(client, metric_ids: Iterable[str], now: datetime, days: int = ACTIVITY_DAYS,
+                    tz: str = "UTC") -> dict[str, Optional[int]]:
     """Events per metric in the last `days`: {metric id: count, or None when Klaviyo wouldn't say}.
 
     Used only to tell a live order source from a dormant one with the same name, so a failed read is
@@ -98,7 +100,8 @@ def recent_activity(client, metric_ids: Iterable[str], now: datetime, days: int 
     start = now - timedelta(days=days)
     for mid in metric_ids:
         try:
-            agg = client.metric_aggregate(mid, measurements=["count"], start=start, end=now, interval="month")
+            agg = client.metric_aggregate(mid, measurements=["count"], start=start, end=now, interval="month",
+                                          timezone_name=tz)
         except Exception:  # noqa: BLE001 - any failure means "unknown", which is the safe answer
             out[mid] = None
             continue
@@ -137,10 +140,12 @@ def pick_metric(metrics: list[dict], names: str | list[str], prefer: Optional[st
     if prefer == "ecommerce":
         shopify = [m for m in candidates if _SHOPIFY.search(_integration_text(m))]
         ecommerce = [m for m in candidates if _ECOMMERCE.search(_integration_text(m))]
-        if activity is not None or platform:
+        asked = {k: v for k, v in (activity or {}).items() if any(m.get("id") == k for m in candidates)}
+        known = {k: v for k, v in asked.items() if v is not None}
+        if asked or platform:
             pool, notes = ecommerce or candidates, []
-            if activity is not None and len(pool) > 1:
-                live = [m for m in pool if activity.get(m.get("id")) is None or (activity.get(m.get("id")) or 0) > 0]
+            if known and len(pool) > 1:
+                live = [m for m in pool if known.get(m.get("id"), 1) > 0]
                 if live and len(live) < len(pool):
                     notes.append(f"{len(pool) - len(live)} dormant copy (no events in {ACTIVITY_DAYS} days) set aside")
                     pool = live
@@ -149,6 +154,15 @@ def pick_metric(metrics: list[dict], names: str | list[str], prefer: Optional[st
                 if match:
                     notes.append(f"matches the store platform ({platform})")
                     pool = match
+            if len(pool) > 1 and all(m.get("id") in known for m in pool):
+                total = sum(known[m["id"]] for m in pool)
+                top = max(pool, key=lambda m: known[m["id"]])
+                if total and known[top["id"]] / total >= DOMINANT_SHARE:
+                    notes.append(f"{known[top['id']] / total:.0%} of recent events")
+                    pool = [top]
+            if len(pool) > 1 and not asked and any(m in shopify for m in pool):
+                pool = [m for m in pool if m in shopify]
+                notes.append("Shopify preferred: no event counts to compare")
             reason = "Ecommerce order source with recent orders" + (f"; {'; '.join(notes)}" if notes else "")
         elif shopify:
             pool, reason = shopify, "Canonical Shopify commerce source"
@@ -174,10 +188,14 @@ def pick_metric(metrics: list[dict], names: str | list[str], prefer: Optional[st
     return {"metric": pool[0], "candidates": candidates, "status": "selected", "reason": reason}
 
 
-def describe(choice: dict) -> dict:
-    """The metricChoices entry step 38 writes: {used, candidates, otherCandidates, status, reason}."""
+def describe(choice: dict, activity: Optional[dict[str, Optional[int]]] = None) -> dict:
+    """The metricChoices entry step 38 writes: {used, candidates, otherCandidates, status, reason}.
+    With `activity`, each candidate carries events_last_90_days (None: Klaviyo wouldn't say)."""
     def summary(m: dict) -> dict:
-        return {"id": m.get("id"), "name": m.get("name"), "integration": integration_name(m)}
+        out = {"id": m.get("id"), "name": m.get("name"), "integration": integration_name(m)}
+        if activity is not None and m.get("id") in activity:
+            out["events_last_90_days"] = activity[m.get("id")]
+        return out
     used = choice.get("metric")
     cands = choice.get("candidates") or []
     return {"used": summary(used) if used else None, "candidates": [summary(m) for m in cands],

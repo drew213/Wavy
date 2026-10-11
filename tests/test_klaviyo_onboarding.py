@@ -164,6 +164,8 @@ def test_klaviyo_key_alone_produces_a_measured_audit(env):
         assert s.scalar(select(func.count()).select_from(m.CommerceOrder)) == 4
         conn = s.scalar(select(m.Connection).where(m.Connection.provider == "klaviyo"))
         assert conn.external_account_id == "ACC1"
+        audit = s.get(m.AuditRun, d["klaviyo"]["full_audit"]["run_id"])
+        assert audit.connection_id == conn.id and audit.status != "queued"
     assert KEY not in json.dumps(run.trigger) and KEY not in json.dumps(body)
     assert not db_file.exists() or KEY.encode() not in db_file.read_bytes()  # no file on Postgres runs
 
