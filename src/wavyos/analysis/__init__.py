@@ -17,14 +17,14 @@ from sqlalchemy.orm import Session
 
 from .. import models as m
 from ..audit.snapshot import MissingData, Snapshot
-from . import (capture_reach, cohorts, complaints, flow_history, journey_graph, kpi_scorecard, messages, performance,
-               program, promotions, subscriptions)
+from . import (capture_reach, cohorts, complaints, flow_categories, flow_history, journey_graph, kpi_scorecard, messages,
+               performance, program, promotions, subscriptions)
 from .base import Analysis
 
 log = logging.getLogger(__name__)
 
-MODULES = (kpi_scorecard, performance, cohorts, flow_history, complaints, journey_graph, program, promotions,
-           capture_reach, subscriptions, messages)
+MODULES = (kpi_scorecard, performance, cohorts, flow_history, flow_categories, complaints, journey_graph, program,
+           promotions, capture_reach, subscriptions, messages)
 ARTIFACT = "analysis"
 LABEL_MAX = 300
 

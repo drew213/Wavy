@@ -24,10 +24,21 @@ def playbooks() -> dict[str, Any]:
         return json.load(fh)
 
 
+def confidence(record: Optional[dict]) -> float:
+    """How far a playbook's track record moves its rank: 1.0 with no decided outcomes, up to 1.5 when it has
+    kept working and down to 0.5 when it hasn't (wavyos.loop.outcomes.track_record)."""
+    r = record or {}
+    n = r.get("improved", 0) + r.get("flat", 0) + r.get("worse", 0)
+    if not n:
+        return 1.0
+    return max(0.5, min(1.5, 1 + (r.get("improved", 0) - r.get("worse", 0)) / (n + 2)))
+
+
 def _rank_key(card: dict) -> tuple:
     sized = card["sizing"] if card.get("sizing") and card["sizing"].get("status") == "sized" else None
-    per_day = sized["annual"]["base"] / max(card["effort_days"], 1) if sized else 0.0
-    return (card["category"] != "fix_first", sized is None, -per_day,
+    conf = confidence(card.get("track_record"))
+    per_day = sized["annual"]["base"] / max(card["effort_days"], 1) * conf if sized else 0.0
+    return (card["category"] != "fix_first", sized is None, -per_day, -conf,
             -SEVERITY_WEIGHT.get(card["severity"], 2), card["verdict"] != "fail", card["id"])
 
 
@@ -47,9 +58,10 @@ def _finding_card(f: dict, sizing: dict) -> dict:
 
 
 def build(snap: Snapshot, results: dict[str, dict], specs: dict[str, dict], findings: Optional[list[dict]] = None,
-          unavailable: Optional[dict[str, str]] = None) -> dict[str, Any]:
+          unavailable: Optional[dict[str, str]] = None, record: Optional[dict[str, dict]] = None) -> dict[str, Any]:
     """results: {check_id: {verdict, message, evidence, value}}; findings: analysis findings (Finding.as_dict);
-    unavailable: {analysis module: reason}. Returns {opportunities, sizing, total, gaps}."""
+    unavailable: {analysis module: reason}; record: decided outcomes per playbook (check id or finding id),
+    which nudge ranking. Returns {opportunities, sizing, total, gaps}."""
     book = playbooks()["playbooks"]
     findings = findings or []
     hits = [cid for cid, r in results.items() if r["verdict"] in ("warn", "fail") and cid in book]
@@ -66,6 +78,10 @@ def build(snap: Snapshot, results: dict[str, dict], specs: dict[str, dict], find
             "outcome": pb["outcome"], "steps": pb["steps"], "effort_days": pb["effort_days"], "readout": pb["readout"],
             "sizing": lever, "status": "Proposed", "owner": "UNCONFIRMED",
         })
+    for card in cards:
+        key = card.get("check_id") or card.get("finding_id")
+        if record and key in record:
+            card["track_record"] = record[key]
     cards.sort(key=_rank_key)
     for i, card in enumerate(cards, 1):
         card["rank"] = i

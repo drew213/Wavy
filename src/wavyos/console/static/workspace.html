@@ -372,27 +372,31 @@ const INFO = icon('<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d=
 const NAV = [
   { id: "opportunities", eyebrow: "01 / DECIDE", title: "What to fix first", sub: "Every finding from the audit, ranked: the fixes that unblock everything else first, then value against the work it takes.",
     icon: '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>' },
-  { id: "foundational", eyebrow: "02 / DIAGNOSE", title: "Foundational report", sub: "Every check in the library against this account: what passed, what didn't, and what we couldn't see.",
+  { id: "report", eyebrow: "02 / REPORT", title: "Monthly report", sub: "The month on one page: your KPIs, every flow category with its third-party twins, what changed and how approved work read out.",
+    icon: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 13H8"/><path d="M16 17H8"/><path d="M16 13h-2"/>' },
+  { id: "changes", eyebrow: "03 / CHANGE", title: "What changed", sub: "This audit against the last one, on the same check library: the score, checks that moved, metrics that moved and opportunities opened or closed.",
+    icon: '<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>' },
+  { id: "foundational", eyebrow: "04 / DIAGNOSE", title: "Foundational report", sub: "Every check in the library against this account: what passed, what didn't, and what we couldn't see.",
     icon: '<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>' },
-  { id: "performance", eyebrow: "03 / MEASURE", title: "Performance", sub: "Store revenue against what email and SMS are credited with, by month, by flow and by order source.",
+  { id: "performance", eyebrow: "05 / MEASURE", title: "Performance", sub: "Store revenue against what email and SMS are credited with, by month, by flow and by order source.",
     icon: '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>' },
-  { id: "cohorts", eyebrow: "04 / RETAIN", title: "Customer cohorts", sub: "How often first-time buyers come back, and what they're worth, at 30 to 365 days.",
+  { id: "cohorts", eyebrow: "06 / RETAIN", title: "Customer cohorts", sub: "How often first-time buyers come back, and what they're worth, at 30 to 365 days.",
     icon: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>' },
-  { id: "journeys", eyebrow: "05 / JOURNEYS", title: "Customer journeys", sub: "Every flow mapped to the customer lifecycle: what's live, what's silent, what's missing.",
+  { id: "journeys", eyebrow: "07 / JOURNEYS", title: "Customer journeys", sub: "Every flow mapped to the customer lifecycle: what's live, what's silent, what's missing.",
     icon: '<line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>' },
-  { id: "calendar", eyebrow: "06 / PROGRAM", title: "Send history", sub: "A year of campaigns week by week, the peak season, and which promotions actually won.",
+  { id: "calendar", eyebrow: "08 / PROGRAM", title: "Send history", sub: "A year of campaigns week by week, the peak season, and which promotions actually won.",
     icon: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>' },
-  { id: "capture", eyebrow: "07 / GROW", title: "Capture & reach", sub: "Sign-up forms, list growth net of unsubscribes, sendable reach and subscriptions.",
+  { id: "capture", eyebrow: "09 / GROW", title: "Capture & reach", sub: "Sign-up forms, list growth net of unsubscribes, sendable reach and subscriptions.",
     icon: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>' },
-  { id: "deliverability", eyebrow: "08 / PROTECT", title: "Deliverability & messages", sub: "Where complaints and unsubscribes come from, and what's wrong inside the live emails.",
+  { id: "deliverability", eyebrow: "10 / PROTECT", title: "Deliverability & messages", sub: "Where complaints and unsubscribes come from, and what's wrong inside the live emails.",
     icon: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>' },
-  { id: "plan", eyebrow: "09 / ACT", title: "90-day plan", sub: "The phases and week-by-week plan, the first month of work and the drafts prepared for it. Proposed until you approve it.",
+  { id: "plan", eyebrow: "11 / ACT", title: "90-day plan", sub: "The phases and week-by-week plan, the first month of work and the drafts prepared for it. Proposed until you approve it.",
     icon: '<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>' },
-  { id: "answers", eyebrow: "10 / CONTEXT", title: "Onboarding answers", sub: "Everything the brand told us in lifecycle onboarding, in their words.",
+  { id: "answers", eyebrow: "12 / CONTEXT", title: "Onboarding answers", sub: "Everything the brand told us in lifecycle onboarding, in their words.",
     icon: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>' },
-  { id: "brand", eyebrow: "11 / RULES", title: "Brand & guardrails", sub: "Voice, economics and the rules every message follows.",
+  { id: "brand", eyebrow: "13 / RULES", title: "Brand & guardrails", sub: "Voice, economics and the rules every message follows.",
     icon: '<path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>' },
-  { id: "sources", eyebrow: "12 / EVIDENCE", title: "Sources & definitions", sub: "Where every number comes from: the run, the metric choices, every fact and its basis.",
+  { id: "sources", eyebrow: "14 / EVIDENCE", title: "Sources & definitions", sub: "Where every number comes from: the run, the metric choices, every fact and its basis.",
     icon: '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>' },
 ];
 const STATE_TEXT = { queued: "Not started", collecting: "Collecting", partial: "Partly measured", unavailable: "Unavailable", awaiting_review: "In review" };
@@ -516,6 +520,8 @@ function story(s) {
   if (n.ultimate_journey?.length) extra += table("story.journey", n.ultimate_journey, [["stage", "Stage", "text"], ["node", "Flow or message", "text"], ["trigger", "Trigger", "text"], ["status", "Build", "text"], ["detail", "What changes", "text"]], { title: "The ultimate journey", note: "Proposed: live means keep, fix means change what's running, build means new." });
   if (n.calendar_90d?.length) extra += `<div class="panel"><div class="panel-head"><div><h2>The next 90 days of sends</h2><p>Proposed. Nothing is scheduled until you approve it.</p></div></div>
       <div class="weeks-list">${n.calendar_90d.map(w => `<div class="week"><b>WEEK ${esc(w.week)}</b><div><strong>${esc(w.theme)}</strong><ul>${(w.sends || []).map(x => `<li>${esc(x.channel)} · ${esc(x.segment)}: ${esc(x.idea)}${x.offer && x.offer !== "none" ? ` · ${esc(x.offer)}` : ""}</li>`).join("")}</ul></div></div>`).join("")}</div></div>`;
+  if (n.summary?.length) extra += `<div class="panel"><div class="panel-head"><div><h2>Executive summary</h2><p>Written from the numbers on this page and reviewed by your strategist.</p></div></div>${n.summary.map(p => `<p style="margin-top:10px">${esc(p)}</p>`).join("")}</div>`;
+  if (n.next_month?.length) extra += table("story.next_month", n.next_month, [["move", "Next month", "text"], ["owner", "Owner", "text"], ["kpi", "KPI", "text"], [r => F(r.baseline_fact) ? fmtFact(F(r.baseline_fact)) ?? "unavailable" : "—", "Baseline", "text"]], { title: "Three moves for next month", note: "Proposed until you approve them." });
   if (n.phases?.length) extra += n.phases.map(p => table(`story.phase.${p.name}`, p.items || [], [["week", "Week", "text"], ["ships", "What ships", "text"], ["owner", "Owner", "text"], ["depends_on", "Needs", "text"], ["kpi", "KPI", "text"], [r => F(r.baseline_fact) ? fmtFact(F(r.baseline_fact)) ?? "unavailable" : "—", "Baseline", "text"]],
     { title: `${p.name} · weeks ${p.weeks}`, note: p.goal })).join("");
   return `<section class="story" aria-label="Strategist's read"><div class="story-head"><span class="eyebrow">STRATEGIST'S READ</span><span class="tag live">${n.status === "edited" ? "Reviewed and edited" : "Reviewed"}${when}</span></div>
@@ -584,7 +590,7 @@ const VIEWS = {
         <p class="op-observation">${esc(sel.observation)}</p>
         ${sel.evidence_text ? `<p class="op-evidence">${esc(sel.evidence_text)}</p>` : (sel.evidence || []).length ? `<p class="op-evidence">${(sel.evidence || []).slice(0, 4).map(e => esc(e.note || e.detail || e.ref || "")).filter(Boolean).join(" · ")}</p>` : ""}
         <div class="op-outcome"><span class="op-label">OUTCOME TO AIM FOR</span><p>${esc(sel.outcome)}</p>
-          <small>Read out: ${esc(sel.readout?.metric || "")}${sel.readout?.days ? `, after ${esc(sel.readout.days)} days` : ""}.</small></div>
+          <small>Read out: ${esc(sel.readout?.metric || "")}${sel.readout?.days ? `, after ${esc(sel.readout.days)} days` : ""}.${sel.outcome_status === "tracking" && sel.due_at ? ` Approved; read out by ${esc(day(sel.due_at))}.` : sel.verdict_reason ? ` ${esc(sel.status)}: ${esc(sel.verdict_reason)}.` : ""}</small></div>
         <div class="op-reasons">
           <div><h4>Annual value</h4>${sized(sel) ? `<strong>${money(z.annual.low)}–${money(z.annual.high)}</strong><p>Modeled, gross, not incremental. Base ${money(z.annual.base)}: ${esc(num(z.pool.value))} ${esc(z.pool.unit)} × ${pct(z.rate.base)} (${esc(z.rate.basis)}) × ${money(z.value_per_order.value)} × ${esc(z.months)} months.</p>`
             : z ? `<strong>Not sized</strong><p>${esc(z.reason)}</p>` : `<strong>—</strong><p>${sel.category === "fix_first" ? "A fix that protects every other number." : "Not a revenue lever on its own."}</p>`}</div>
@@ -610,6 +616,40 @@ const VIEWS = {
         </div>
       </section>
       ${gaps.length ? table("gaps", gaps, [["title", "What we couldn't measure", "text"], ["reason", "Why", "text"], ["unlock", "What it would unlock", "text"]], { title: "What we couldn't see", note: "Unmeasured is listed with its reason, never shown as zero." }) : ""}`;
+  },
+
+  report(s) {
+    if (waiting(s)) return head(s);
+    const d = s.data || {}, lead = T(s, "kpi_scorecard.selected"), cats = T(s, "flow_categories.categories");
+    const first = !F("changes.days_between");
+    const kpis = lead.length ? metrics(lead.length >= 5 ? "five" : lead.length === 3 ? "three" : "", lead.slice(0, 5).map(k => metric(`kpi_scorecard.${k.kpi}.last_month`, `${k.label}, last full month`, "", { delta: `kpi_scorecard.${k.kpi}.yoy_3m`, compact: true }))) : `<p class="empty">The KPI scorecard is unavailable on this run.</p>`;
+    const twin = r => (r.third_party || []).length ? r.third_party.join(", ") : "—";
+    return `${head(s)}
+      <div class="panel-head" style="margin-bottom:18px"><div><h2>${esc(S.b.client?.name || "")} · ${esc(d.month || "")}</h2><p>${esc(label(d.refresh || ""))} · workspace v${esc(S.b.version || "")}</p></div><button class="btn small" type="button" id="print">Print or save as PDF</button></div>
+      <h2 style="margin:0 0 14px">KPI scorecard</h2>${kpis}
+      ${lead.length ? metrics(lead.length >= 5 ? "five" : lead.length === 3 ? "three" : "", lead.slice(0, 5).map(k => metric(`kpi_scorecard.${k.kpi}.12m`, `${k.label}, last 12 months`, "", { compact: true }))) : ""}
+      ${table("flow_categories.categories", cats, [["label", "Flow category", "text"], ["live_flows", "Live flows", "num"], ["recipients", "Recipients, 365d", "num"], ["revenue", "Attributed, 365d", "money"], ["rpr", "Per recipient", "cents"], [twin, "Third-party twin", "text"], ["third_party_share", "Twin share", "pct"]], { title: "Flows by category", note: "One row per category. A third-party flow serving the same visitors (Retention.com and similar) is counted inside its category. Klaviyo attribution, send-date basis, not incremental.", limit: 12 })}
+      <h2 style="margin:8px 0 14px">Since the last audit</h2>
+      ${first ? `<div class="notice">${INFO}<p><strong>First audit.</strong> Changes show from the next refresh.</p></div>` : metrics("", [metric("changes.score_delta", "Score change", "Points on the foundational score."), metric("changes.checks_regressed", "Checks that got worse"), metric("changes.checks_improved", "Checks that improved"), metric("changes.opportunities_resolved", "Opportunities resolved")])}
+      ${table("report.top", d.top || [], [["rank", "Rank", "num"], ["title", "Top opportunity", "text"], ["severity", "Severity", "text"], ["status", "Status", "text"], ["owner", "Owner", "text"]], { title: "Top opportunities", note: "The five highest-ranked cards on this audit." })}
+      ${table("report.outcomes", d.outcomes || [], [["title", "Approved opportunity", "text"], ["owner", "Owner", "text"], ["status", "Read out", "text"], ["readout_metric", "Measured by", "text"], ["due_at", "Due", "date"], ["verdict_reason", "What happened", "text"]], { title: "How approved work read out", note: "Each approved opportunity is read against its baseline once its window has passed. Unmeasured says why." })}
+      ${findingCards(s.findings)}`;
+  },
+
+  changes(s) {
+    if (waiting(s) || s.state === "unavailable") return head(s);
+    const sum = T(s, "changes.summary")[0] || {};
+    const val = (v, u) => fmtFact({ value: v, unit: u }) ?? "—";
+    return `${head(s)}
+      ${sum.same_library === false ? `<div class="notice partial">${INFO}<p><strong>The check library changed between these audits.</strong> A check that moved may reflect the library, not the account.</p></div>` : ""}
+      ${metrics("", [metric("changes.days_between", "Days since the last audit", sum.previous_at ? `Last audit ${day(sum.previous_at)}.` : ""), metric("changes.score_delta", "Score change", F("changes.previous_score") ? `From ${fmtFact(F("changes.previous_score"))}.` : ""),
+        metric("changes.checks_regressed", "Checks that got worse"), metric("changes.checks_improved", "Checks that improved")])}
+      ${metrics("three", [metric("changes.opportunities_new", "New opportunities"), metric("changes.opportunities_resolved", "Opportunities resolved"), metric("journey_graph.live_flows", "Live flows now")])}
+      ${findingCards(s.findings, "What needs attention")}
+      ${table("changes.movers", T(s, "changes.movers"), [["label", "Metric", "text"], [r => val(r.before, r.unit), "Last audit", "text"], [r => val(r.after, r.unit), "Now", "text"], ["pct_change", "Change", "pct"], [r => r.good ? "Better" : "Worse", "Direction", "text"]], { title: "Metrics that moved", note: "Lead metrics first, then the largest moves. Under 1% isn't listed." })}
+      ${table("changes.checks", T(s, "changes.checks"), [["check_id", "Check", "text"], ["title", "What it checks", "text"], ["before", "Last audit", "text"], ["after", "Now", "text"], ["direction", "Moved", "text"]], { title: "Checks that moved" })}
+      ${table("changes.opportunities", T(s, "changes.opportunities"), [["title", "Opportunity", "text"], [r => ({ new: "New", resolved: "Resolved", still_open: "Still open" })[r.change], "Since last audit", "text"], ["rank", "Rank now", "num"]], { title: "Opportunities opened and closed", limit: 40 })}
+      ${table("changes.outcomes", (s.data || {}).outcomes || [], [["title", "Approved opportunity", "text"], ["owner", "Owner", "text"], ["status", "Read out", "text"], ["verdict_reason", "What happened", "text"]], { title: "Readouts", note: "Approved work, read against its baseline." })}`;
   },
 
   foundational(s) {
@@ -684,6 +724,7 @@ const VIEWS = {
         <span>${st.live.length ? `<span class="tag live">${st.live.length} live</span>` : st.not_live.length ? `<span class="tag off">Built, not live</span>` : `<span class="tag missing">Missing</span>`}</span>
         <small>${esc([...st.live, ...st.not_live.map(n => n + " (off)")].join(", "))}</small></div>`).join("")}</div>` : ""}
       ${findingCards(s.findings)}
+      ${table("flow_categories.categories", T(s, "flow_categories.categories"), [["label", "Category", "text"], ["live_flows", "Live flows", "num"], [r => (r.flows || []).map(f => f.name + (f.third_party ? " (third-party)" : "") + (f.live ? "" : " (off)")).join(", "), "Flows", "text"], ["revenue", "Attributed, 365d", "money"], ["rpr", "Per recipient", "cents"]], { title: "Flows by category", note: "Third-party twins counted inside the category they serve." })}
       ${table("journey_graph.nodes", T(s, "journey_graph.nodes"), [["name", "Flow", "text"], ["stage", "Stage", "text"], ["status", "Status", "text"], ["trigger", "Trigger", "text"], ["emails", "Emails", "num"], ["sms", "SMS", "num"], ["first_send_days", "First send (days)", "dec"], ["recipients_90d", "Recipients, 90d", "num"]], { title: "Every flow", limit: 60 })}`;
   },
 
@@ -814,6 +855,7 @@ function wire() {
   }));
   document.querySelectorAll("[data-more]").forEach(b => b.addEventListener("click", () => { S.expanded = { ...(S.expanded || {}), [b.dataset.more]: true }; render(); }));
   $("plan-md")?.addEventListener("click", () => download(`${S.slug}-30-day-plan.md`, S.md, "text/markdown"));
+  $("print")?.addEventListener("click", () => window.print());
   $("download")?.addEventListener("click", () => download(`${S.slug}-workspace-v${S.b.version || "live"}.json`, JSON.stringify(S.b, null, 2), "application/json"));
 }
 

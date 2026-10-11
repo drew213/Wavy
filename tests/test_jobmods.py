@@ -284,7 +284,7 @@ def test_cadence_contracts_are_registered_but_not_scheduled(factory, world, sess
     for key in IMPLEMENTED:
         assert jobs.REGISTRY[key].handler is not None
     expected = {"post_send.review", "weekly.trends", "weekly.calendar_readiness", "biweekly.meeting_prep",
-                "monthly.report", "monthly.calendar", "quarterly.roadmap", "event.anomaly", "event.tracking_failure",
+                "monthly.calendar", "quarterly.roadmap", "event.anomaly", "event.tracking_failure",
                 "event.client_feedback"}
     assert set(CONTRACT_ONLY) == expected
     for key in expected:

@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from typing import Callable, Iterator, Literal, Optional
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -59,6 +59,7 @@ class JobDefinition:
     handler: Optional[Callable[[JobContext], JobOutcome]] = None
     events: tuple[str, ...] = ()  # for cadence == "event"
     area: str = "reporting"
+    hour: Optional[int] = None    # local hour a scheduled run is due (overnight batches); None = as soon as queued
 
 
 REGISTRY: dict[str, JobDefinition] = {}
@@ -72,10 +73,10 @@ def register(defn: JobDefinition) -> JobDefinition:
 
 
 def job(key: str, title: str, cadence: Cadence, owner_role: str, *, checks: str, action: str,
-        completion: str, events: tuple[str, ...] = (), area: str = "reporting"):
+        completion: str, events: tuple[str, ...] = (), area: str = "reporting", hour: Optional[int] = None):
     """Decorator: register a handler as a job definition."""
     def deco(fn: Callable[[JobContext], JobOutcome]):
-        register(JobDefinition(key, title, cadence, owner_role, checks, action, completion, fn, events, area))
+        register(JobDefinition(key, title, cadence, owner_role, checks, action, completion, fn, events, area, hour))
         return fn
     return deco
 
@@ -95,6 +96,16 @@ def period_key(cadence: Cadence, now: datetime, tz: str) -> Optional[str]:
 
 
 SCHEDULE_BATCH = 100
+
+
+def due_time(now: datetime, tz: str, hour: Optional[int]) -> datetime:
+    """When a scheduled run is due: now, or the next time it is `hour` o'clock in the client's timezone when
+    that is later today (a period that opens at midnight runs in the overnight batch, not at the first tick)."""
+    if hour is None:
+        return now
+    local = now.astimezone(ZoneInfo(tz))
+    at = local.replace(hour=hour, minute=0, second=0, microsecond=0)
+    return at.astimezone(now.tzinfo) if at > local else now
 
 
 def enqueue_due(session: Session, now: Optional[datetime] = None, org_id: Optional[str] = None) -> list[m.JobRun]:
@@ -117,7 +128,8 @@ def enqueue_due(session: Session, now: Optional[datetime] = None, org_id: Option
         queued = set(session.scalars(select(m.JobRun.run_key).where(m.JobRun.run_key.in_(list(wanted)))))
         for run_key, (client, defn, pk) in wanted.items():
             if run_key not in queued:
-                run = _insert(session, client, defn, run_key, now, {"kind": "schedule", "period": pk})
+                run = _insert(session, client, defn, run_key, due_time(now, client.timezone, defn.hour),
+                              {"kind": "schedule", "period": pk})
                 if run:
                     created.append(run)
     return created
@@ -163,9 +175,13 @@ def _agent_for(session: Session, org_id: str, role: str) -> m.Agent:
 
 
 def claim(factory: sessionmaker[Session], job_key: Optional[str] = None) -> Optional[str]:
-    """Atomically move one queued run to running. Returns its id, or None."""
+    """Atomically move one queued run to running. Returns its id, or None. Runs of a definition with an
+    overnight hour wait until they are due; everything else runs as soon as it is queued."""
     with factory() as s:
         q = select(m.JobRun.id).where(m.JobRun.status == "queued").order_by(m.JobRun.due_at).limit(5)
+        held = [k for k, d in REGISTRY.items() if d.hour is not None]
+        if held:
+            q = q.where(or_(m.JobRun.due_at <= utcnow(), m.JobRun.job_key.not_in(held)))
         if job_key:
             q = q.where(m.JobRun.job_key == job_key)
         for run_id in s.scalars(q).all():

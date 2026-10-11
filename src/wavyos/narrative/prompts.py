@@ -86,6 +86,14 @@ SECTIONS: dict[str, tuple[str, dict]] = {
     "capture": ("Forms, list growth, consented reach and subscriptions: who we can reach and how to grow it.", {}),
     "deliverability": ("Complaints, unsubscribes, bounces and message hygiene (clipping, links, claims language): "
                        "what threatens the inbox and the fix.", {}),
+    "report": ("The monthly report's executive summary, in this order: the KPI scorecard (the brand's chosen KPIs, "
+               "last month and trend), then each flow category in the packet's flow_categories table (welcome, "
+               "checkout, cart, browse, cross-sell, replenishment; a third-party twin counts inside its category), "
+               "then what changed since the previous audit and how approved opportunities read out, then the three "
+               "moves for next month.",
+               {"summary": ["one short paragraph per part, numbers from packet facts only"],
+                "next_month": [{"move": "what to do", "owner": "Wavy Studios | Brand", "kpi": "metric",
+                                "baseline_fact": "fact id"}]}),
     "plan": ("The 90-day game plan in phases, then week by week for 13 weeks: what ships, owner, dependency, the "
              "KPI with its baseline fact.",
              {"phases": [{"name": "Foundation", "weeks": "1-3", "goal": "what the phase achieves",

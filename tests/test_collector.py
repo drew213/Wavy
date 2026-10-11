@@ -360,6 +360,7 @@ def test_the_job_runs_the_audit_with_the_vaulted_key(factory, session, shop, vau
     done = jobs.run_pending(factory, {"vault": vault, "klaviyo_factory": lambda key: KlaviyoClient(
         key, transport=fake.transport(), pace=False, sleep=lambda s: None), "sleep": lambda s: None})
     assert [(j.job_key, j.status) for j in done] == [("audit.collect", "succeeded"), ("audit.analyze", "succeeded"),
+                                                     ("outcomes.readout", "no_action"),
                                                      ("narrative.draft", "no_action")], [j.error for j in done]
     assert "No model provider is allowed" in done[-1].summary
     session.expire_all()

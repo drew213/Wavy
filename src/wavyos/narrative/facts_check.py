@@ -16,7 +16,7 @@ from typing import Any, Iterable, Optional
 from . import numbers
 from .prompts import SECTIONS
 
-CLAIM_KEYS = frozenset({"headline", "finding", "evidence", "observation"})
+CLAIM_KEYS = frozenset({"headline", "finding", "evidence", "observation", "summary"})
 STRUCTURAL_KEYS = frozenset({"id", "facts", "baseline_fact", "week", "weeks", "when", "owner", "stage", "status",
                              "channel"})
 REQUIRED = ("finding", "evidence", "action")

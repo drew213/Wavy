@@ -555,6 +555,42 @@ class NarrativeDraft(IdMixin, Base):
     updated_at: Mapped[Optional[datetime]]
 
 
+OUTCOME_STATUSES = ("tracking", "improved", "flat", "worse", "unmeasured", "withdrawn")
+
+
+class OpportunityOutcome(IdMixin, Base):
+    """An approved opportunity and what happened after (wavyos.loop.outcomes).
+
+    Approval records the baseline: the value of the card's readout fact in the run it was approved from.
+    Each later scored run adds a readout; once the readout window has passed the outcome gets a verdict
+    (improved / flat / worse, or unmeasured when no later run measured the fact), which feeds back into
+    how the playbook behind the card (source_key) is ranked for every brand.
+    """
+    __tablename__ = "opportunity_outcomes"
+    __table_args__ = (UniqueConstraint("client_id", "run_id", "opportunity_id"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("audit_runs.id"), index=True)
+    opportunity_id: Mapped[str] = mapped_column(String(120))
+    source_key: Mapped[str] = mapped_column(String(160), index=True)   # check id or analysis finding id
+    title: Mapped[str] = mapped_column(String(300), default="")
+    owner: Mapped[str] = mapped_column(String(120), default="")
+    approved_by: Mapped[str] = mapped_column(String(120), default="")
+    approved_at: Mapped[datetime]
+    readout_metric: Mapped[str] = mapped_column(String(200), default="")
+    readout_fact: Mapped[Optional[str]] = mapped_column(String(120))
+    direction: Mapped[str] = mapped_column(String(4), default="up")     # up: higher is better; down: lower is
+    baseline: Mapped[dict] = mapped_column(default=dict)                # {"v": value, "unit", "label"}
+    readout_days: Mapped[int] = mapped_column(Integer, default=45)
+    due_at: Mapped[datetime]
+    status: Mapped[str] = mapped_column(String(20), default="tracking", index=True)
+    readouts: Mapped[list] = mapped_column(default=list)                # [{run_id, at, v, check}]
+    verdict_reason: Mapped[str] = mapped_column(Text, default="")
+    decided_at: Mapped[Optional[datetime]]
+    note: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[Optional[datetime]]
+
+
 class AuditOrder(IdMixin, Base):
     """One Placed Order event, compact. Profile ids are Klaviyo's pseudonymous ids: never emails or names.
 

@@ -27,10 +27,12 @@ NARRATIVE_STATES = ("awaiting_review", "approved", "none")
 # (id, title, analysis modules that feed it, has written parts a strategist reviews)
 SECTIONS: tuple[tuple[str, str, tuple[str, ...], bool], ...] = (
     ("opportunities", "Opportunities", ("kpi_scorecard",), True),
+    ("changes", "What changed", ("changes",), False),
+    ("report", "Monthly report", ("kpi_scorecard", "flow_categories", "changes"), True),
     ("foundational", "Foundational report", (), True),
     ("performance", "Performance", ("performance", "kpi_scorecard", "flow_history"), True),
     ("cohorts", "Customer cohorts", ("cohorts",), True),
-    ("journeys", "Customer journeys", ("journey_graph", "flow_history"), True),
+    ("journeys", "Customer journeys", ("journey_graph", "flow_categories", "flow_history"), True),
     ("calendar", "Send history", ("program", "promotions"), True),
     ("capture", "Capture & reach", ("capture_reach", "subscriptions"), True),
     ("deliverability", "Deliverability & messages", ("complaints", "messages"), True),
@@ -148,6 +150,27 @@ def _metric_choices(totals: Optional[dict]) -> list[dict]:
     return out
 
 
+OUTCOME_LABEL = {"tracking": "Approved", "improved": "Read out: improved", "flat": "Read out: flat",
+                 "worse": "Read out: worse", "unmeasured": "Read out: unmeasured", "withdrawn": "Withdrawn"}
+
+
+def _with_outcomes(cards: list[dict], tracked: list) -> list[dict]:
+    """Cards with the latest approval on each (status, owner, readout) instead of Proposed / UNCONFIRMED."""
+    latest: dict[str, Any] = {}
+    for o in tracked:  # newest first
+        latest.setdefault(o.opportunity_id, o)
+    out = []
+    for c in cards:
+        o = latest.get(c["id"])
+        if o is None:
+            out.append(c)
+            continue
+        out.append({**c, "status": OUTCOME_LABEL.get(o.status, o.status), "owner": o.owner, "outcome_id": o.id,
+                    "outcome_status": o.status, "due_at": o.due_at.isoformat() if o.due_at else None,
+                    "verdict_reason": o.verdict_reason})
+    return out
+
+
 def build(session: Session, client: m.Client, run: Optional[m.AuditRun] = None) -> Bundle:
     """The bundle for one run (default: the client's latest), with live states."""
     from . import intake as intake_mod
@@ -168,8 +191,10 @@ def build(session: Session, client: m.Client, run: Optional[m.AuditRun] = None) 
     dossier = session.scalar(select(m.Dossier).where(m.Dossier.client_id == client.id).order_by(m.Dossier.version.desc()).limit(1))
     doc = ((dossier.document or {}).get("dossier") or dossier.document or {}) if dossier else {}
 
+    from .loop import outcomes as outcomes_mod
     from .narrative.review import narrative_for, published
     drafts = narrative_for(session, run.id) if run is not None else {}
+    tracked = outcomes_mod.for_client(session, client.id)
     sections = []
     for sid, title, modules, written in SECTIONS:
         state, reason = _module_state(run, sc is not None, analysis, modules)
@@ -182,7 +207,18 @@ def build(session: Session, client: m.Client, run: Optional[m.AuditRun] = None) 
         s.tables = {f"{mod}.{name}": rows for mod in modules for name, rows in (tables.get(mod) or {}).items()}
         if sid == "opportunities":
             s.data = {k: summary.get(k) for k in ("opportunities", "total", "sizing", "gaps", "playbook_version")}
+            s.data["opportunities"] = _with_outcomes(summary.get("opportunities") or [], tracked)
+            s.data["outcomes"] = [outcomes_mod.view(o) for o in tracked]
             s.findings = findings
+        elif sid == "changes":
+            s.data = {"outcomes": [outcomes_mod.view(o) for o in tracked if o.status != "tracking"]}
+        elif sid == "report":
+            s.data = {"month": run.created_at.strftime("%B %Y") if run is not None else None,
+                      "refresh": ((run.context or {}).get("refresh") or "first audit") if run is not None else None,
+                      "score": summary.get("score"),
+                      "top": [{k: c.get(k) for k in ("id", "rank", "title", "category", "severity", "status", "owner")}
+                              for c in _with_outcomes(summary.get("opportunities") or [], tracked)[:5]],
+                      "outcomes": [outcomes_mod.view(o) for o in tracked]}
         elif sid == "foundational":
             if sc is not None:
                 s.data = {"score": summary.get("score"), "by_area": summary.get("by_area"), "by_verdict": summary.get("by_verdict"),

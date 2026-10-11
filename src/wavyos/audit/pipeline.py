@@ -11,6 +11,7 @@ from typing import Any, Callable, Optional
 from sqlalchemy.orm import Session
 
 from .. import models as m
+from ..loop import changes, outcomes
 from ..scope import InvalidState, Scope, get_scoped
 from . import opportunities
 from .engine import results_of, score_snapshot
@@ -86,8 +87,16 @@ def run_audit_for_run(session: Session, scope: Scope, run_id: str, context: Opti
     rows = {cid: {"verdict": r.verdict, "message": r.message, "evidence": r.evidence or [], "value": r.value or {}}
             for cid, r in results_of(session, sc).items()}
     result = analysis.run_all(snap, fetch=link_fetcher)
-    built = opportunities.build(snap, rows, library_specs(), findings=result["findings"], unavailable=result["unavailable"])
-    result["facts"] = result["facts"] + scorecard_facts(sc.summary or {}, rows, library_specs(), built)
+    ch = changes.compare(session, run, sc, rows, result["facts"])
+    built = opportunities.build(snap, rows, library_specs(), findings=result["findings"] + [f.as_dict() for f in ch.findings],
+                                unavailable=result["unavailable"], record=outcomes.track_record(session, run.org_id))
+    prev = getattr(ch, "prev", None)
+    changes.opportunity_diff(ch, session.get(m.Scorecard, prev.scorecard_id) if prev is not None else None,
+                             built["opportunities"])
+    result["modules"][changes.MODULE] = changes.as_module(ch)
+    result["facts"] = result["facts"] + [f.__dict__ for f in ch.facts] + scorecard_facts(sc.summary or {}, rows,
+                                                                                      library_specs(), built)
+    result["findings"] = result["findings"] + [f.as_dict() for f in ch.findings]
     analysis.store(session, run, result)
     sc.summary = {**(sc.summary or {}), "audit_run_id": run.id, **built,
                   "analysis": {name: {"status": v["status"], "reason": v["reason"], "facts": v["facts"],

@@ -678,7 +678,8 @@ def orders(c: Collect) -> dict:
     st = c.state()
     start = st.get("start") or boundary_to_utc(f"{month_start(c.now, c.timezone, -23)}T00:00:00", c.timezone)
     end = st.get("end") or c.windows["current"]["end"]
-    since = st.get("since") or _resume_point(c, placed["id"], start)
+    full = (c.run.context or {}).get("refresh") == "full"  # the monthly re-audit re-reads the whole window
+    since = st.get("since") or (start if full else _resume_point(c, placed["id"], start))
     page_size = st.get("page_size") or 1000
     pages, stored = st.get("pages") or 0, st.get("stored") or 0
     target = st.get("next") or ("/api/events/" if not pages else None)

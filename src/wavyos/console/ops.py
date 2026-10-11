@@ -93,6 +93,16 @@ class RedraftBody(BaseModel):
     sections: Optional[list[str]] = None
 
 
+class OutcomeApproveBody(BaseModel):
+    owner: str
+    fact: Optional[str] = None
+    note: str = ""
+
+
+class OutcomeWithdrawBody(BaseModel):
+    note: str = ""
+
+
 def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
     r = APIRouter(prefix="/v1/ops", tags=["ops"])
 
@@ -624,5 +634,57 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
         queued = jobs.emit(s, sc, "narrative.draft", {"run_id": run.id, "sections": body.sections},
                            dedupe=f"{run.id}:{utcnow().isoformat()}")
         return {"run_id": run.id, "job_run_ids": [j.id for j in queued]}
+
+    # ---------------------------------------------------------------- the loop (staff only)
+
+    @r.get("/morning")
+    def morning(hours: int = Query(24, ge=1, le=24 * 14), u: m.User = Depends(user), s: Session = Depends(db)):
+        """What the overnight batch changed, drafts ready to approve, and anything blocked."""
+        from ..loop import morning as morning_mod
+        staff(s, u)
+        return morning_mod.queue(s, visible_ids(s, u), hours=hours)
+
+    @r.get("/learning")
+    def learning(u: m.User = Depends(user), s: Session = Depends(db)):
+        """Strategist edits and rejections per section prompt and playbook, and how playbooks read out."""
+        from ..loop import learning as learning_mod
+        staff(s, u)
+        return learning_mod.report(s, visible_ids(s, u))
+
+    @r.get("/clients/{slug}/outcomes")
+    def client_outcomes(slug: str, u: m.User = Depends(user), s: Session = Depends(db)):
+        """The latest audit's ranked cards with their approval state, and every outcome for the brand."""
+        from .. import workspace
+        from ..loop import outcomes
+        staff(s, u)
+        c = client_by_slug(s, u, slug)
+        run = outcomes.latest_scored(s, c.id)
+        sc = s.get(m.Scorecard, run.scorecard_id) if run is not None else None
+        tracked = outcomes.for_client(s, c.id)
+        cards = workspace._with_outcomes((sc.summary or {}).get("opportunities") or [] if sc else [], tracked)
+        return {"client": c.slug, "client_name": c.name, "run_id": run.id if run else None,
+                "opportunities": [{k: card.get(k) for k in ("id", "rank", "title", "category", "severity", "status",
+                                                            "owner", "readout", "outcome_id", "outcome_status",
+                                                            "due_at", "track_record")} for card in cards],
+                "outcomes": [outcomes.view(o) for o in tracked]}
+
+    @r.post("/clients/{slug}/opportunities/{opportunity_id}/approve")
+    def approve_opportunity(slug: str, opportunity_id: str, body: OutcomeApproveBody, u: m.User = Depends(user),
+                            s: Session = Depends(db)):
+        from ..loop import outcomes
+        staff(s, u)
+        c = client_by_slug(s, u, slug)
+        return guard(lambda: outcomes.view(outcomes.approve(s, scope_for_user(s, u, c.id), opportunity_id,
+                                                            owner=body.owner, fact=body.fact, note=body.note)))
+
+    @r.post("/outcomes/{outcome_id}/withdraw")
+    def withdraw_outcome(outcome_id: str, body: OutcomeWithdrawBody, u: m.User = Depends(user), s: Session = Depends(db)):
+        from ..loop import outcomes
+        staff(s, u)
+        row = s.get(m.OpportunityOutcome, outcome_id)
+        c = visible_client(s, u, row.client_id if row else None)
+        if c is None:
+            raise HTTPException(404, {"error": "outcome not found"})
+        return guard(lambda: outcomes.view(outcomes.withdraw(s, scope_for_user(s, u, c.id), outcome_id, body.note)))
 
     return r

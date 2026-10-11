@@ -112,6 +112,10 @@ def drafter(*, invent_first: bool = True):
         elif section == "calendar":
             d["calendar_90d"] = [{"week": 1, "theme": "Warm-up", "sends": [{"channel": "email", "segment": "Engaged 90 days",
                                                                            "idea": "Best sellers", "offer": "none"}]}]
+        elif section == "report":
+            d["summary"] = [f"The lead number this month is {v}."]
+            d["next_month"] = [{"move": "Rebuild the welcome flow", "owner": "Wavy Studios", "kpi": "welcome revenue",
+                                "baseline_fact": fid}]
         elif section == "plan":
             d["phases"] = [{"name": "Foundation", "weeks": "1-3", "goal": "Fix the leaks", "items": [
                 {"week": 1, "ships": "Welcome rebuild", "owner": "Wavy Studios", "depends_on": "Brand approval",

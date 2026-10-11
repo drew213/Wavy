@@ -122,7 +122,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
 <div id="root"></div>
 <script>
 (() => {
-  const VIEWS = [["overview","Overview"],["flow","Flow"],["review","Review"],["executions","Executions"],["jobs","Jobs"],["approvals","Approvals"],["events","Events"]];
+  const VIEWS = [["morning","Morning"],["overview","Overview"],["flow","Flow"],["review","Review"],["outcomes","Outcomes"],["learning","Learning"],["executions","Executions"],["jobs","Jobs"],["approvals","Approvals"],["events","Events"]];
   const S = { token: null, me: null, view: "overview", client: "", sel: null, data: {}, live: false, last: null, err: "", after: 0, events: [] };
   try { S.token = sessionStorage.getItem("wos-token"); S.client = localStorage.getItem("wos-client") || ""; } catch {}
   const $ = (q) => document.querySelector(q);
@@ -159,7 +159,9 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
     const ov = S.data.overview?.clients || [];
     const pendingAp = ov.reduce((a, c) => a + c.approvals_pending, 0);
     const running = ov.reduce((a, c) => a + (c.executions.running || 0), 0);
-    const counts = { approvals: pendingAp, executions: running, review: (S.data.review?.drafts || []).filter(d => d.status === "draft" || d.status === "needs_rewrite").length };
+    const mc = S.data.morning?.counts || {};
+    const counts = { approvals: pendingAp, executions: running, review: (S.data.review?.drafts || []).filter(d => d.status === "draft" || d.status === "needs_rewrite").length,
+      morning: (mc.drafts_ready || 0) + (mc.needs_rewrite || 0) + (mc.blocked || 0) };
     $("#root").innerHTML = `<div class="app"><nav class="rail" aria-label="Sections"><div class="brand"><h1>Wavy <span>OS</span></h1><div class="label">Console</div></div>
       ${VIEWS.map(([k, l]) => `<a href="#${k}" data-v="${k}" aria-current="${S.view === k ? "page" : "false"}">${l}${counts[k] ? `<b class="${k === "approvals" ? "hot" : ""}">${counts[k]}</b>` : ""}</a>`).join("")}
       <a href="/onboard" target="_blank" style="margin-top:12px; border:1px solid var(--lime); color:var(--lime); font-weight:700;">⚡ Onboard Client ↗</a>
@@ -319,6 +321,71 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
     return redraft + `<div class="split"><div>${list}</div>${panel}</div>`;
   }
 
+
+  const pctS = (v) => v == null ? "—" : (v > 0 ? "+" : "") + (v * 100).toFixed(1) + "%";
+  const staffOnly = () => `<div class="empty"><h3>Staff only</h3><p class="muted">This view is for Wavy strategists.</p></div>`;
+
+  function vMorning() {
+    if (!S.me?.staff) return staffOnly();
+    const m = S.data.morning; if (!m) return `<p class="muted">Loading…</p>`;
+    const mine = (xs) => (xs || []).filter(x => !S.client || x.client === S.client);
+    const c = { changed: mine(m.changed), ready: mine(m.drafts_ready), rewrite: mine(m.needs_rewrite), blocked: mine(m.blocked), decided: mine(m.outcomes_decided), due: mine(m.outcomes_due) };
+    const strip = `<div class="grid" style="grid-template-columns:repeat(6,minmax(0,1fr));margin-bottom:18px">${[["Changed overnight", c.changed.length], ["Ready to approve", c.ready.length], ["Needs a rewrite", c.rewrite.length], ["Blocked", c.blocked.length], ["Read out", c.decided.length], ["Due this week", c.due.length]]
+      .map(([l, n]) => `<div class="card"><div class="label">${l}</div><div class="n num" style="font-size:26px;color:var(--text)">${n}</div></div>`).join("")}</div>`;
+    const drafts = (xs, tone) => xs.length ? `<div class="tbl" style="margin-bottom:22px"><table><thead><tr><th>Client</th><th>Section</th><th>Headline</th><th>Score</th><th>Since</th></tr></thead><tbody>
+      ${xs.map(d => `<tr class="click" data-gonarr="${esc(d.id)}" tabindex="0"><td>${esc(d.client_name)}</td><td>${chip(tone, d.section.replace(/_/g, " "))}</td><td style="max-width:420px">${esc(d.headline || d.reason || "")}</td><td class="num">${d.score == null ? "—" : esc(d.score) + "/10"}</td><td class="muted">${esc(ago(d.since))}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted" style="margin-bottom:22px">Nothing here.</p>`;
+    return `${strip}
+      <div class="label" style="margin-bottom:8px">What changed overnight (last ${esc(m.hours)} hours)</div>
+      ${c.changed.length ? `<div class="tbl" style="margin-bottom:22px"><table><thead><tr><th>Client</th><th>Run</th><th class="num">Score</th><th class="num">Checks worse / better</th><th class="num">Opportunities new / resolved</th><th>Biggest moves</th><th></th></tr></thead><tbody>
+        ${c.changed.map(r => `<tr><td class="t">${esc(r.client_name)}</td><td>${chip(r.first_audit ? "review" : "ok", r.first_audit ? "first audit" : r.refresh)}<div class="muted">v${esc(r.version)} · ${esc(ago(r.published_at))}</div></td>
+          <td class="num">${r.score_delta == null ? "—" : (r.score_delta > 0 ? "+" : "") + esc(r.score_delta)}</td><td class="num">${r.checks_regressed ?? "—"} / ${r.checks_improved ?? "—"}</td><td class="num">${r.opportunities_new ?? "—"} / ${r.opportunities_resolved ?? "—"}</td>
+          <td style="font-size:11.5px">${(r.movers || []).map(x => `${esc(x.label)} <b style="color:var(--text)">${pctS(x.pct_change)}</b>`).join("<br>") || '<span class="muted">—</span>'}</td>
+          <td><a class="btn" href="/audit/${encodeURIComponent(r.client)}" target="_blank">Workspace ↗</a></td></tr>`).join("")}</tbody></table></div>` : `<p class="muted" style="margin-bottom:22px">No audit finished in this window.</p>`}
+      <div class="label" style="margin-bottom:8px">Drafts ready to approve</div>${drafts(c.ready, "review")}
+      <div class="label" style="margin-bottom:8px">Drafts that need a strategist's rewrite</div>${drafts(c.rewrite, "blocked")}
+      <div class="label" style="margin-bottom:8px">Blocked</div>
+      ${c.blocked.length ? `<div class="tbl" style="margin-bottom:22px"><table><thead><tr><th>Client</th><th>What</th><th>Why</th><th>When</th></tr></thead><tbody>
+        ${c.blocked.map(b => `<tr><td>${esc(b.client_name)}</td><td>${chip("failed", b.kind.replace(/_/g, " "))}<div class="muted">${esc(b.job || b.section || "")}</div></td><td style="max-width:520px">${esc(b.reason)}</td><td class="muted">${esc(ago(b.at))}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted" style="margin-bottom:22px">Nothing blocked.</p>`}
+      <div class="label" style="margin-bottom:8px">Approved work: read out, and due this week</div>
+      ${c.decided.length + c.due.length ? `<div class="tbl"><table><thead><tr><th>Client</th><th>Opportunity</th><th>Owner</th><th>Status</th><th>What happened</th></tr></thead><tbody>
+        ${[...c.decided, ...c.due].map(o => `<tr><td>${esc(o.client_name)}</td><td class="t">${esc(o.title)}</td><td>${esc(o.owner)}</td><td>${chip(o.status === "improved" ? "ok" : o.status === "worse" ? "failed" : "review", o.status)}</td><td style="font-size:11.5px">${esc(o.verdict_reason || (o.due_at ? "due " + o.due_at.slice(0, 10) : ""))}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted">No readouts in this window.</p>`}`;
+  }
+
+  function vOutcomes() {
+    if (!S.me?.staff) return staffOnly();
+    if (!S.client) return `<div class="empty"><h3>Pick a client</h3><p class="muted">Approve the latest audit's opportunities with an owner. Each approval records its baseline; later audits read it out, and verdicts move the playbook's rank for every brand.</p></div>`;
+    const o = S.data.outcomes; if (!o) return `<p class="muted">Loading…</p>`;
+    const rec = (r) => r ? `${r.improved || 0}↑ ${r.flat || 0}→ ${r.worse || 0}↓` : "—";
+    return `<div class="tbl" style="margin-bottom:22px"><table><thead><tr><th class="num">Rank</th><th>Opportunity</th><th>Status</th><th>Read out by</th><th>Track record</th><th>Approve</th></tr></thead><tbody>
+      ${o.opportunities.map(c => `<tr data-k="op-${esc(c.id)}"><td class="num">${esc(c.rank)}</td><td><div class="t">${esc(c.title)}</div><div class="muted">${esc((c.category || "").replace(/_/g, " "))} · ${esc(c.severity)}</div></td>
+        <td>${chip(c.outcome_status ? (c.outcome_status === "tracking" ? "approved" : c.outcome_status === "improved" ? "ok" : c.outcome_status === "worse" ? "failed" : "review") : "pending", c.status)}${c.owner && c.owner !== "UNCONFIRMED" ? `<div class="muted">${esc(c.owner)}</div>` : ""}</td>
+        <td style="font-size:11.5px">${esc(c.readout?.metric || "")}${c.readout?.days ? ` · ${esc(c.readout.days)} days` : ""}</td><td class="muted">${rec(c.track_record)}</td>
+        <td>${c.outcome_status === "tracking" ? `<button class="btn danger" data-wd="${esc(c.outcome_id)}">Withdraw</button>` : `<div class="row"><input id="ow-${esc(c.id)}" placeholder="Owner" style="width:120px"><button class="btn primary" data-oppok="${esc(c.id)}">Approve</button></div>`}</td></tr>`).join("")}</tbody></table></div>
+      <div class="label" style="margin-bottom:8px">Every outcome for ${esc(o.client_name)}</div>
+      ${o.outcomes.length ? `<div class="tbl"><table><thead><tr><th>Opportunity</th><th>Owner</th><th>Baseline</th><th>Readouts</th><th>Status</th><th>What happened</th></tr></thead><tbody>
+        ${o.outcomes.map(x => `<tr><td class="t">${esc(x.title)}<div class="muted">${esc(x.readout_fact || "no fact maps to this card")}</div></td><td>${esc(x.owner)}</td><td class="num">${x.baseline?.v == null ? "—" : esc(x.baseline.v)}</td>
+          <td class="num">${(x.readouts || []).map(r => r.v == null ? "—" : esc(r.v)).join(" → ") || "—"}</td><td>${chip(x.status === "improved" ? "ok" : x.status === "worse" ? "failed" : x.status === "tracking" ? "approved" : "review", x.status)}<div class="muted">due ${esc((x.due_at || "").slice(0, 10))}</div></td><td style="font-size:11.5px">${esc(x.verdict_reason)}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted">Nothing approved yet.</p>`}`;
+  }
+
+  function vLearning() {
+    if (!S.me?.staff) return staffOnly();
+    const l = S.data.learning; if (!l) return `<p class="muted">Loading…</p>`;
+    const rate = (v) => v == null ? "—" : (v * 100).toFixed(0) + "%";
+    return `<p class="muted" style="margin-bottom:14px">${l.totals.drafts} drafts and ${l.totals.outcomes} approved opportunities (${l.totals.decided} read out). Use this to tune section prompts and playbooks.json.</p>
+      <div class="label" style="margin-bottom:8px">Per section prompt</div>
+      ${l.sections.length ? `<div class="tbl" style="margin-bottom:22px"><table><thead><tr><th>Section</th><th class="num">Drafts</th><th class="num">As drafted / edited / rejected</th><th class="num">Edit rate</th><th class="num">Reject rate</th><th class="num">Avg score</th><th class="num">Avg rounds</th><th>Most edited</th><th>Facts check blocks</th><th>Weakest criteria</th></tr></thead><tbody>
+        ${l.sections.map(x => `<tr data-k="ls-${esc(x.section)}"><td class="t">${esc(x.section)}</td><td class="num">${x.drafts}</td><td class="num">${x.approved_as_drafted} / ${x.edited} / ${x.rejected}</td><td class="num">${rate(x.edit_rate)}</td><td class="num">${rate(x.reject_rate)}</td>
+          <td class="num">${x.avg_score ?? "—"}</td><td class="num">${x.avg_rounds ?? "—"}</td><td style="font-size:11.5px">${x.edited_paths.map(p => `${esc(p.path)} ×${p.count}`).join("<br>") || "—"}</td>
+          <td style="font-size:11.5px">${x.facts_check_reasons.map(p => `${esc(p.reason)} ×${p.count}`).join("<br>") || "—"}</td><td style="font-size:11.5px">${x.weakest_criteria.map(p => `${esc(p.criterion)} ${esc(p.avg)}`).join("<br>") || "—"}</td></tr>
+          ${x.notes.length ? `<tr><td></td><td colspan="9"><details><summary>Strategist notes (${x.notes.length})</summary>${x.notes.map(n => `<div style="font-size:12px;padding:3px 0">${esc(n.client)} · ${esc(n.status)} · ${esc(ago(n.at))}: <span style="color:var(--text)">${esc(n.note)}</span></div>`).join("")}</details></td></tr>` : ""}`).join("")}</tbody></table></div>` : `<p class="muted" style="margin-bottom:22px">No drafts yet.</p>`}
+      <div class="label" style="margin-bottom:8px">Per playbook</div>
+      ${l.playbooks.length ? `<div class="tbl" style="margin-bottom:22px"><table><thead><tr><th>Playbook</th><th class="num">Approved</th><th class="num">Tracking</th><th class="num">Improved / flat / worse</th><th class="num">Unmeasured</th><th class="num">Card edits</th><th class="num">Brands</th><th class="num">Rank weight</th></tr></thead><tbody>
+        ${l.playbooks.map(p => `<tr><td><div class="t">${esc(p.title)}</div><div class="muted">${esc(p.source_key)}</div></td><td class="num">${p.approved}</td><td class="num">${p.tracking}</td><td class="num">${p.improved} / ${p.flat} / ${p.worse}</td><td class="num">${p.unmeasured}</td><td class="num">${p.card_edits}</td><td class="num">${p.brands}</td><td class="num">×${Number(p.rank_weight).toFixed(2)}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted" style="margin-bottom:22px">No playbook has been approved or edited yet.</p>`}
+      <div class="label" style="margin-bottom:8px">Per writer and critic</div>
+      ${l.models.length ? `<div class="tbl"><table><thead><tr><th>Drafter → critic</th><th class="num">Drafts</th><th class="num">Passed</th><th class="num">Avg score</th><th class="num">Avg rounds</th><th class="num">Cost</th></tr></thead><tbody>
+        ${l.models.map(x => `<tr><td class="exec">${esc(x.drafter)} → ${esc(x.critic || "none")}</td><td class="num">${x.drafts}</td><td class="num">${x.passed}</td><td class="num">${x.avg_score ?? "—"}</td><td class="num">${x.avg_rounds ?? "—"}</td><td class="num">${usd(x.cost_usd)}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted">No model has drafted yet.</p>`}`;
+  }
+
   function vEvents() {
     const ev = S.events.filter(e => !S.client || e.client === S.client).slice(-300).reverse();
     if (!ev.length) return `<div class="empty"><h3>No events yet</h3><p class="muted">Every change in Wavy OS is written here, chained by hash.</p></div>`;
@@ -329,7 +396,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
 
   function render() {
     shell();
-    const v = { overview: vOverview, flow: vFlow, review: vReview, executions: vExecutions, jobs: vJobs, approvals: vApprovals, events: vEvents }[S.view];
+    const v = { morning: vMorning, overview: vOverview, flow: vFlow, review: vReview, outcomes: vOutcomes, learning: vLearning, executions: vExecutions, jobs: vJobs, approvals: vApprovals, events: vEvents }[S.view];
     $("#content").innerHTML = v();
   }
 
@@ -342,6 +409,9 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
       if (S.view === "executions") { S.data.executions = await api("/v1/ops/executions?" + qc()); if (S.sel) S.data.exec = await api("/v1/ops/executions/" + S.sel); }
       if (S.view === "jobs") S.data.jobs = await api("/v1/ops/jobs");
       if (S.view === "approvals") S.data.approvals = await api("/v1/ops/approvals");
+      if (S.me?.staff && (S.view === "morning" || !S.data.morning || Date.now() - (S.mAt || 0) > 60000)) { S.data.morning = await api("/v1/ops/morning"); S.mAt = Date.now(); }
+      if (S.view === "learning" && S.me?.staff) S.data.learning = await api("/v1/ops/learning");
+      if (S.view === "outcomes" && S.me?.staff) S.data.outcomes = S.client ? await api(`/v1/ops/clients/${encodeURIComponent(S.client)}/outcomes`) : null;
       if (S.view === "review" && S.me?.staff) { S.data.review = await api("/v1/ops/narrative?" + qc()); S.data.nd = S.selN ? await api("/v1/ops/narrative/" + S.selN) : null; }
       const ev = await api("/v1/ops/events?after=" + S.after);
       if (ev.events.length) { S.events = S.events.concat(ev.events).slice(-1000); S.after = ev.events[ev.events.length - 1].id; }
@@ -351,7 +421,8 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
     // Redraw only when something changed, so open details, scroll and typing survive the live refresh.
     const sig = JSON.stringify([S.view, S.client, S.sel, S.data.overview?.clients, S.view === "flow" && S.data.flow,
       S.view === "executions" && [S.data.executions, S.data.exec], S.view === "jobs" && S.data.jobs,
-      S.view === "approvals" && S.data.approvals, S.view === "review" && [S.data.review, S.data.nd], S.view === "events" && S.after, S.live]);
+      S.view === "approvals" && S.data.approvals, S.view === "review" && [S.data.review, S.data.nd], S.view === "events" && S.after, S.live,
+      S.data.morning?.counts, S.view === "morning" && S.data.morning?.changed, S.view === "learning" && S.data.learning, S.view === "outcomes" && S.data.outcomes]);
     if (!redraw && sig === S.sig) { const l = document.querySelector(".live"); if (l) l.lastChild.textContent = "Live · " + ago(S.last); return; }
     S.sig = sig;
     const a = document.activeElement; const keep = a && a.id && a.tagName === "TEXTAREA" ? [a.id, a.value] : null;
@@ -365,7 +436,13 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
   }
 
   document.addEventListener("click", async (e) => {
-    const t = e.target.closest("[data-v],[data-open],[data-ex],[data-dispatch],[data-ap],[data-cancel],#closeEx,[data-nd],[data-ndok],[data-ndedit],[data-redraft],#closeNd"); if (!t) return;
+    const t = e.target.closest("[data-v],[data-open],[data-ex],[data-dispatch],[data-ap],[data-cancel],#closeEx,[data-nd],[data-ndok],[data-ndedit],[data-redraft],#closeNd,[data-gonarr],[data-oppok],[data-wd]"); if (!t) return;
+    if (t.dataset.gonarr) { S.selN = t.dataset.gonarr; location.hash = "review"; return; }
+    if (t.dataset.oppok) { const id = t.dataset.oppok, owner = (document.getElementById("ow-" + id)?.value || "").trim();
+      if (!owner) { toast("Name an owner first"); return; }
+      try { await api(`/v1/ops/clients/${encodeURIComponent(S.client)}/opportunities/${encodeURIComponent(id)}/approve`, { method: "POST", body: JSON.stringify({ owner }) }); toast("Approved; baseline recorded"); } catch (err) { toast(err.message); }
+      refresh(true); return; }
+    if (t.dataset.wd) { try { await api(`/v1/ops/outcomes/${t.dataset.wd}/withdraw`, { method: "POST", body: "{}" }); toast("Withdrawn"); } catch (err) { toast(err.message); } refresh(true); return; }
     if (t.id === "closeNd") { S.selN = null; S.data.nd = null; render(); return; }
     if (t.dataset.nd) { S.selN = t.dataset.nd; refresh(true); return; }
     if (t.dataset.ndok) { const ok = t.dataset.ndok === "1", id = t.dataset.id, note = document.getElementById("nn-" + id)?.value || "";
@@ -392,7 +469,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
       try { const r = await api(`/v1/ops/approvals/${t.dataset.ap}/decide`, { method: "POST", body: JSON.stringify({ approve: ok, note }) }); toast(ok ? "Approved" : "Rejected"); } catch (err) { toast(err.message); }
       refresh(); }
   });
-  document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("tr[data-ex],tr[data-nd]")) e.target.click(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("tr[data-ex],tr[data-nd],tr[data-gonarr]")) e.target.click(); });
   window.addEventListener("hashchange", () => { const v = location.hash.slice(1); if (VIEWS.some(x => x[0] === v)) { S.view = v; refresh(true); } });
 
   let timer;

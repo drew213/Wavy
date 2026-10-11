@@ -65,8 +65,11 @@ def context(session: Session, run: m.AuditRun) -> dict:
               for f in session.scalars(select(m.AuditFact).where(m.AuditFact.run_id == run.id))}
     row = session.scalar(select(m.OnboardingIntake).where(m.OnboardingIntake.client_id == client.id))
     answers = (row.answers if row else {}) or {}
+    from ..loop.outcomes import for_client
+    tracked = [{"title": o.title, "status": o.status, "owner": o.owner, "readout_metric": o.readout_metric,
+                "readout_fact": o.readout_fact} for o in for_client(session, client.id)[:12]]
     return {"client": client, "summary": summary, "analysis": analysis, "ledger": ledger, "answers": answers,
-            "checks": workspace._checks(session, sc) if sc is not None else []}
+            "checks": workspace._checks(session, sc) if sc is not None else [], "outcomes": tracked}
 
 
 def build(ctx: dict, section: str, today: Optional[date] = None) -> tuple[dict, str]:
@@ -109,6 +112,11 @@ def build(ctx: dict, section: str, today: Optional[date] = None) -> tuple[dict, 
                         "reason": (c.get("sizing") or {}).get("reason")} if c.get("sizing") else None),
         } for c in summary.get("opportunities") or []]
         packet["gaps"] = summary.get("gaps") or []
+    if section == "report":
+        packet["top_opportunities"] = [{"id": c["id"], "rank": c.get("rank"), "title": c.get("title"),
+                                        "observation": c.get("observation"), "status": c.get("status")}
+                                       for c in (summary.get("opportunities") or [])[:5]]
+        packet["outcomes"] = ctx.get("outcomes") or []
     if section == "foundational":
         packet["checks"] = [{k: c.get(k) for k in ("id", "title", "area", "severity", "verdict", "message")}
                             for c in ctx["checks"] if c.get("verdict") not in ("pass",)]

@@ -28,6 +28,7 @@ def audit_analyze(ctx: JobContext) -> JobOutcome:
     sc = run_audit_for_run(ctx.session, ctx.scope, run.id, link_fetcher=ctx.services.get("link_fetcher"))
     ctx.note("scorecards", sc.id)
     ctx.note("workspace_bundles", workspace.publish(ctx.session, run).id)
+    jobs.emit(ctx.session, ctx.scope, "outcomes.readout", {"run_id": run.id}, dedupe=run.id)
     jobs.emit(ctx.session, ctx.scope, "narrative.draft", {"run_id": run.id}, dedupe=run.id)
     summary = sc.summary or {}
     unavailable = [k for k, v in (summary.get("analysis") or {}).items() if v.get("status") != "ok"]
