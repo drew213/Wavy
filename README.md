@@ -342,6 +342,8 @@ WAVYOS_TEST_SNAPSHOT_ROOT=/path/to/audit/output WAVYOS_TEST_AUDIT_OS_ROOT=/path/
 3. Deploy. Each web deploy runs `wavyos init-db && wavyos ensure-admin` first. Brands sign up at `/start`; staff sign in at `/login`.
 4. Copy `WAVYOS_MASTER_KEY` from the `wavyos-shared` environment group somewhere safe. Without it, stored Klaviyo keys can't be opened.
 
+**Free hosting** (demos and early clients): one Render free web service plus a free Neon Postgres database. Free services have no separate worker, so the start command runs it in-process: `wavyos init-db && wavyos ensure-admin && wavyos serve --host 0.0.0.0 --port $PORT --forwarded-allow-ips '*' --with-worker`. The service sleeps after 15 idle minutes and takes about a minute to wake; an audit only runs while it's awake. Move to the Blueprint above before relying on scheduled jobs.
+
 Cloud-specific settings: `WAVYOS_MASTER_KEY` (the master key from the host's secret store, used instead of the key file), `WAVYOS_ADMIN_EMAIL`, `WAVYOS_ADMIN_PASSWORD`, `WAVYOS_ADMIN_NAME`, `WAVYOS_ORG_NAME`. `postgres://` URLs are accepted as given.
 
 Run the suite against Postgres with `WAVYOS_TEST_POSTGRES_URL=postgresql+psycopg://localhost/wavyos_test`; each test gets its own schema.

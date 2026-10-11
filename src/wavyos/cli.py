@@ -292,6 +292,22 @@ def cmd_demo(args, settings: Settings) -> int:
 def cmd_serve(args, settings: Settings) -> int:
     import uvicorn
     from .api import create_app
+    if args.with_worker:  # single-process hosting (free tiers): the worker runs as a thread beside the API
+        import threading
+        import time
+        import traceback
+        work_args = argparse.Namespace(loop=True, interval=2.0, schedule_every=300.0, limit=50,
+                                       jobs_only=False, executions_only=False)
+
+        def worker() -> None:
+            while True:
+                try:
+                    cmd_work(work_args, settings)
+                except Exception:
+                    traceback.print_exc()
+                    time.sleep(5)
+
+        threading.Thread(target=worker, name="wavyos-worker", daemon=True).start()
     # Behind a host's TLS proxy, trust X-Forwarded-* so request.client is the visitor, not the proxy.
     uvicorn.run(create_app(services={"settings": settings}), host=args.host, port=args.port,
                 proxy_headers=True, forwarded_allow_ips=args.forwarded_allow_ips)
@@ -415,6 +431,8 @@ def build_parser() -> argparse.ArgumentParser:
     sv.add_argument("--port", type=int, default=8000)
     sv.add_argument("--forwarded-allow-ips", default="127.0.0.1",
                     help="proxies whose X-Forwarded-For is trusted ('*' behind a host's load balancer)")
+    sv.add_argument("--with-worker", action="store_true",
+                    help="also run the worker and scheduler in this process (when the host has no separate worker)")
     sv.set_defaults(fn=cmd_serve)
 
     v = sub.add_parser("verify-events", help="check a client's event hash chain")

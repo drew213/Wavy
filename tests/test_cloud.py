@@ -144,6 +144,22 @@ def test_ensure_admin_sets_up_once_and_never_resets_a_password(tmp_path, monkeyp
             accounts.sign_in(s, "andrew@wavy.test", "second-password-456")
 
 
+def test_serve_with_worker_starts_the_worker_beside_the_api(tmp_path, monkeypatch):
+    import threading
+
+    import uvicorn
+
+    from wavyos import cli
+    started = threading.Event()
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: started.wait(2))
+    monkeypatch.setattr(cli, "cmd_work", lambda args, settings: (started.set(), threading.Event().wait())
+                        if args.loop and args.schedule_every else None)
+    monkeypatch.setenv("WAVYOS_DATABASE_URL", f"sqlite:///{tmp_path / 's.db'}")
+    monkeypatch.setenv("WAVYOS_MASTER_KEY", "z" * 40)
+    assert main(["serve", "--with-worker"]) == 0
+    assert started.is_set()
+
+
 def test_worker_schedules_due_jobs(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("WAVYOS_DATABASE_URL", f"sqlite:///{tmp_path / 'w.db'}")
     monkeypatch.setenv("WAVYOS_MASTER_KEY", "z" * 40)
