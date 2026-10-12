@@ -51,6 +51,17 @@ class LoginBody(BaseModel):
     password: SecretStr
 
 
+class TeammateBody(BaseModel):
+    email: str
+    name: str = ""
+    role: str = "org_admin"
+
+
+class SetPasswordBody(BaseModel):
+    token: SecretStr
+    password: SecretStr
+
+
 class OnboardBody(BaseModel):
     client_name: str
     client_slug: str
@@ -490,6 +501,50 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
         except accounts.SignInFailed as e:
             raise HTTPException(401, {"error": str(e)})
         return {"token": token, "expires_in_days": accounts.BROWSER_SESSION_TTL.days}
+
+    @r.post("/password-link")
+    def set_password_from_link(body: SetPasswordBody, request: Request, s: Session = Depends(db)):
+        from .. import accounts
+        if not login_by_ip.allow(s, visitor(request)):
+            raise too_many()
+        _, token = guard(lambda: accounts.redeem_password_link(s, body.token.get_secret_value(), body.password.get_secret_value()))
+        return {"token": token, "expires_in_days": accounts.BROWSER_SESSION_TTL.days}
+
+    # ---------------------------------------------------------------- team (org admins)
+
+    def org_admin(s: Session, u: m.User):
+        sc = guard(lambda: scope_for_user(s, u, None))
+        if "org_admin" not in sc.actor.roles:
+            raise HTTPException(404, {"error": "not found"})
+        return sc
+
+    def teammate_row(s: Session, t: m.User) -> dict:
+        roles = s.scalars(select(m.Membership.role).where(m.Membership.user_id == t.id, m.Membership.client_id.is_(None))).all()
+        has_password = s.scalar(select(func.count()).select_from(m.PasswordCredential).where(m.PasswordCredential.user_id == t.id))
+        return {"id": t.id, "email": t.email, "name": t.name, "roles": sorted(roles), "active": t.active,
+                "has_password": bool(has_password)}
+
+    @r.get("/team")
+    def team(u: m.User = Depends(user), s: Session = Depends(db)):
+        org_admin(s, u)
+        people = s.scalars(select(m.User).where(m.User.org_id == u.org_id, m.User.kind == "staff").order_by(m.User.name)).all()
+        return {"people": [teammate_row(s, t) for t in people], "roles": list(m.STAFF_ROLES)}
+
+    @r.post("/team")
+    def add_teammate(body: TeammateBody, u: m.User = Depends(user), s: Session = Depends(db)):
+        from .. import accounts
+        sc = org_admin(s, u)
+        t = guard(lambda: tenancy.add_teammate(s, sc, email=body.email, name=body.name, role=body.role))
+        return {"person": teammate_row(s, t), "link": accounts.password_link(s, t)}
+
+    @r.post("/team/{user_id}/link")
+    def teammate_link(user_id: str, u: m.User = Depends(user), s: Session = Depends(db)):
+        from .. import accounts
+        org_admin(s, u)
+        t = s.get(m.User, user_id)
+        if t is None or t.org_id != u.org_id or t.kind != "staff":
+            raise HTTPException(404, {"error": "not found"})
+        return {"person": teammate_row(s, t), "link": accounts.password_link(s, t)}
 
     @r.post("/logout")
     def logout(authorization: Optional[str] = Header(default=None), s: Session = Depends(db)):

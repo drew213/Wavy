@@ -114,26 +114,44 @@ form .sub { color: var(--muted); font-size: 12px; margin-top: -8px; }
     <p class="err" id="l-err" role="alert"></p>
     <button class="cta" type="submit" id="l-btn">Sign in</button>
     <p class="fine">New here? <a href="/start">Get your free audit</a></p>
-    <p class="fine">Wavy team: set a password with <code>wavyos password --email you@wavy.studio</code>, then sign in here.</p>
+    <p class="fine">Wavy team: ask an admin for a sign-in link to set your password.</p>
+  </form>
+
+  <form id="welcome" autocomplete="on" hidden>
+    <h2>Set your password</h2>
+    <p class="sub">You'll use it with your email to sign in from now on.</p>
+    <div class="field"><label for="w-pass">Password</label><input id="w-pass" type="password" autocomplete="new-password" minlength="10" required>
+      <small>At least 10 characters.</small></div>
+    <p class="err" id="w-err" role="alert"></p>
+    <button class="cta" type="submit" id="w-btn">Set password and sign in</button>
   </form>
 </main>
 
 <script>
 const $ = id => document.getElementById(id);
-const isLogin = location.pathname.startsWith("/login");
-const next = new URLSearchParams(location.search).get("next");
+const mode = location.pathname.startsWith("/welcome") ? "welcome" : location.pathname.startsWith("/login") ? "login" : "signup";
+const isLogin = mode === "login";
+const params = new URLSearchParams(location.search);
+const next = params.get("next");
 const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+const linkToken = mode === "welcome" ? params.get("t") || "" : "";
+if (linkToken) history.replaceState(null, "", "/welcome");
 
-const COPY = isLogin
-  ? { title: "Wavy — Sign in", headline: 'Welcome <em>back.</em>',
-      lede: "Sign in to reopen your retention audit, see every version of it, and run a fresh one whenever your numbers move." }
-  : { title: "Wavy — Get your retention audit", headline: 'Your retention audit, from one <em>Klaviyo</em> key.',
-      lede: "We read 24 months of orders and every flow, score your retention, and show what email is leaving on the table, with a 30-day plan to fix it." };
+const COPY = {
+  login: { title: "Wavy — Sign in", headline: 'Welcome <em>back.</em>',
+    lede: "Sign in to reopen your retention audit, see every version of it, and run a fresh one whenever your numbers move." },
+  signup: { title: "Wavy — Get your retention audit", headline: 'Your retention audit, from one <em>Klaviyo</em> key.',
+    lede: "We read 24 months of orders and every flow, score your retention, and show what email is leaving on the table, with a 30-day plan to fix it." },
+  welcome: { title: "Wavy — Set your password", headline: 'Welcome to <em>Wavy OS.</em>',
+    lede: "Set a password to open the console: every client's audit, plan and progress in one place." },
+}[mode];
 document.title = COPY.title;
 $("headline").innerHTML = COPY.headline;
 $("lede").textContent = COPY.lede;
-$(isLogin ? "login" : "signup").hidden = false;
-$("switch").innerHTML = isLogin ? 'New here? <a href="/start">Get your audit</a>' : 'Have an account? <a href="/login">Sign in</a>';
+$(mode).hidden = false;
+$("path").hidden = mode === "welcome";
+$("switch").innerHTML = { signup: 'Have an account? <a href="/login">Sign in</a>', login: 'New here? <a href="/start">Get your audit</a>', welcome: "" }[mode];
+if (mode === "welcome" && !linkToken) $("w-err").textContent = "This page needs the link an admin sent you. Ask them for a new one.";
 
 async function post(path, body) {
   const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -189,9 +207,24 @@ $("login").addEventListener("submit", async e => {
   }
 });
 
-$(isLogin ? "l-email" : "s-brand").focus();
+$("welcome").addEventListener("submit", async e => {
+  e.preventDefault();
+  $("w-err").textContent = "";
+  if ($("w-pass").value.length < 10) { $("w-err").textContent = "Use a password of at least 10 characters."; $("w-pass").focus(); return; }
+  $("w-btn").disabled = true;
+  try {
+    const { token } = await post("/v1/ops/password-link", { token: linkToken, password: $("w-pass").value });
+    await land(token);
+  } catch (err) {
+    $("w-err").textContent = err.message;
+    $("w-btn").disabled = false;
+  }
+});
+
+$({ login: "l-email", signup: "s-brand", welcome: "w-pass" }[mode]).focus();
 
 (async () => {
+  if (mode === "welcome") return;
   let saved = "";
   try { saved = localStorage.getItem("wos-token") || sessionStorage.getItem("wos-token") || ""; } catch {}
   if (!saved) return;

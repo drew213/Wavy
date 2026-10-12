@@ -10,19 +10,24 @@ import hashlib
 import hmac
 import re
 import secrets
-from datetime import timedelta
+from datetime import timedelta, timezone
 from typing import Optional
+from urllib.parse import urlencode
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from . import events, tenancy
 from . import models as m
+from .db import utcnow
 from .scope import SYSTEM, InvalidState, Scope
 
 MIN_PASSWORD = 10
 BROWSER_SESSION = "browser sign-in"
 BROWSER_SESSION_TTL = timedelta(days=30)
+PASSWORD_LINK = "set-password link"
+PASSWORD_LINK_PREFIX = "wpl_"
+PASSWORD_LINK_TTL = timedelta(days=7)
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _N, _R, _P = 2 ** 14, 8, 1
 
@@ -106,6 +111,42 @@ def set_password(session: Session, user: m.User, password: str) -> None:
     else:
         cred.password_hash = hash_password(password)
     session.flush()
+
+
+def password_link(session: Session, user: m.User) -> str:
+    """A path where this person sets their own password, once, within a week. Issuing one cancels any
+    earlier link. Only a hash is stored, and the prefix keeps it from working as an API token."""
+    _cancel_password_links(session, user)
+    token = PASSWORD_LINK_PREFIX + secrets.token_urlsafe(32)
+    session.add(m.ApiToken(user_id=user.id, prefix=token[:12], token_hash=hashlib.sha256(token.encode()).hexdigest(),
+                           label=PASSWORD_LINK, expires_at=utcnow() + PASSWORD_LINK_TTL))
+    session.flush()
+    events.record(session, Scope(user.org_id, None, SYSTEM), "user.password_link", user, f"set-password link for {user.email}")
+    return "/welcome?" + urlencode({"t": token})
+
+
+def redeem_password_link(session: Session, token: str, password: str) -> tuple[m.User, str]:
+    """Set the password the link was made for and sign that person in. Returns (user, browser token)."""
+    row = None
+    if token.startswith(PASSWORD_LINK_PREFIX):
+        digest = hashlib.sha256(token.encode()).hexdigest()
+        row = next((r for r in session.scalars(select(m.ApiToken).where(
+            m.ApiToken.prefix == token[:12], m.ApiToken.label == PASSWORD_LINK, m.ApiToken.revoked_at.is_(None)))
+            if hmac.compare_digest(r.token_hash, digest)), None)
+    expires = row.expires_at.replace(tzinfo=row.expires_at.tzinfo or timezone.utc) if row else None
+    user = session.get(m.User, row.user_id) if row else None
+    if user is None or not user.active or expires <= utcnow():
+        raise InvalidState("this link has expired or was already used; ask an admin for a new one")
+    set_password(session, user, password)
+    row.revoked_at = utcnow()
+    events.record(session, Scope(user.org_id, None, SYSTEM), "user.password_set", user, f"{user.email} set a password")
+    return user, tenancy.issue_token(session, user, BROWSER_SESSION, ttl=BROWSER_SESSION_TTL)
+
+
+def _cancel_password_links(session: Session, user: m.User) -> None:
+    for r in session.scalars(select(m.ApiToken).where(m.ApiToken.user_id == user.id, m.ApiToken.label == PASSWORD_LINK,
+                                                      m.ApiToken.revoked_at.is_(None))):
+        r.revoked_at = utcnow()
 
 
 def _free_slug(session: Session, org_id: str, name: str) -> str:
