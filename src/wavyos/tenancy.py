@@ -76,6 +76,28 @@ def add_user(session: Session, scope: Scope, *, email: str, name: str, kind: str
     return u
 
 
+def add_teammate(session: Session, scope: Scope, *, email: str, name: str, role: str) -> m.User:
+    """An agency person with an org-wide role, which shows them every client. An existing staff account
+    with this email gets the role added instead of a second account."""
+    if role not in m.STAFF_ROLES:
+        raise ValueError(f"role must be one of {m.STAFF_ROLES}")
+    email, name = email.strip().lower(), name.strip()
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+        raise ValueError("enter a valid email address")
+    user = session.scalar(select(m.User).where(m.User.org_id == scope.org_id, m.User.email == email))
+    if user is None:
+        if not name:
+            raise ValueError("enter their name")
+        user = add_user(session, scope, email=email, name=name, kind="staff")
+    elif user.kind != "staff":
+        raise InvalidState("that email belongs to a brand's account")
+    held = session.scalars(select(m.Membership.role).where(m.Membership.user_id == user.id,
+                                                           m.Membership.client_id.is_(None))).all()
+    if role not in held:
+        grant(session, scope, user_id=user.id, role=role, client_id=None)
+    return user
+
+
 def grant(session: Session, scope: Scope, *, user_id: str, role: str, client_id: Optional[str]) -> m.Membership:
     """Org admins grant anything; account leads grant client roles on their clients."""
     user = session.get(m.User, user_id)

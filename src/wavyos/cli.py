@@ -170,6 +170,32 @@ def cmd_password(args, settings: Settings) -> int:
     return 0
 
 
+def cmd_team_add(args, settings: Settings) -> int:
+    from . import accounts
+    with transaction(_factory(settings)) as s:
+        actor = _user(s, args.actor, args.org)
+        try:
+            person = tenancy.add_teammate(s, scope_for_user(s, actor, None), email=args.email, name=args.name, role=args.role)
+        except ValueError as e:
+            raise CliError(str(e))
+        link = accounts.password_link(s, person)
+    print(f"{person.email} is on the team as {args.role}. Send them this link (works once, for 7 days):")
+    print((args.site or settings.app_url) + link)
+    return 0
+
+
+def cmd_team_link(args, settings: Settings) -> int:
+    from . import accounts
+    with transaction(_factory(settings)) as s:
+        person = _user(s, args.email, args.org)
+        if person.kind != "staff":
+            raise CliError(f"{person.email} is a brand account; brands reset passwords by signing up again")
+        link = accounts.password_link(s, person)
+    print(f"Set-password link for {person.email} (works once, for 7 days; cancels any earlier link):")
+    print((args.site or settings.app_url) + link)
+    return 0
+
+
 def cmd_client_create(args, settings: Settings) -> int:
     with transaction(_factory(settings)) as s:
         actor = _user(s, args.actor, args.org)
@@ -467,6 +493,22 @@ def build_parser() -> argparse.ArgumentParser:
     pw.add_argument("--email", required=True)
     pw.add_argument("--org", help="organization slug (when the email exists in several)")
     pw.set_defaults(fn=cmd_password)
+
+    tm = sub.add_parser("team", help="agency people: add them and send set-password links")
+    tms = tm.add_subparsers(dest="team_command", required=True)
+    ta = tms.add_parser("add", help="add someone with an org-wide role (sees every client); prints their link")
+    ta.add_argument("--as", dest="actor", required=True, help="email of an org admin")
+    ta.add_argument("--org")
+    ta.add_argument("--email", required=True)
+    ta.add_argument("--name", required=True)
+    ta.add_argument("--role", default="org_admin", choices=list(m.STAFF_ROLES))
+    ta.add_argument("--site", help="site address for the link (default: WAVYOS_APP_URL)")
+    ta.set_defaults(fn=cmd_team_add)
+    tl = tms.add_parser("link", help="print a one-time set-password link for a team member")
+    tl.add_argument("--email", required=True)
+    tl.add_argument("--org")
+    tl.add_argument("--site", help="site address for the link (default: WAVYOS_APP_URL)")
+    tl.set_defaults(fn=cmd_team_link)
 
     c = sub.add_parser("client", help="client workspaces")
     csub = c.add_subparsers(dest="client_command", required=True)

@@ -74,6 +74,10 @@ def mount_console(app: FastAPI, get_factory) -> None:
     def login() -> FileResponse:
         return _page("account.html")
 
+    @app.get("/welcome", include_in_schema=False)
+    def welcome() -> FileResponse:
+        return _page("account.html")
+
     @app.get("/", include_in_schema=False)
     def root() -> RedirectResponse:
         return RedirectResponse("/login")

@@ -122,7 +122,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
 <div id="root"></div>
 <script>
 (() => {
-  const VIEWS = [["morning","Morning"],["overview","Overview"],["flow","Flow"],["review","Review"],["outcomes","Outcomes"],["learning","Learning"],["scale","Scale"],["executions","Executions"],["jobs","Jobs"],["approvals","Approvals"],["events","Events"]];
+  const VIEWS = [["morning","Morning"],["overview","Overview"],["flow","Flow"],["review","Review"],["outcomes","Outcomes"],["learning","Learning"],["scale","Scale"],["executions","Executions"],["jobs","Jobs"],["approvals","Approvals"],["events","Events"],["team","Team"]];
   const S = { token: null, me: null, view: "overview", client: "", sel: null, data: {}, live: false, last: null, err: "", after: 0, events: [] };
   try { S.token = localStorage.getItem("wos-token") || sessionStorage.getItem("wos-token"); S.client = localStorage.getItem("wos-client") || ""; } catch {}
   const $ = (q) => document.querySelector(q);
@@ -442,9 +442,30 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
       <td>${chip(e.action.split(".").pop(), e.action)}</td><td>${esc(e.summary)}</td><td class="muted">${esc(e.hash)}</td></tr>`).join("")}</tbody></table></div>`;
   }
 
+  const isAdmin = () => (S.me?.roles || []).some(r => r.role === "org_admin" && !r.client_id);
+  const ROLE_NAMES = { org_admin: "Admin", account_lead: "Account lead", strategist: "Strategist", analyst: "Analyst", creative: "Creative", qa: "QA" };
+
+  function vTeam() {
+    if (!isAdmin()) return `<div class="empty"><h3>Admins only</h3><p class="muted">Ask an admin to add people or send sign-in links.</p></div>`;
+    const x = S.data.team; if (!x) return `<p class="muted">Loading…</p>`;
+    const link = S.teamLink ? `<div class="card" style="margin-bottom:18px;border-color:var(--lime)"><div class="label">Sign-in link for ${esc(S.teamLink.email)}</div>
+        <div class="row" style="margin:8px 0"><input id="team-link" readonly style="flex:1" value="${esc(S.teamLink.url)}"><button class="btn primary" data-copylink="1">Copy</button></div>
+        <div class="muted" style="font-size:12px">Send it to them directly. It works once, for 7 days, and lets them set their own password. Making a new link cancels this one.</div></div>` : "";
+    return `${link}<div class="card" style="margin-bottom:18px"><div class="label">Add someone from the team</div>
+        <div class="muted" style="font-size:12px;margin:4px 0 10px">Team members see every client's workspace, current and future.</div>
+        <div class="row"><input id="tm-name" placeholder="Name" style="flex:1"><input id="tm-email" type="email" placeholder="Email" style="flex:1.4">
+        <select id="tm-role">${x.roles.map(r => `<option value="${esc(r)}">${esc(ROLE_NAMES[r] || r)}</option>`).join("")}</select>
+        <button class="btn primary" data-teamadd="1">Add and get link</button></div></div>
+      <div class="tbl"><table><thead><tr><th>Person</th><th>Role</th><th>Password</th><th></th></tr></thead><tbody>
+        ${x.people.map(p => `<tr><td><div class="t">${esc(p.name)}</div><div class="muted">${esc(p.email)}</div></td>
+          <td>${p.roles.map(r => esc(ROLE_NAMES[r] || r)).join(", ") || `<span class="muted">none</span>`}</td>
+          <td>${p.has_password ? chip("ok", "set") : chip("pending", "not set yet")}</td>
+          <td class="num"><button class="btn" data-teamlink="${esc(p.id)}">${p.has_password ? "Password reset link" : "New sign-in link"}</button></td></tr>`).join("")}</tbody></table></div>`;
+  }
+
   function render() {
     shell();
-    const v = { morning: vMorning, overview: vOverview, flow: vFlow, review: vReview, outcomes: vOutcomes, learning: vLearning, scale: vScale, executions: vExecutions, jobs: vJobs, approvals: vApprovals, events: vEvents }[S.view];
+    const v = { morning: vMorning, overview: vOverview, flow: vFlow, review: vReview, outcomes: vOutcomes, learning: vLearning, scale: vScale, executions: vExecutions, jobs: vJobs, approvals: vApprovals, events: vEvents, team: vTeam }[S.view];
     $("#content").innerHTML = v();
   }
 
@@ -464,6 +485,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
         const base = S.client ? `/v1/ops/clients/${encodeURIComponent(S.client)}` : null;
         [S.data.outcomes, S.data.progress, S.data.mail] = base ? await Promise.all([api(base + "/outcomes"), api(base + "/progress"), api(base + "/mail")]) : [null, null, null];
       }
+      if (S.view === "team" && isAdmin()) S.data.team = await api("/v1/ops/team");
       if (S.view === "review" && S.me?.staff) { S.data.review = await api("/v1/ops/narrative?" + qc()); S.data.nd = S.selN ? await api("/v1/ops/narrative/" + S.selN) : null; }
       const ev = await api("/v1/ops/events?after=" + S.after);
       if (ev.events.length) { S.events = S.events.concat(ev.events).slice(-1000); S.after = ev.events[ev.events.length - 1].id; }
@@ -474,7 +496,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
     const sig = JSON.stringify([S.view, S.client, S.sel, S.data.overview?.clients, S.view === "flow" && S.data.flow,
       S.view === "executions" && [S.data.executions, S.data.exec], S.view === "jobs" && S.data.jobs,
       S.view === "approvals" && S.data.approvals, S.view === "review" && [S.data.review, S.data.nd], S.view === "events" && S.after, S.live,
-      S.data.morning?.counts, S.view === "morning" && S.data.morning?.changed, S.view === "learning" && S.data.learning, S.view === "outcomes" && [S.data.outcomes, S.data.progress, S.data.mail], (S.view === "scale" || S.view === "morning") && S.data.scale]);
+      S.data.morning?.counts, S.view === "morning" && S.data.morning?.changed, S.view === "learning" && S.data.learning, S.view === "outcomes" && [S.data.outcomes, S.data.progress, S.data.mail], (S.view === "scale" || S.view === "morning") && S.data.scale, S.view === "team" && [S.data.team, S.teamLink]]);
     if (!redraw && sig === S.sig) { const l = document.querySelector(".live"); if (l) l.lastChild.textContent = "Live · " + ago(S.last); return; }
     S.sig = sig;
     const a = document.activeElement; const keep = a && a.id && a.tagName === "TEXTAREA" ? [a.id, a.value] : null;
@@ -488,7 +510,15 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
   }
 
   document.addEventListener("click", async (e) => {
-    const t = e.target.closest("[data-v],[data-open],[data-ex],[data-dispatch],[data-ap],[data-cancel],#closeEx,[data-nd],[data-ndok],[data-ndedit],[data-redraft],#closeNd,[data-gonarr],[data-oppok],[data-wd],[data-ship],[data-mailpause],[data-mailprev]"); if (!t) return;
+    const t = e.target.closest("[data-v],[data-open],[data-ex],[data-dispatch],[data-ap],[data-cancel],#closeEx,[data-nd],[data-ndok],[data-ndedit],[data-redraft],#closeNd,[data-gonarr],[data-oppok],[data-wd],[data-ship],[data-mailpause],[data-mailprev],[data-teamadd],[data-teamlink],[data-copylink]"); if (!t) return;
+    if (t.dataset.teamadd) { const body = { name: $("#tm-name").value.trim(), email: $("#tm-email").value.trim(), role: $("#tm-role").value };
+      if (!body.email) { toast("Enter their email"); return; }
+      try { const r = await api("/v1/ops/team", { method: "POST", body: JSON.stringify(body) }); S.teamLink = { email: r.person.email, url: location.origin + r.link }; toast("Added " + r.person.email); } catch (err) { toast(err.message); }
+      refresh(true); return; }
+    if (t.dataset.teamlink) {
+      try { const r = await api(`/v1/ops/team/${encodeURIComponent(t.dataset.teamlink)}/link`, { method: "POST", body: "{}" }); S.teamLink = { email: r.person.email, url: location.origin + r.link }; } catch (err) { toast(err.message); }
+      refresh(true); return; }
+    if (t.dataset.copylink) { const i = $("#team-link"); i.select(); try { await navigator.clipboard.writeText(i.value); toast("Copied"); } catch { document.execCommand("copy"); toast("Copied"); } return; }
     if (t.dataset.ship) { const at = document.getElementById("sh-" + t.dataset.ship)?.value;
       try { await api(`/v1/ops/outcomes/${encodeURIComponent(t.dataset.ship)}/shipped`, { method: "POST", body: JSON.stringify(at ? { at } : {}) }); toast("Marked live; measuring from that day"); } catch (err) { toast(err.message); }
       refresh(true); return; }
