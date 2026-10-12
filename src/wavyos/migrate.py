@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 import tempfile
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Optional
 
@@ -18,6 +19,7 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
+from alembic.operations import Operations
 from alembic.script import ScriptDirectory
 from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
@@ -55,8 +57,7 @@ def upgrade(engine: Engine) -> str:
         insp = inspect(conn)
         legacy = not insp.has_table("alembic_version") and insp.has_table("organizations")
         if legacy:  # fill in any baseline tables it lacks; later revisions add the rest
-            baseline = [t for t in Base.metadata.sorted_tables if t.name in _baseline_tables()]
-            Base.metadata.create_all(conn, tables=baseline)
+            _create_missing_baseline(conn)
             command.stamp(config(conn), BASELINE)
         before = MigrationContext.configure(conn).get_current_revision()
         command.upgrade(config(conn), "head")
@@ -66,9 +67,43 @@ def upgrade(engine: Engine) -> str:
     return f"database at {after}" if before == after else f"database upgraded {before or 'empty'} -> {after}"
 
 
-def _baseline_tables() -> set[str]:
-    script = next((SCRIPTS / "versions").glob(f"{BASELINE}_*.py")).read_text()
-    return set(re.findall(r"op\.create_table\('(\w+)'", script))
+def _create_missing_baseline(conn) -> None:
+    """Create the tables the baseline has and the database lacks, exactly as the baseline made them.
+    Today's models would make them in their latest shape, which the revisions after the baseline can't apply to."""
+    existing = set(inspect(conn).get_table_names())
+    baseline = ScriptDirectory.from_config(config()).get_revision(BASELINE).module
+    real_op = baseline.op
+    baseline.op = _MissingTablesOnly(Operations(MigrationContext.configure(conn)), existing)
+    try:
+        baseline.upgrade()
+    finally:
+        baseline.op = real_op
+
+
+class _MissingTablesOnly:
+    """Stands in for alembic's op while the baseline runs: skips every table that already exists."""
+
+    def __init__(self, ops: Operations, existing: set[str]):
+        self._ops, self._existing = ops, existing
+
+    def create_table(self, name, *columns, **kw):
+        if name not in self._existing:
+            return self._ops.create_table(name, *columns, **kw)
+
+    def batch_alter_table(self, name, **kw):
+        return nullcontext(_Skipped()) if name in self._existing else self._ops.batch_alter_table(name, **kw)
+
+    def __getattr__(self, attr):
+        return getattr(self._ops, attr)
+
+
+class _Skipped:
+    @staticmethod
+    def f(name):
+        return name
+
+    def __getattr__(self, attr):
+        return lambda *args, **kw: None
 
 
 def differences(engine: Engine) -> list:
