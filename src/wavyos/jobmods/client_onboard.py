@@ -121,7 +121,7 @@ def _continue_backfill(ctx: JobContext, raw: dict) -> None:
     jobs.emit(ctx.session, ctx.scope, KEY, {**raw, "continuation": True}, dedupe=uuid.uuid4().hex)
 
 
-@job(KEY, "Onboard a client", "event", "account_lead", area="onboarding", events=("client.onboard",),
+@job(KEY, "Onboard a client", "event", "account_lead", area="onboarding", events=("client.onboard",), family="klaviyo",
      checks="The intake on the job, plus the client's sealed Klaviyo key (and Shopify token, if one was given).",
      action="Read the Klaviyo account (orders, flows, revenue), run onboarding, and store a new dossier version.",
      completion="Done when a dossier row for this run is stored.")

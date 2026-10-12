@@ -614,12 +614,24 @@ class AuditOrder(IdMixin, Base):
 
 
 class KlaviyoReportCall(IdMixin, Base):
-    """Reporting-endpoint calls per Klaviyo account per UTC day (Klaviyo allows 225, shared with the brand's other apps)."""
+    """Klaviyo calls per account, per budget family, per UTC day. reporting: reporting-endpoint calls (Klaviyo
+    allows 225, shared with the brand's other apps); events: pages of the events endpoint (order history)."""
     __tablename__ = "klaviyo_report_calls"
-    __table_args__ = (UniqueConstraint("account_id", "day"),)
+    __table_args__ = (UniqueConstraint("account_id", "family", "day", name="uq_klaviyo_report_calls_account_family_day"),)
     account_id: Mapped[str] = mapped_column(String(100))
+    family: Mapped[str] = mapped_column(String(20), default="reporting", server_default="reporting")
     day: Mapped[str] = mapped_column(String(10))
     count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class LlmSpend(IdMixin, Base):
+    """Model spend per organization per UTC day, across narrative drafting and task executions."""
+    __tablename__ = "llm_spend"
+    __table_args__ = (UniqueConstraint("org_id", "day"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    day: Mapped[str] = mapped_column(String(10))
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    calls: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class MetricPin(IdMixin, Base):

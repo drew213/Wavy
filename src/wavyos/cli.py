@@ -7,6 +7,7 @@ API token from `bootstrap` and `token`, once, at creation.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from typing import Optional, Sequence
 
@@ -360,8 +361,18 @@ def cmd_serve(args, settings: Settings) -> int:
 
         threading.Thread(target=worker, name="wavyos-worker", daemon=True).start()
     # Behind a host's TLS proxy, trust X-Forwarded-* so request.client is the visitor, not the proxy.
-    uvicorn.run(create_app(services={"settings": settings}), host=args.host, port=args.port,
+    uvicorn.run(create_app(services={"settings": settings, "embedded_worker": bool(args.with_worker)}), host=args.host, port=args.port,
                 proxy_headers=True, forwarded_allow_ips=args.forwarded_allow_ips)
+    return 0
+
+
+def cmd_scale_check(args, settings: Settings) -> int:
+    from . import dbsize, scale
+    factory = _factory(settings)
+    report = dbsize.cached(factory, force=True)
+    with factory() as s:
+        sig = scale.signals(s, report, embedded_worker={"embedded": True, "separate": False}.get(args.hosting))
+    print(json.dumps({"signals": sig, "storage": dbsize.summary(report)}, indent=2, default=str))
     return 0
 
 
@@ -490,6 +501,11 @@ def build_parser() -> argparse.ArgumentParser:
                     help="also run the worker and scheduler in this process (when the host has no separate worker)")
     sv.add_argument("--worker-threads", type=int, default=1, help="with --with-worker: jobs to run at once (Postgres only)")
     sv.set_defaults(fn=cmd_serve)
+
+    sk2 = sub.add_parser("scale-check", help="storage per brand and whether it's time to move hosting up a step")
+    sk2.add_argument("--hosting", choices=["embedded", "separate"],
+                     help="embedded: the worker runs inside the web service (free); separate: its own service")
+    sk2.set_defaults(fn=cmd_scale_check)
 
     v = sub.add_parser("verify-events", help="check a client's event hash chain")
     v.add_argument("--client", help="client slug")

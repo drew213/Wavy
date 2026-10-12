@@ -15,7 +15,7 @@ from ..scope import get_scoped
 KEY = "outcomes.readout"
 
 
-@job(KEY, "Opportunity readouts", "event", "analyst", area="reporting", events=(KEY,),
+@job(KEY, "Opportunity readouts", "event", "analyst", area="reporting", events=(KEY,), family="analysis",
      checks="Every approved opportunity still being tracked for this brand, against the newly scored audit.",
      action="Adds the run's value of each outcome's baseline fact; writes improved / flat / worse / unmeasured once "
             "the readout window has passed.",

@@ -61,6 +61,10 @@ def start(session: Session, scope: Scope, connection: m.Connection, *, started_b
     if spent + budget.SNAPSHOT_REPORT_CALLS > budget.REPORT_DAILY_LIMIT:
         raise budget.BudgetExceeded(f"this Klaviyo account has used {spent} of today's {budget.REPORT_DAILY_LIMIT} "
                                     "reporting calls; start the audit after midnight UTC")
+    pages = budget.used(session, connection.external_account_id, now, family="events")
+    if pages >= budget.LIMITS["events"]:
+        raise budget.BudgetExceeded(f"this Klaviyo account has read {pages} of today's {budget.LIMITS['events']} "
+                                    "event pages; start the audit after midnight UTC")
     run = m.AuditRun(org_id=scope.org_id, client_id=client_id, connection_id=connection.id,
                      account_id=connection.external_account_id, track=track, started_by=started_by,
                      stages={key: {"status": "pending", "label": label} for key, label in LABELS.items()},

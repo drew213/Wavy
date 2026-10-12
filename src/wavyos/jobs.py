@@ -8,6 +8,7 @@ nothing must say why (status no_action), so observation without execution is vis
 """
 from __future__ import annotations
 
+import os
 import threading
 import traceback
 from contextlib import contextmanager
@@ -60,6 +61,7 @@ class JobDefinition:
     events: tuple[str, ...] = ()  # for cadence == "event"
     area: str = "reporting"
     hour: Optional[int] = None    # local hour a scheduled run is due (overnight batches); None = as soon as queued
+    family: str = ""              # concurrency family (FAMILY_LIMITS); "" = unlimited
 
 
 REGISTRY: dict[str, JobDefinition] = {}
@@ -73,10 +75,12 @@ def register(defn: JobDefinition) -> JobDefinition:
 
 
 def job(key: str, title: str, cadence: Cadence, owner_role: str, *, checks: str, action: str,
-        completion: str, events: tuple[str, ...] = (), area: str = "reporting", hour: Optional[int] = None):
+        completion: str, events: tuple[str, ...] = (), area: str = "reporting", hour: Optional[int] = None,
+        family: str = ""):
     """Decorator: register a handler as a job definition."""
     def deco(fn: Callable[[JobContext], JobOutcome]):
-        register(JobDefinition(key, title, cadence, owner_role, checks, action, completion, fn, events, area, hour))
+        register(JobDefinition(key, title, cadence, owner_role, checks, action, completion, fn, events, area, hour,
+                               family))
         return fn
     return deco
 
@@ -174,14 +178,47 @@ def _agent_for(session: Session, org_id: str, role: str) -> m.Agent:
     return agent
 
 
+# Jobs running at once per family, across every worker: klaviyo jobs spend the brands' API allowances and
+# wait on Klaviyo's pacing; analysis jobs are CPU and memory heavy; llm jobs spend model budget. Override with
+# WAVYOS_JOB_FAMILY_LIMITS="klaviyo=6,llm=1". The limit is soft: two workers claiming in the same instant can
+# each start one more.
+FAMILY_LIMITS = {"klaviyo": 4, "analysis": 2, "llm": 2}
+
+
+def family_limits() -> dict[str, int]:
+    limits = dict(FAMILY_LIMITS)
+    for part in (os.environ.get("WAVYOS_JOB_FAMILY_LIMITS") or "").split(","):
+        name, _, n = part.partition("=")
+        if name.strip() and n.strip().isdigit():
+            limits[name.strip()] = max(1, int(n))
+    return limits
+
+
+def saturated(session: Session) -> list[str]:
+    """Job keys whose family is at its limit right now."""
+    limits = family_limits()
+    fams = {k: d.family for k, d in REGISTRY.items() if d.family in limits}
+    if not fams:
+        return []
+    running: dict[str, int] = {}
+    for key, n in session.execute(select(m.JobRun.job_key, func.count()).where(
+            m.JobRun.status == "running", m.JobRun.job_key.in_(list(fams))).group_by(m.JobRun.job_key)):
+        running[fams[key]] = running.get(fams[key], 0) + n
+    return [k for k, f in fams.items() if running.get(f, 0) >= limits[f]]
+
+
 def claim(factory: sessionmaker[Session], job_key: Optional[str] = None) -> Optional[str]:
     """Atomically move one queued run to running. Returns its id, or None. Runs of a definition with an
-    overnight hour wait until they are due; everything else runs as soon as it is queued."""
+    overnight hour wait until they are due; everything else runs as soon as it is queued. A run whose family
+    is at its concurrency limit waits for one of that family to finish."""
     with factory() as s:
         q = select(m.JobRun.id).where(m.JobRun.status == "queued").order_by(m.JobRun.due_at).limit(5)
         held = [k for k, d in REGISTRY.items() if d.hour is not None]
         if held:
             q = q.where(or_(m.JobRun.due_at <= utcnow(), m.JobRun.job_key.not_in(held)))
+        full = saturated(s)
+        if full:
+            q = q.where(m.JobRun.job_key.not_in(full))
         if job_key:
             q = q.where(m.JobRun.job_key == job_key)
         for run_id in s.scalars(q).all():

@@ -10,8 +10,8 @@ For each written section of a scored run:
 Only a passing draft enters the strategist queue (an approval). A draft still failing after the last round
 is kept as needs_rewrite: a strategist can fix it, but it never publishes as is.
 
-Spend is capped per audit (client settings: audit_llm_cap_usd, default DEFAULT_CAP_USD). A section that
-would cross the cap is skipped with the reason, never half-drafted silently.
+Spend is capped per audit (client settings: audit_llm_cap_usd, default DEFAULT_CAP_USD) and per org per day
+(spend.daily_cap). A section that would cross either cap is skipped with the reason, never half-drafted silently.
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from typing import Optional
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .. import approvals, events
+from .. import approvals, events, spend
 from .. import models as m
 from ..analysis.messages import _terms
 from ..execution.engine import allowed_providers
@@ -74,7 +74,8 @@ def _route(client: m.Client, writers: dict[str, Writer]) -> tuple[Optional[str],
     return drafter, critic
 
 
-def _charge(row: m.NarrativeDraft, c: Completion) -> float:
+def _charge(session: Session, row: m.NarrativeDraft, c: Completion) -> float:
+    spend.charge(session, row.org_id, c.cost_usd)
     row.input_tokens += c.input_tokens
     row.output_tokens += c.output_tokens
     row.cost_usd = round(row.cost_usd + c.cost_usd, 6)
@@ -123,15 +124,19 @@ def draft_run(session: Session, scope: Scope, run: m.AuditRun, writers: dict[str
         check: dict = {"ok": False, "problems": [], "cut": [], "warnings": [], "numbers_checked": 0}
         rounds: list[dict] = []
         notes: list[str] = []
-        total, passed, capped = 0.0, False, False
+        total, passed, capped, org_capped = 0.0, False, False, False
         for rnd in range(1, prompts.MAX_ROUNDS + 1):
             if spent + 2 * per_call > cap:
                 capped = True
                 break
+            org_left = spend.left(session, run.org_id)
+            if org_left <= 0 or 2 * per_call > org_left:
+                org_capped = True
+                break
             c = writers[drafter].complete(prompts.SYSTEM_DRAFTER,
                                           prompts.draft_prompt(section, pk, (draft or {}) if rnd > 1 else None,
                                                                check["problems"], notes))
-            spent += _charge(row, c)
+            spent += _charge(session, row, c)
             reply = parse_json(c.text)
             if reply is None:
                 check = {"ok": False, "problems": [{"path": "", "reason": "the reply wasn't a JSON object"}],
@@ -142,7 +147,7 @@ def draft_run(session: Session, scope: Scope, run: m.AuditRun, writers: dict[str
                 draft = check.pop("draft")
             c2 = writers[critic].complete(prompts.SYSTEM_CRITIC,
                                           prompts.critic_prompt(section, pk, draft or {}, check["problems"]))
-            spent += _charge(row, c2)
+            spent += _charge(session, row, c2)
             per_call = max(per_call, c.cost_usd, c2.cost_usd)
             scores, notes, total = score_of(parse_json(c2.text))
             rounds.append({"round": rnd, "total": total, "scores": scores, "notes": notes,
@@ -164,6 +169,9 @@ def draft_run(session: Session, scope: Scope, run: m.AuditRun, writers: dict[str
                                    {"section": section, "packet_hash": row.packet_hash, "payload": row.payload})
             session.flush()
             row.approval_id = ap.id
+        elif org_capped and not rounds:
+            row.status = "skipped"
+            row.reason = spend.cap_reason() + " Nothing was drafted for this section; draft it again tomorrow."
         elif capped and not rounds:
             row.status = "skipped"
             row.reason = f"The ${cap:.2f} model spend cap for this audit was reached before this section was drafted."
@@ -171,6 +179,8 @@ def draft_run(session: Session, scope: Scope, run: m.AuditRun, writers: dict[str
             why = []
             if capped:
                 why.append(f"the ${cap:.2f} spend cap stopped revisions after round {len(rounds)}")
+            if org_capped:
+                why.append(f"the agency's ${spend.daily_cap():.2f} daily spend cap stopped revisions after round {len(rounds)}")
             if not check["ok"]:
                 why.append(f"{len(check['problems'])} facts-check problem(s) remain")
             if rounds and total < prompts.PASS_SCORE:

@@ -16,7 +16,7 @@ from ..scope import get_scoped
 KEY = collector.JOB_KEY
 
 
-@job(KEY, "Collect a Klaviyo audit", "event", "analyst", area="onboarding", events=(KEY,),
+@job(KEY, "Collect a Klaviyo audit", "event", "analyst", area="onboarding", events=(KEY,), family="klaviyo",
      checks="The audit run on the job and the client's sealed Klaviyo key.",
      action="Read the account stage by stage into audit artifacts and stored orders, resuming any stage that was interrupted.",
      completion="Done when every stage is done, failed or skipped, and the run is ready, partial or failed.")

@@ -14,7 +14,7 @@ from ..scope import get_scoped
 KEY = "audit.analyze"
 
 
-@job(KEY, "Analyze a collected audit", "event", "analyst", area="onboarding", events=(KEY,),
+@job(KEY, "Analyze a collected audit", "event", "analyst", area="onboarding", events=(KEY,), family="analysis",
      checks="The audit run on the job, which must have finished collecting.",
      action="Score the run with the check library, size the levers from measured inputs and rank opportunity cards.",
      completion="Done when the run has a scorecard with sizing and opportunities.")

@@ -19,7 +19,7 @@ from typing import Optional
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
-from .. import approvals, events, operations
+from .. import approvals, events, operations, spend
 from .. import models as m
 from ..db import utcnow
 from ..policy import authorize
@@ -112,6 +112,8 @@ def dispatch(session: Session, scope: Scope, task_id: str, *, purpose: str = "pr
     budget = float((client.settings or {}).get("daily_budget_usd", DEFAULT_DAILY_BUDGET_USD))
     if spent_today(session, client.id) >= budget:
         raise InvalidState(f"today's model budget for this client (${budget:.2f}) is used up")
+    if spend.left(session, scope.org_id) <= 0:
+        raise InvalidState(spend.cap_reason())
     attempts = session.scalar(select(func.count()).select_from(m.Execution).where(
         m.Execution.task_id == task.id, m.Execution.purpose == purpose)) or 0
     ex_name, model, effort = route(session, task, purpose, prefer=executor)
@@ -166,6 +168,7 @@ def run(factory: sessionmaker[Session], execution_id: str, adapters) -> m.Execut
                 raise ExecutorUnavailable(f"{ex.executor} isn't an allowed provider for this client")
             result: AdapterResult = adapter.run(ex.packet, tools_for(ex.purpose), gw, ex.model, ex.packet["routing"]["effort"])
             ex.input_tokens, ex.output_tokens, ex.cost_usd = result.input_tokens, result.output_tokens, round(result.cost_usd, 6)
+            spend.charge(s, ex.org_id, ex.cost_usd)
             ex.result = {"summary": result.summary, "outputs": gw.outputs, "checks": gw.checks, "turns": result.turns}
             ex.finished_at = utcnow()
             _settle(s, base, ex, task, gw)

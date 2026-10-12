@@ -38,6 +38,27 @@ Render free web service (512 MB, sleeps after 15 idle minutes) with the worker i
 - **Pruning.** The scheduler tick clears expired rate-limit rows and raw artifacts beyond each brand's last 3 runs.
 - **Error reporting.** Set `SENTRY_DSN` and errors, including failed jobs, go to Sentry (free plan). Nothing personal is sent.
 
+## Cost guards (done)
+
+| Guard | Default | Change it with | When it trips |
+|---|---|---|---|
+| Klaviyo reporting calls, per account per UTC day | 40 (Klaviyo allows 225) | `collector/budget.py` | A run that would cross it is refused; a report mid-run is recorded as failed with the reason. |
+| Klaviyo event pages (order history), per account per UTC day | 1,500 pages | `collector/budget.py` | The orders read stops with "events budget used" and the run is partial; a new audit is refused until midnight UTC. Pages are reserved one checkpoint (10 pages) at a time. |
+| Model spend per audit | $5 | client setting `audit_llm_cap_usd` | Sections past it are skipped with the reason. |
+| Model spend per client per day (task executions) | $5 | client setting `daily_budget_usd` | New executions are refused. |
+| Model spend per organization per UTC day (drafting and executions together) | $50 | `WAVYOS_ORG_LLM_DAILY_USD` | Drafting stops with "the agency's daily spend cap"; new executions are refused. Both show in the morning queue. |
+| Jobs running at once per family, across all workers | klaviyo 4, analysis 2, llm 2 | `WAVYOS_JOB_FAMILY_LIMITS="klaviyo=6,llm=1"` | Further runs of that family wait in the queue; other families keep running. The limit is soft: two workers claiming in the same instant can each start one. |
+
+**Storage per brand.** `/healthz` reports the database size, its share of the free plan, the brand count and the largest brand (no names; it's public), measured at most every 15 minutes, and logs each brand's size (logger `wavyos.dbsize`). On Postgres a brand's size is the sum of its rows across every table with a `client_id`. The staff console's **Scale** view shows the same per brand by name, today's Klaviyo budgets per brand, model spend against the org cap, and jobs running per family.
+
+## When to move (the trigger)
+
+The console's **Scale** view (and the banner on **Morning**) and `wavyos scale-check --hosting embedded|separate` say when to move up a step:
+
+- **Step 1** when the worker still runs inside the web service and any of: a brand is marked active (paying), the database is past 70% of the free 0.5 GB, due jobs have waited 30 minutes or more, or an overnight run is still queued 2 hours after it was due.
+- **More threads, then a second worker** when a separate worker falls behind the same way.
+- **Step 2** past about 200 brands or 70% of a 10 GB paid database.
+
 ## The move to paid hosting
 
 ### Step 1: at the first paying brand (about $45–60 a month)

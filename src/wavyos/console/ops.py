@@ -644,6 +644,35 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
         staff(s, u)
         return morning_mod.queue(s, visible_ids(s, u), hours=hours)
 
+    @r.get("/scale")
+    def scale_view(request: Request, fresh: bool = False, u: m.User = Depends(user), s: Session = Depends(db)):
+        """Cost guards and hosting: storage per brand, today's model spend and Klaviyo budgets, jobs per
+        family against their limits, and whether it's time to move hosting up a step."""
+        from .. import dbsize, jobs, scale, spend
+        from ..collector import budget
+        staff(s, u)
+        ids = set(s.scalars(visible(s, u).with_only_columns(m.Client.id)))
+        report = dbsize.cached(request.app.state.factory, force=fresh)
+        services = request.app.state.services
+        conns = s.execute(select(m.Client.slug, m.Client.name, m.Connection.external_account_id)
+                          .join(m.Connection, m.Connection.client_id == m.Client.id)
+                          .where(m.Client.id.in_(ids), m.Connection.provider == "klaviyo",
+                                 m.Connection.status == "active")).all()
+        used = budget.today(s, [a for _, _, a in conns if a])
+        running = dict(s.execute(select(m.JobRun.job_key, func.count()).where(m.JobRun.status == "running")
+                                 .group_by(m.JobRun.job_key)).all())
+        limits = jobs.family_limits()
+        families = [{"family": f, "limit": n,
+                     "running": sum(running.get(k, 0) for k, d in REGISTRY.items() if d.family == f),
+                     "jobs": sorted(k for k, d in REGISTRY.items() if d.family == f)} for f, n in limits.items()]
+        return {"signals": scale.signals(s, report, embedded_worker=services.get("embedded_worker")),
+                "storage": dbsize.for_clients(report, ids),
+                "llm": {"used_usd": round(spend.used(s, u.org_id), 4), "cap_usd": spend.daily_cap()},
+                "klaviyo": [{"client": slug, "client_name": name,
+                             **{f: {"used": used.get(a, {}).get(f, 0), "limit": lim} for f, lim in budget.LIMITS.items()}}
+                            for slug, name, a in conns if a],
+                "families": families}
+
     @r.get("/learning")
     def learning(u: m.User = Depends(user), s: Session = Depends(db)):
         """Strategist edits and rejections per section prompt and playbook, and how playbooks read out."""

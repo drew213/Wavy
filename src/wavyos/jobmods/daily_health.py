@@ -95,7 +95,7 @@ def _connection_insight(ctx, conn, title, detail, dedupe, severity="high"):
         ctx.note("insights", ins.id)
 
 
-@job(KEY, "Daily account health", "daily", "analyst", area="flow_audit",
+@job(KEY, "Daily account health", "daily", "analyst", area="flow_audit", family="klaviyo",
      checks="Every flow in each connected Klaviyo account: is it still in the state it was in yesterday? "
             "Has a live flow gone to draft, manual, paused or archived, disappeared, or started reporting an error? "
             "Does the key still open the account we connected?",

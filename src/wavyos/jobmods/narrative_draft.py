@@ -14,7 +14,7 @@ from ..scope import get_scoped
 KEY = "narrative.draft"
 
 
-@job(KEY, "Draft the written audit sections", "event", "analyst", area="onboarding", events=(KEY,),
+@job(KEY, "Draft the written audit sections", "event", "analyst", area="onboarding", events=(KEY,), family="llm",
      checks="A scored audit run and the brand's allowed model providers.",
      action="Draft each written section from its fact packet, block numbers not in the ledger, have a second "
             "provider critique it (up to 3 rounds), and queue passing drafts for strategist approval.",

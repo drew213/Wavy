@@ -122,7 +122,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
 <div id="root"></div>
 <script>
 (() => {
-  const VIEWS = [["morning","Morning"],["overview","Overview"],["flow","Flow"],["review","Review"],["outcomes","Outcomes"],["learning","Learning"],["executions","Executions"],["jobs","Jobs"],["approvals","Approvals"],["events","Events"]];
+  const VIEWS = [["morning","Morning"],["overview","Overview"],["flow","Flow"],["review","Review"],["outcomes","Outcomes"],["learning","Learning"],["scale","Scale"],["executions","Executions"],["jobs","Jobs"],["approvals","Approvals"],["events","Events"]];
   const S = { token: null, me: null, view: "overview", client: "", sel: null, data: {}, live: false, last: null, err: "", after: 0, events: [] };
   try { S.token = sessionStorage.getItem("wos-token"); S.client = localStorage.getItem("wos-client") || ""; } catch {}
   const $ = (q) => document.querySelector(q);
@@ -334,7 +334,9 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
       .map(([l, n]) => `<div class="card"><div class="label">${l}</div><div class="n num" style="font-size:26px;color:var(--text)">${n}</div></div>`).join("")}</div>`;
     const drafts = (xs, tone) => xs.length ? `<div class="tbl" style="margin-bottom:22px"><table><thead><tr><th>Client</th><th>Section</th><th>Headline</th><th>Score</th><th>Since</th></tr></thead><tbody>
       ${xs.map(d => `<tr class="click" data-gonarr="${esc(d.id)}" tabindex="0"><td>${esc(d.client_name)}</td><td>${chip(tone, d.section.replace(/_/g, " "))}</td><td style="max-width:420px">${esc(d.headline || d.reason || "")}</td><td class="num">${d.score == null ? "—" : esc(d.score) + "/10"}</td><td class="muted">${esc(ago(d.since))}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted" style="margin-bottom:22px">Nothing here.</p>`;
-    return `${strip}
+    const sg = S.data.scale?.signals;
+    const move = sg?.move ? `<div class="card" style="margin-bottom:18px;border-color:var(--amber, #c90)"><div class="label">Hosting</div><div class="t" style="margin:4px 0">${esc(sg.action)}</div><div class="muted" style="font-size:12px">${sg.reasons.map(esc).join("<br>")}</div><a class="btn" href="#scale" style="margin-top:8px">Scale and cost guards</a></div>` : "";
+    return `${move}${strip}
       <div class="label" style="margin-bottom:8px">What changed overnight (last ${esc(m.hours)} hours)</div>
       ${c.changed.length ? `<div class="tbl" style="margin-bottom:22px"><table><thead><tr><th>Client</th><th>Run</th><th class="num">Score</th><th class="num">Checks worse / better</th><th class="num">Opportunities new / resolved</th><th>Biggest moves</th><th></th></tr></thead><tbody>
         ${c.changed.map(r => `<tr><td class="t">${esc(r.client_name)}</td><td>${chip(r.first_audit ? "review" : "ok", r.first_audit ? "first audit" : r.refresh)}<div class="muted">v${esc(r.version)} · ${esc(ago(r.published_at))}</div></td>
@@ -386,6 +388,31 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
         ${l.models.map(x => `<tr><td class="exec">${esc(x.drafter)} → ${esc(x.critic || "none")}</td><td class="num">${x.drafts}</td><td class="num">${x.passed}</td><td class="num">${x.avg_score ?? "—"}</td><td class="num">${x.avg_rounds ?? "—"}</td><td class="num">${usd(x.cost_usd)}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted">No model has drafted yet.</p>`}`;
   }
 
+  function vScale() {
+    if (!S.me?.staff) return staffOnly();
+    const x = S.data.scale; if (!x) return `<p class="muted">Loading…</p>`;
+    const sg = x.signals, st = x.storage, mt = sg.metrics;
+    const pct = (a, b) => b ? Math.round(100 * a / b) + "%" : "—";
+    const card = (l, v, sub) => `<div class="card"><div class="label">${l}</div><div class="n num" style="font-size:24px;color:var(--text)">${v}</div><div class="muted" style="font-size:11.5px">${sub}</div></div>`;
+    return `<div class="card" style="margin-bottom:18px"><div class="label">Hosting</div>${chip(sg.move ? "blocked" : "ok", sg.move ? (sg.step === "step2" ? "move to step 2" : sg.step === "threads" ? "add worker threads" : "move to paid hosting") : "fine for now")}
+        <div class="t" style="margin:6px 0">${esc(sg.action)}</div>${sg.reasons.length ? `<div class="muted" style="font-size:12px">${sg.reasons.map(esc).join("<br>")}</div>` : ""}</div>
+      <div class="grid" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:18px">
+        ${card("Database", st.error ? "—" : esc(st.database_mb) + " MB", st.error ? esc(st.error) : pct(st.database_mb, st.free_plan_mb) + " of the " + esc(st.free_plan_mb) + " MB free plan")}
+        ${card("Model spend today", usd(x.llm.used_usd), "of " + usd(x.llm.cap_usd) + " agency cap (" + pct(x.llm.used_usd, x.llm.cap_usd) + ")")}
+        ${card("Queue lag", esc(mt.queue_lag_minutes) + " min", esc(mt.missed_overnight_runs) + " overnight run(s) missed")}
+        ${card("Brands", esc(mt.brands), esc(mt.active_brands) + " active · " + esc(mt.connected_brands) + " connected to Klaviyo")}</div>
+      <div class="label" style="margin-bottom:8px">Jobs running per family</div>
+      <div class="tbl" style="margin-bottom:22px"><table><thead><tr><th>Family</th><th class="num">Running / limit</th><th>Jobs</th></tr></thead><tbody>
+        ${x.families.map(f => `<tr><td class="t">${esc(f.family)}</td><td class="num">${f.running} / ${f.limit}</td><td class="muted" style="font-size:11.5px">${f.jobs.map(esc).join(", ")}</td></tr>`).join("")}</tbody></table></div>
+      <div class="label" style="margin-bottom:8px">Klaviyo budgets today (reset at midnight UTC)</div>
+      ${x.klaviyo.length ? `<div class="tbl" style="margin-bottom:22px"><table><thead><tr><th>Client</th><th class="num">Reporting calls</th><th class="num">Event pages</th></tr></thead><tbody>
+        ${x.klaviyo.map(k => `<tr><td>${esc(k.client_name)}</td><td class="num">${k.reporting.used} / ${k.reporting.limit}</td><td class="num">${k.events.used} / ${k.events.limit}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted" style="margin-bottom:22px">No brand has an active Klaviyo connection.</p>`}
+      <div class="label" style="margin-bottom:8px">Storage per brand</div>
+      ${(st.brands || []).length ? `<div class="tbl"><table><thead><tr><th>Client</th><th class="num">Size</th><th class="num">Rows</th></tr></thead><tbody>
+        ${st.brands.map(b => `<tr><td>${esc(b.name || b.slug)}</td><td class="num">${b.mb == null ? "—" : esc(b.mb) + " MB"}</td><td class="num">${Number(b.rows).toLocaleString()}</td></tr>`).join("")}</tbody></table></div>
+        ${st.dialect !== "postgresql" ? `<p class="muted" style="margin-top:6px">Sizes per brand are measured on Postgres; this database reports row counts.</p>` : ""}` : `<p class="muted">No brand data stored yet.</p>`}`;
+  }
+
   function vEvents() {
     const ev = S.events.filter(e => !S.client || e.client === S.client).slice(-300).reverse();
     if (!ev.length) return `<div class="empty"><h3>No events yet</h3><p class="muted">Every change in Wavy OS is written here, chained by hash.</p></div>`;
@@ -396,7 +423,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
 
   function render() {
     shell();
-    const v = { morning: vMorning, overview: vOverview, flow: vFlow, review: vReview, outcomes: vOutcomes, learning: vLearning, executions: vExecutions, jobs: vJobs, approvals: vApprovals, events: vEvents }[S.view];
+    const v = { morning: vMorning, overview: vOverview, flow: vFlow, review: vReview, outcomes: vOutcomes, learning: vLearning, scale: vScale, executions: vExecutions, jobs: vJobs, approvals: vApprovals, events: vEvents }[S.view];
     $("#content").innerHTML = v();
   }
 
@@ -411,6 +438,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
       if (S.view === "approvals") S.data.approvals = await api("/v1/ops/approvals");
       if (S.me?.staff && (S.view === "morning" || !S.data.morning || Date.now() - (S.mAt || 0) > 60000)) { S.data.morning = await api("/v1/ops/morning"); S.mAt = Date.now(); }
       if (S.view === "learning" && S.me?.staff) S.data.learning = await api("/v1/ops/learning");
+      if (S.me?.staff && (S.view === "scale" || (S.view === "morning" && Date.now() - (S.sAt || 0) > 300000))) { S.data.scale = await api("/v1/ops/scale"); S.sAt = Date.now(); }
       if (S.view === "outcomes" && S.me?.staff) S.data.outcomes = S.client ? await api(`/v1/ops/clients/${encodeURIComponent(S.client)}/outcomes`) : null;
       if (S.view === "review" && S.me?.staff) { S.data.review = await api("/v1/ops/narrative?" + qc()); S.data.nd = S.selN ? await api("/v1/ops/narrative/" + S.selN) : null; }
       const ev = await api("/v1/ops/events?after=" + S.after);
@@ -422,7 +450,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
     const sig = JSON.stringify([S.view, S.client, S.sel, S.data.overview?.clients, S.view === "flow" && S.data.flow,
       S.view === "executions" && [S.data.executions, S.data.exec], S.view === "jobs" && S.data.jobs,
       S.view === "approvals" && S.data.approvals, S.view === "review" && [S.data.review, S.data.nd], S.view === "events" && S.after, S.live,
-      S.data.morning?.counts, S.view === "morning" && S.data.morning?.changed, S.view === "learning" && S.data.learning, S.view === "outcomes" && S.data.outcomes]);
+      S.data.morning?.counts, S.view === "morning" && S.data.morning?.changed, S.view === "learning" && S.data.learning, S.view === "outcomes" && S.data.outcomes, (S.view === "scale" || S.view === "morning") && S.data.scale]);
     if (!redraw && sig === S.sig) { const l = document.querySelector(".live"); if (l) l.lastChild.textContent = "Live · " + ago(S.last); return; }
     S.sig = sig;
     const a = document.activeElement; const keep = a && a.id && a.tagName === "TEXTAREA" ? [a.id, a.value] : null;

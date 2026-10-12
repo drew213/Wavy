@@ -671,6 +671,15 @@ def _resume_point(c: Collect, metric_id: str, start: str) -> str:
     return start
 
 
+def _reserve_pages(c: Collect, want: int) -> int:
+    """Reserve up to the next checkpoint's worth of event pages. Spending commits, so it happens only right
+    after a checkpoint, never with orders stored since the last one."""
+    left = budget.LIMITS["events"] - budget.used(c.session, c.run.account_id, family="events")
+    n = max(1, min(want, left))
+    budget.spend(c.session, c.run.account_id, n, family="events")
+    return n
+
+
 def orders(c: Collect) -> dict:
     placed = c.placed_order
     if not placed:
@@ -684,11 +693,18 @@ def orders(c: Collect) -> dict:
     pages, stored = st.get("pages") or 0, st.get("stored") or 0
     target = st.get("next") or ("/api/events/" if not pages else None)
     c.checkpoint(start=start, end=end, since=since, metric_id=placed["id"])
-    truncated, error = False, None
+    truncated, error, reserved = False, None, 0
     while target:
         if pages >= MAX_EVENT_PAGES:
             truncated = True
             break
+        if not reserved:
+            try:
+                reserved = _reserve_pages(c, CHECKPOINT_EVERY - pages % CHECKPOINT_EVERY)
+            except budget.BudgetExceeded as e:
+                error = failure("placed order events", e)
+                break
+        reserved -= 1
         params = None if target != "/api/events/" else {
             "filter": f'equals(metric_id,"{_id(placed["id"])}"),greater-or-equal(datetime,{since}),less-than(datetime,{end})',
             "fields[event]": "datetime,event_properties", "page[size]": page_size, "sort": "datetime"}
