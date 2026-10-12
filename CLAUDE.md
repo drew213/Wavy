@@ -23,7 +23,7 @@ Plans from audits a brand starts stay `proposed` (no tasks) until a lead approve
 
 ```bash
 python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]"
-.venv/bin/python -m pytest -q                      # must stay green (about 200 tests, 10 s)
+.venv/bin/python -m pytest -q                      # must stay green (about 240 tests, 15 s)
 WAVYOS_DATABASE_URL=sqlite:///$PWD/var/dev.db .venv/bin/wavyos demo   # fictional demo workspace
 WAVYOS_DATABASE_URL=sqlite:///$PWD/var/dev.db .venv/bin/wavyos serve --port 8792 --with-worker
 ```
@@ -34,7 +34,9 @@ The suite also runs against Postgres: `WAVYOS_TEST_POSTGRES_URL=postgresql+psyco
 
 - **Tenant isolation is the product.** Every query goes through a scope (`scope.py`: `scope_for_user`, `scope_for_agent`). Never load a client row by id or slug without checking the caller's scope. Brands (`client_owner`, `client_approver`) see only their own client.
 - **Every action is a policy action.** New things people can do get an entry in `policy.ACTIONS` with who may perform them, and are checked with `authorize()`.
-- **No migrations yet.** Tables are made with `create_all`, which adds new tables but never changes existing ones. Add new tables, not new columns, until Alembic is in. If a column change is unavoidable, add Alembic first.
+- **Every schema change is a migration.** Edit `models.py`, run `wavyos db-revision -m "what changed"`, read the file it writes in `src/wavyos/migrations/versions/` (autogenerate misses renames and data moves; fix those by hand), and commit both. `wavyos init-db` applies migrations on every deploy. `tests/test_migrations.py` fails if the models and migrations disagree. New columns on existing tables must be nullable or have a `server_default`, since rows already exist. Never edit a migration that has reached `main`. Autogenerate compares against SQLite, so Postgres-only changes (column types like `BigInteger`) must be written by hand, as in `0003`; the Postgres test run catches a miss.
+- **Built for thousands of brands.** Never run a query per brand in a loop: use one grouped query (`GROUP BY client_id`) or a subquery of visible client ids, as `console/ops.py` does. `tests/test_scale.py` asserts the console and the scheduler cost the same number of queries at 1 brand or 25; add new list endpoints to it. Every column a hot query filters or sorts on needs an index. Big tables (orders, events) are queried by `client_id` plus a time range.
+- **Keep transactions short.** Each brand's event chain has one writer at a time, so an open transaction that has recorded an event holds up that brand's other work until it commits. Commit as work completes (the collector checkpoints; the job runner commits right after authorizing). Allowed `data.read` checks aren't logged, so reads never write.
 - **Secrets.** Klaviyo and model keys only go into the vault (`vault.py`, `connections.py`). Never log, return or store a key in plain text; tests assert this. `WAVYOS_MASTER_KEY` must never change in a running environment, or every stored key becomes unreadable.
 - **Never commit** `var/`, `.env` files, keys, database files or client data. The repository is public: anything pushed can be read and copied by anyone. Test fixtures are synthetic only.
 - **Every change is an event.** Use `events.record(...)` for state changes, as the existing services do.
@@ -64,12 +66,12 @@ Every push to `main` redeploys the live site. Work on branches and open pull req
 2. **Approving a proposed plan should create its tasks.** Today a brand-started audit stores proposed task titles (`onboarding.py`, `first_30_day_plan.status == "proposed"`); a lead's approval needs to turn them into tasks through `operations.py`.
 3. **Don't make a returning brand re-enter its Klaviyo key.** If the client already has a live Klaviyo connection, skip step 1 of `/onboard` and run the audit with the stored key (`connections.py`, vault).
 4. **Account basics:** password reset and email verification (needs an email provider), and session tokens that survive a new browser tab (today they're in `sessionStorage`).
-5. **Rate limits across instances:** `ratelimit.py` is in-memory per process. Fine on one instance; move to the database before scaling out.
-6. **Alembic migrations** before the first change to an existing table.
-7. **Workspace sections from the Client Hub:** covered by `docs/AUDIT-PLAN.md` section 5 (section map, data shapes, design system).
-8. **Model work in the cloud:** the `codex` executor needs a ChatGPT-signed-in machine and won't run on Render. Store an Anthropic key with `wavyos provider add anthropic` (or `ANTHROPIC_API_KEY`) and allow it per client with `wavyos client allow`.
-9. **Shopify** as an order source alongside Klaviyo (`connectors/shopify.py` exists; not wired into onboarding).
-10. **Shopify transactional emails, redone: the first paid feature.** Queued behind audit phases 1–3; see `docs/AUDIT-PLAN.md` section 10. Don't start it yet.
+5. **Workspace sections from the Client Hub:** covered by `docs/AUDIT-PLAN.md` section 5 (section map, data shapes, design system).
+6. **Model work in the cloud:** the `codex` executor needs a ChatGPT-signed-in machine and won't run on Render. Store an Anthropic key with `wavyos provider add anthropic` (or `ANTHROPIC_API_KEY`) and allow it per client with `wavyos client allow`.
+7. **Shopify** as an order source alongside Klaviyo (`connectors/shopify.py` exists; not wired into onboarding).
+8. **Shopify transactional emails, redone: the first paid feature.** Queued behind audit phases 1–3; see `docs/AUDIT-PLAN.md` section 10. Don't start it yet.
+
+Capacity and the move to paid hosting are in `docs/SCALING.md`. Stay on the free plan until the first paying brand.
 
 ## Before you open a pull request
 

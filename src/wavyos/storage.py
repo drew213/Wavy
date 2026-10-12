@@ -250,7 +250,8 @@ def _klaviyo_row(event: dict) -> Optional[dict]:
     """One Placed Order event as an order. The profile id is the customer; no email or name is kept."""
     attrs = event.get("attributes") or {}
     props = attrs.get("event_properties") or {}
-    external_id = str(props.get("$event_id") or event.get("id") or "")[:64]
+    # Klaviyo's event id, not $event_id: some stores (WooCommerce) reuse order numbers across orders.
+    external_id = str(event.get("id") or props.get("$event_id") or "")[:64]
     if not external_id:
         return None
     profile = (((event.get("relationships") or {}).get("profile") or {}).get("data") or {}).get("id")

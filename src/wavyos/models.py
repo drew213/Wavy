@@ -8,7 +8,8 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, CheckConstraint, Date, Float, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
+from sqlalchemy import (BigInteger, Boolean, CheckConstraint, Date, Float, ForeignKey, Index, Integer, LargeBinary, String,
+                        Text, UniqueConstraint)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base, IdMixin
@@ -49,6 +50,7 @@ class User(IdMixin, Base):
     name: Mapped[str] = mapped_column(String(200))
     kind: Mapped[str] = mapped_column(String(10), default="staff")
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    email_opt_out_at: Mapped[Optional[datetime]]  # no more onboarding nudges; transactional emails still send
 
 
 # Staff roles act across the agency; client roles belong to one client's stakeholders.
@@ -74,6 +76,7 @@ class ApiToken(IdMixin, Base):
     label: Mapped[str] = mapped_column(String(100), default="")
     last_used_at: Mapped[Optional[datetime]]
     revoked_at: Mapped[Optional[datetime]]
+    expires_at: Mapped[Optional[datetime]]
 
 
 class OnboardingIntake(IdMixin, Base):
@@ -304,6 +307,7 @@ JOB_RUN_STATUSES = ("queued", "running", "succeeded", "no_action", "failed", "sk
 
 class JobRun(IdMixin, Base):
     __tablename__ = "job_runs"
+    __table_args__ = (Index("ix_job_runs_status_due", "status", "due_at"),)  # the claim and stuck-run queries
     org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
     client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
     job_key: Mapped[str] = mapped_column(String(80), index=True)
@@ -313,11 +317,22 @@ class JobRun(IdMixin, Base):
     status: Mapped[str] = mapped_column(String(20), default="queued")
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     started_at: Mapped[Optional[datetime]]
+    heartbeat_at: Mapped[Optional[datetime]]  # touched while running; a stale one means the worker died
     finished_at: Mapped[Optional[datetime]]
     summary: Mapped[str] = mapped_column(Text, default="")
     produced: Mapped[dict] = mapped_column(default=dict)   # {insights: [], tasks: [], approvals: []}
     error: Mapped[str] = mapped_column(Text, default="")
     cost_usd: Mapped[Optional[float]] = mapped_column(Float)
+
+
+class RateLimit(IdMixin, Base):
+    """Attempts per key per window, shared by every web process. Keys are hashed: no IPs or emails stored."""
+    __tablename__ = "rate_limits"
+    __table_args__ = (UniqueConstraint("key", "bucket"),)
+    key: Mapped[str] = mapped_column(String(64))
+    bucket: Mapped[int] = mapped_column(Integer)
+    count: Mapped[int] = mapped_column(Integer, default=0)
+    expires_at: Mapped[datetime] = mapped_column(index=True)
 
 
 # ---------------------------------------------------------------- durable onboard output and commerce ingest
@@ -426,13 +441,292 @@ class CheckResult(IdMixin, Base):
     scorecard: Mapped["Scorecard"] = relationship(back_populates="results")
 
 
+# ---------------------------------------------------------------- audit collection (docs/AUDIT-PLAN.md section 4)
+
+AUDIT_RUN_STATUSES = ("queued", "collecting", "scoring", "ready", "partial", "failed")
+
+
+class AuditRun(IdMixin, Base):
+    """One audit attempt: which collector stages ran, what each found, and where each stopped.
+
+    stages: {stage_key: {status, started_at, finished_at, detail, counts, error, cursor}}, rewritten
+    (never mutated in place) after every stage so readers and a resumed run see the latest state.
+    """
+    __tablename__ = "audit_runs"
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    connection_id: Mapped[Optional[str]] = mapped_column(ForeignKey("connections.id"))
+    account_id: Mapped[str] = mapped_column(String(100), default="")
+    track: Mapped[str] = mapped_column(String(10), default="snapshot")
+    status: Mapped[str] = mapped_column(String(20), default="queued")
+    stages: Mapped[dict] = mapped_column(default=dict)
+    started_by: Mapped[str] = mapped_column(String(80))
+    job_run_id: Mapped[Optional[str]] = mapped_column(ForeignKey("job_runs.id"))
+    scorecard_id: Mapped[Optional[str]] = mapped_column(ForeignKey("scorecards.id"))
+    started_at: Mapped[Optional[datetime]]
+    finished_at: Mapped[Optional[datetime]]
+    error: Mapped[str] = mapped_column(Text, default="")
+    # Client-confirmed facts the account can't tell us (store_platform, ...), for metric choice and checks.
+    context: Mapped[dict] = mapped_column(default=dict)
+
+
+class AuditArtifact(IdMixin, Base):
+    """One collector output (a snapshot.FILES key) for one run, in the reference collector's JSON shape."""
+    __tablename__ = "audit_artifacts"
+    __table_args__ = (UniqueConstraint("run_id", "name"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("audit_runs.id"), index=True)
+    name: Mapped[str] = mapped_column(String(20))
+    payload: Mapped[dict] = mapped_column(default=dict)
+    captured_at: Mapped[Optional[datetime]]
+
+
+class AuditFact(IdMixin, Base):
+    """One measured number an analysis module produced for a run: the ledger every report section and
+    narrative draft must quote from. value is {"v": ...}; v is None when the input was unavailable."""
+    __tablename__ = "audit_facts"
+    __table_args__ = (UniqueConstraint("run_id", "fact_id"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("audit_runs.id"), index=True)
+    fact_id: Mapped[str] = mapped_column(String(120))
+    module: Mapped[str] = mapped_column(String(40))
+    label: Mapped[str] = mapped_column(String(300))
+    value: Mapped[dict] = mapped_column(default=dict)
+    unit: Mapped[str] = mapped_column(String(30), default="")
+    window: Mapped[str] = mapped_column(String(60), default="")
+    time_basis: Mapped[str] = mapped_column(String(10), default="event")
+    source: Mapped[str] = mapped_column(String(300), default="")
+    evidence_class: Mapped[str] = mapped_column(String(20), default="documented")
+
+
+class WorkspaceBundle(IdMixin, Base):
+    """One published version of a client's workspace (wavyos.workspace.Bundle), built from one audit run.
+
+    status: measured (numbers only; written parts wait for strategist review) or reviewed.
+    """
+    __tablename__ = "workspace_bundles"
+    __table_args__ = (UniqueConstraint("client_id", "version"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("audit_runs.id"), unique=True)
+    version: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(20), default="measured")
+    bundle: Mapped[dict] = mapped_column(default=dict)
+    updated_at: Mapped[Optional[datetime]]
+
+
+NARRATIVE_STATUSES = ("drafting", "draft", "needs_rewrite", "skipped", "approved", "edited", "rejected")
+
+
+class NarrativeDraft(IdMixin, Base):
+    """The written half of one workspace section for one audit run (wavyos.narrative).
+
+    draft          passed the facts check and the critic; waiting in the strategist queue (approval_id)
+    needs_rewrite  still failing after the last round; a strategist must edit it before it can publish
+    skipped        not drafted (spend cap reached, no provider allowed); reason says why
+    approved       published to the brand as drafted; edited: published after a strategist's edit (diff)
+    rejected       never shown to the brand
+    """
+    __tablename__ = "narrative_drafts"
+    __table_args__ = (UniqueConstraint("run_id", "section"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("audit_runs.id"), index=True)
+    section: Mapped[str] = mapped_column(String(40))
+    status: Mapped[str] = mapped_column(String(20), default="drafting", index=True)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    payload: Mapped[dict] = mapped_column(default=dict)
+    original: Mapped[Optional[dict]]
+    packet_hash: Mapped[str] = mapped_column(String(64), default="")
+    facts_check: Mapped[dict] = mapped_column(default=dict)
+    critic: Mapped[dict] = mapped_column(default=dict)       # {independent, rounds: [{scores, total, notes}]}
+    score: Mapped[Optional[float]] = mapped_column(Float)
+    rounds: Mapped[int] = mapped_column(Integer, default=0)
+    drafter: Mapped[str] = mapped_column(String(80), default="")
+    critic_by: Mapped[str] = mapped_column(String(80), default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    approval_id: Mapped[Optional[str]] = mapped_column(String(32))
+    reviewer: Mapped[Optional[str]] = mapped_column(String(120))
+    reviewed_at: Mapped[Optional[datetime]]
+    review_note: Mapped[str] = mapped_column(Text, default="")
+    diff: Mapped[list] = mapped_column(default=list)
+    updated_at: Mapped[Optional[datetime]]
+
+
+OUTCOME_STATUSES = ("tracking", "improved", "flat", "worse", "unmeasured", "withdrawn")
+
+
+class OpportunityOutcome(IdMixin, Base):
+    """An approved opportunity and what happened after (wavyos.loop.outcomes).
+
+    Approval records the baseline: the value of the card's readout fact in the run it was approved from.
+    Each later scored run adds a readout; once the readout window has passed the outcome gets a verdict
+    (improved / flat / worse, or unmeasured when no later run measured the fact), which feeds back into
+    how the playbook behind the card (source_key) is ranked for every brand.
+    """
+    __tablename__ = "opportunity_outcomes"
+    __table_args__ = (UniqueConstraint("client_id", "run_id", "opportunity_id"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("audit_runs.id"), index=True)
+    opportunity_id: Mapped[str] = mapped_column(String(120))
+    source_key: Mapped[str] = mapped_column(String(160), index=True)   # check id or analysis finding id
+    title: Mapped[str] = mapped_column(String(300), default="")
+    owner: Mapped[str] = mapped_column(String(120), default="")
+    approved_by: Mapped[str] = mapped_column(String(120), default="")
+    approved_at: Mapped[datetime]
+    readout_metric: Mapped[str] = mapped_column(String(200), default="")
+    readout_fact: Mapped[Optional[str]] = mapped_column(String(120))
+    direction: Mapped[str] = mapped_column(String(4), default="up")     # up: higher is better; down: lower is
+    baseline: Mapped[dict] = mapped_column(default=dict)                # {"v": value, "unit", "label"}
+    readout_days: Mapped[int] = mapped_column(Integer, default=45)
+    due_at: Mapped[datetime]
+    status: Mapped[str] = mapped_column(String(20), default="tracking", index=True)
+    readouts: Mapped[list] = mapped_column(default=list)                # [{run_id, at, v, check}]
+    verdict_reason: Mapped[str] = mapped_column(Text, default="")
+    decided_at: Mapped[Optional[datetime]]
+    note: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[Optional[datetime]]
+    # What the fix changes ([{flow_id, message_id?, name}]) and when it went live; impact is read from these.
+    targets: Mapped[list] = mapped_column(default=list)
+    shipped_at: Mapped[Optional[datetime]]
+    shipped_by: Mapped[str] = mapped_column(String(120), default="")
+
+
+IMPACT_METHODS = ("before_after", "holdout", "attributed_only")
+IMPACT_STATUSES = ("measured", "too_small", "pending")
+
+
+class ImpactReading(IdMixin, Base):
+    """One measurement of what a live fix earned (wavyos.impact). The latest reading per outcome counts.
+
+    before_after: the targeted flows' revenue per recipient before vs since the change, scaled by the
+    account-wide trend of flows the fix didn't touch. lift = (after rate - before rate x trend) x recipients since.
+    """
+    __tablename__ = "impact_readings"
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    outcome_id: Mapped[str] = mapped_column(ForeignKey("opportunity_outcomes.id"), index=True)
+    method: Mapped[str] = mapped_column(String(20))
+    status: Mapped[str] = mapped_column(String(20))
+    before: Mapped[dict] = mapped_column(default=dict)    # {start, end, recipients, revenue, rate}
+    after: Mapped[dict] = mapped_column(default=dict)
+    trend: Mapped[Optional[float]] = mapped_column(Float)
+    lift: Mapped[Optional[float]] = mapped_column(Float)
+    attributed: Mapped[float] = mapped_column(Float, default=0.0)
+    reason: Mapped[str] = mapped_column(Text, default="")
+
+
+class AuditOrder(IdMixin, Base):
+    """One Placed Order event, compact. Profile ids are Klaviyo's pseudonymous ids: never emails or names.
+
+    Keyed by Klaviyo's event id, so a retried page or a re-audit upserts instead of duplicating.
+    order_id is the store's id ($event_id or OrderId) that the engine dedupes on.
+    """
+    __tablename__ = "audit_orders"
+    __table_args__ = (UniqueConstraint("client_id", "event_id"),
+                      Index("ix_audit_orders_client_placed", "client_id", "placed_at"))
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    metric_id: Mapped[str] = mapped_column(String(64))
+    event_id: Mapped[str] = mapped_column(String(64))
+    order_id: Mapped[Optional[str]] = mapped_column(String(120))
+    profile_id: Mapped[Optional[str]] = mapped_column(String(64))
+    placed_at: Mapped[datetime]
+    value: Mapped[float] = mapped_column(Float, default=0.0)
+    items: Mapped[list] = mapped_column(default=list)
+    discount: Mapped[Optional[list]] = mapped_column()
+    source: Mapped[Optional[str]] = mapped_column(String(120))
+
+
+class KlaviyoReportCall(IdMixin, Base):
+    """Klaviyo calls per account, per budget family, per UTC day. reporting: reporting-endpoint calls (Klaviyo
+    allows 225, shared with the brand's other apps); events: pages of the events endpoint (order history)."""
+    __tablename__ = "klaviyo_report_calls"
+    __table_args__ = (UniqueConstraint("account_id", "family", "day", name="uq_klaviyo_report_calls_account_family_day"),)
+    account_id: Mapped[str] = mapped_column(String(100))
+    family: Mapped[str] = mapped_column(String(20), default="reporting", server_default="reporting")
+    day: Mapped[str] = mapped_column(String(10))
+    count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class EmailHtml(IdMixin, Base):
+    """A live email template's HTML as collected, stored once per brand per version (sha256 of the HTML).
+    Runs point at versions through the templates artifact's htmlHash; the workspace renders previews from it."""
+    __tablename__ = "email_html"
+    __table_args__ = (UniqueConstraint("client_id", "sha256"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    template_id: Mapped[str] = mapped_column(String(64), index=True)
+    sha256: Mapped[str] = mapped_column(String(64))
+    html: Mapped[str] = mapped_column(Text)
+    bytes: Mapped[int] = mapped_column(Integer, default=0)
+    captured_at: Mapped[Optional[datetime]]
+
+
+EMAIL_KINDS = ("transactional", "nudge", "staff")
+EMAIL_STATUSES = ("queued", "sending", "sent", "failed", "skipped", "suppressed")
+
+
+class OutboundEmail(IdMixin, Base):
+    """One email the app sends (wavyos.mail), rendered when queued so the console shows exactly what went out.
+    key is unique per person: each onboarding email reaches someone at most once (repeats carry a suffix)."""
+    __tablename__ = "outbound_emails"
+    __table_args__ = (UniqueConstraint("user_id", "key"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[Optional[str]] = mapped_column(ForeignKey("clients.id"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    key: Mapped[str] = mapped_column(String(120))
+    kind: Mapped[str] = mapped_column(String(20), default="nudge")
+    to_email: Mapped[str] = mapped_column(String(320))
+    subject: Mapped[str] = mapped_column(String(300))
+    html: Mapped[str] = mapped_column(Text, default="")
+    text: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="queued", index=True)
+    send_after: Mapped[datetime]
+    sent_at: Mapped[Optional[datetime]]
+    provider: Mapped[str] = mapped_column(String(20), default="")
+    provider_id: Mapped[str] = mapped_column(String(200), default="")
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str] = mapped_column(Text, default="")
+    data: Mapped[dict] = mapped_column(default=dict)
+
+
+class LlmSpend(IdMixin, Base):
+    """Model spend per organization per UTC day, across narrative drafting and task executions."""
+    __tablename__ = "llm_spend"
+    __table_args__ = (UniqueConstraint("org_id", "day"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    day: Mapped[str] = mapped_column(String(10))
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    calls: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class MetricPin(IdMixin, Base):
+    """A staff-verified metric id for one event name on one client's account. Pins fail closed:
+    a pinned id that's gone, renamed or from another integration stops the audit instead of guessing."""
+    __tablename__ = "metric_pins"
+    __table_args__ = (UniqueConstraint("client_id", "name"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    metric_id: Mapped[str] = mapped_column(String(64))
+    integration: Mapped[Optional[str]] = mapped_column(String(120))
+    created_by: Mapped[str] = mapped_column(String(80))
+
+
 # ---------------------------------------------------------------- event log
 
 class Event(Base):
     """Append-only. hash = sha256(prev_hash + canonical event body), chained per (org, client)."""
     __tablename__ = "events"
     __table_args__ = (UniqueConstraint("org_id", "chain", "seq"),)
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # 64-bit on Postgres; SQLite only autoincrements a column declared exactly INTEGER.
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
     client_id: Mapped[Optional[str]] = mapped_column(ForeignKey("clients.id"), index=True)
     chain: Mapped[str] = mapped_column(String(40))  # client_id, or "org" for org-level events

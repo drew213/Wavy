@@ -57,6 +57,39 @@ def test_signup_creates_a_brand_workspace_and_sign_in_works(env):
     assert not db_file.exists() or b"correct horse battery" not in db_file.read_bytes()  # no file on Postgres runs
 
 
+def test_browser_sign_ins_last_30_days_and_sign_out_revokes_them(env):
+    from datetime import timedelta
+
+    from wavyos import tenancy
+    from wavyos.db import utcnow
+    factory, staff, _, _ = env
+    anon = TestClient(staff.app)
+    first = _signup(anon)["token"]
+    second = anon.post("/v1/ops/login", json={"email": "maya@glowlab.co", "password": "correct horse battery"}).json()
+    assert second["expires_in_days"] == 30
+    with factory() as s:
+        row = s.scalar(select(m.ApiToken).where(m.ApiToken.prefix == second["token"][:12]))
+        expires = row.expires_at if row.expires_at.tzinfo else row.expires_at.replace(tzinfo=utcnow().tzinfo)
+        assert timedelta(days=29) < expires - utcnow() <= timedelta(days=30)
+        user = s.get(m.User, row.user_id)
+        script = tenancy.issue_token(s, user, "reporting script")
+        row.expires_at = utcnow() - timedelta(minutes=1)
+        s.commit()
+    assert _as(staff, second["token"]).get("/v1/ops/me").status_code == 401  # expired
+
+    assert anon.post("/v1/ops/logout", headers={"Authorization": "Bearer " + script}).json() == {"signed_out": True}
+    assert _as(staff, script).get("/v1/ops/me").status_code == 200  # sign-out never touches script tokens
+    assert anon.post("/v1/ops/logout", headers={"Authorization": "Bearer " + first}).status_code == 200
+    assert _as(staff, first).get("/v1/ops/me").status_code == 401
+
+    a, b = (anon.post("/v1/ops/login", json={"email": "maya@glowlab.co", "password": "correct horse battery"}).json()["token"]
+            for _ in range(2))
+    assert _as(staff, a).post("/v1/ops/logout-everywhere").json() == {"signed_out": 3}  # a, b and the expired one
+    assert _as(staff, b).get("/v1/ops/me").status_code == 401
+    assert _as(staff, script).get("/v1/ops/me").status_code == 200
+    assert anon.post("/v1/ops/logout").status_code == 200  # no token: nothing to do, still fine
+
+
 def test_a_signed_up_brand_runs_its_own_audit_and_the_plan_waits_for_the_agency(env):
     factory, staff, vault, _ = env
     made = _signup(TestClient(staff.app))
@@ -99,7 +132,7 @@ ANSWERS = {
     "primary_contact": "Maya", "final_approver": "Maya", "success": "Repeat rate up 5 points by day 90",
     "economics": "AOV around $72, gross margin 64%", "shipping_returns": "Free shipping over $60, 30-day returns",
     "consumable_days": "Serum lasts about 6 weeks", "programs": ["Subscriptions", "Bundles"], "program_apps": "Recharge",
-    "submitted_by_name": "Maya Chen",
+    "submitted_by_name": "Maya Chen", "store_platform": "WooCommerce",
 }
 
 
@@ -113,7 +146,8 @@ def test_intake_answers_map_onto_the_build():
     assert f["free_shipping_threshold"] == 60 and f["gross_margin_pct"] == 64 and f["target_aov"] == 72
     assert f["typical_consumption_days"] == 42 and f["subscription_app"] == "Recharge"
     assert f["messaging_tools"] == ["Klaviyo", "Attentive"]
-    assert len(intake.QUESTIONS) == 49 and sum(q["required"] for q in intake.QUESTIONS.values()) == 13
+    assert f["store_platform"] == "WooCommerce"
+    assert len(intake.QUESTIONS) == 52 and sum(q["required"] for q in intake.QUESTIONS.values()) == 14
 
 
 def test_brand_questionnaire_autosaves_and_feeds_the_audit(env):
@@ -123,7 +157,7 @@ def test_brand_questionnaire_autosaves_and_feeds_the_audit(env):
     slug = made["client_slug"]
 
     blank = brand.get(f"/v1/ops/intake?client={slug}").json()
-    assert blank["answered"] == 0 and blank["total"] == 49 and len(blank["sections"]) == 8
+    assert blank["answered"] == 0 and blank["total"] == 52 and len(blank["sections"]) == 8
     partial = brand.put("/v1/ops/intake", json={"client_slug": slug, "answers": {"what_you_sell": "Skincare"}}).json()
     assert partial["answered"] == 1 and brand.get(f"/v1/ops/intake?client={slug}").json()["answers"] == {"what_you_sell": "Skincare"}
     assert brand.put("/v1/ops/intake", json={"client_slug": slug, "answers": {"nope": "x"}}).status_code == 422
@@ -139,10 +173,45 @@ def test_brand_questionnaire_autosaves_and_feeds_the_audit(env):
     jobs.run_pending(factory, _services(vault, httpx.MockTransport(fake_klaviyo())), limit=10)
     d = brand.get(f"/v1/ops/clients/{slug}/audit").json()["result"]["dossier"]
     assert d["intake"]["success"] == ANSWERS["success"]
+    with factory() as s:
+        context = s.get(m.AuditRun, d["klaviyo"]["full_audit"]["run_id"]).context
+        assert context["store_platform"] == "WooCommerce" and context["sells_subscriptions"] is True
+        assert context["avoid_claims"] == ANSWERS["avoid_claims"]
     assert d["brand_identity"]["tone_descriptors"] == ["calm", "expert", "warm"]
     assert d["campaign_directives"]["allowed_discounts"] == "VALUE_ADD_ONLY"
     assert d["economics"]["free_shipping_threshold"] == 60
     assert brand.get(f"/v1/ops/intake?client={slug}").json()["submitted_at"]
+
+
+def test_the_workspace_bundle_has_every_section_with_an_honest_state(env):
+    from wavyos.workspace import SECTION_STATES, SECTIONS
+    factory, staff, vault, _ = env
+    made = _signup(TestClient(staff.app))
+    brand = _as(staff, made["token"])
+    slug = made["client_slug"]
+    assert brand.get(f"/v1/ops/clients/{slug}/workspace").status_code == 404
+    assert brand.put("/v1/ops/intake", json={"client_slug": slug, "answers": ANSWERS}).status_code == 200
+    queued = brand.post("/v1/ops/onboard", json={"client_name": "Glow Lab", "client_slug": slug, "klaviyo_private_key": KEY,
+                                                 "use_intake": True})
+    assert queued.status_code == 200, queued.text
+    jobs.run_pending(factory, _services(vault, httpx.MockTransport(fake_klaviyo())), limit=10)
+
+    b = brand.get(f"/v1/ops/clients/{slug}/workspace").json()
+    assert [s["id"] for s in b["sections"]] == [s[0] for s in SECTIONS]
+    assert all(s["state"] in SECTION_STATES for s in b["sections"])
+    assert all(s["reason"] for s in b["sections"] if s["state"] in ("partial", "unavailable", "queued", "collecting"))
+    by = {s["id"]: s for s in b["sections"]}
+    assert by["answers"]["state"] == "ready" and by["answers"]["data"]["answers"]["success"] == ANSWERS["success"]
+    assert by["sources"]["data"]["definitions"]
+    assert b["run"]["status"] in ("ready", "partial"), b["run"]
+    assert b["version"] == 1 and [v["version"] for v in b["versions"]] == [1]
+    assert by["foundational"]["data"]["checks"] and b["facts"]
+    assert by["opportunities"]["narrative_state"] == "awaiting_review"
+    fact = next(iter(b["facts"].values()))
+    assert {"label", "window", "source", "time_basis", "evidence_class"} <= set(fact)
+    assert brand.get(f"/v1/ops/clients/{slug}/workspace?version=9").status_code == 404
+    rival = _as(staff, _signup(TestClient(staff.app), email="sam@rival.co", brand="Rival")["token"])
+    assert rival.get(f"/v1/ops/clients/{slug}/workspace").status_code == 404
 
 
 def test_staff_can_start_a_questionnaire_for_a_new_client(env):

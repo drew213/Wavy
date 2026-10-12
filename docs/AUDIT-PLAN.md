@@ -55,7 +55,7 @@ Each stage is its own job (`audit_collect`, payload `{run_id, stage}`), claimed 
 |---|---|---|---|---|---|
 | 0 | Verify | every script's `GET /accounts` check, `source-contract.js` | 1 | account, timezone, currency in `run` | key |
 | 1 | **First look** | parts of 24, 34, 38 | `GET /metrics`; `GET /flows` (attributes incl. trigger type); 2 reporting calls (flow and campaign values, `last_365_days`, grouped exactly like step 34); 1 monthly `placed_order` aggregate by `$attributed_channel` in the account timezone | the 365-day half of `perf`; a `first_look` summary in `audit_runs.stages` | 0 |
-| 2 | Account structure | step 24 | about 2 per flow + 2 per action + 1 per message (cap 5,000 messages), plus campaigns, forms, lists, segments, templates list | `api` | 0 |
+| 2 | Account structure | step 24 | 1 per flow (its definition; the Node walk of every action and message is skipped because no check reads it), plus forms, lists, segments, templates list; campaigns come from stage 5 | `api` | 1 |
 | 3 | Performance, 90 days | step 34 | 2 reporting calls, 31 s apart | completes `perf` | 1 |
 | 4 | Template weight | step 37 | 1 per unique live template | `templates` (measurements only: bytes, counts, a short text sample) | 2 |
 | 5 | Aggregates and campaigns | step 38 sections 1–3 and 5 (form values report only) | about 45 aggregates, campaigns with messages, 1 reporting call | `totals` | 0 |
@@ -179,7 +179,7 @@ The real audits used a language model to write the narrative from a sanitized pa
 - **Facts check:** every number in model output must match a value in the run's facts table (built by code, never by the model) within rounding. A mismatch blocks the draft; it doesn't get auto-fixed.
 - **Outputs:** foundational-report narrative (priorities, 90-day phases, 13-week plan, owner decisions), the journey map (hub shape: stages, nodes with trigger, timing, eligibility, exit, message jobs, success metric, guardrails, finding ids), calendar.
 - **Review:** a strategist approves, edits or rejects each draft in the staff console before the brand sees it (decision 2). Approvals are policy actions and events.
-- Runs on the Anthropic provider (backlog item 8), allowed per client.
+- Runs on the Anthropic provider (backlog item 6), allowed per client.
 
 ## 7. Phases and acceptance
 

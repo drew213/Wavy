@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import re
 import secrets
+from datetime import timedelta, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo
 
@@ -108,25 +109,58 @@ def _digest(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def issue_token(session: Session, user: m.User, label: str = "") -> str:
-    """Returns the plaintext token once. Only its hash is stored."""
+def issue_token(session: Session, user: m.User, label: str = "", ttl: Optional[timedelta] = None) -> str:
+    """Returns the plaintext token once. Only its hash is stored. Without a ttl the token lasts until revoked."""
     token = TOKEN_PREFIX + secrets.token_urlsafe(32)
-    session.add(m.ApiToken(user_id=user.id, prefix=token[:12], token_hash=_digest(token), label=label))
+    session.add(m.ApiToken(user_id=user.id, prefix=token[:12], token_hash=_digest(token), label=label,
+                           expires_at=utcnow() + ttl if ttl else None))
     session.flush()
     events.record(session, Scope(user.org_id, None, SYSTEM), "token.issued", user, label or "api token")
     return token
 
 
-def user_for_token(session: Session, token: str) -> Optional[m.User]:
+def _token_row(session: Session, token: str) -> Optional[m.ApiToken]:
     if not token or not token.startswith(TOKEN_PREFIX):
         return None
     digest = _digest(token)
     for row in session.scalars(select(m.ApiToken).where(m.ApiToken.prefix == token[:12], m.ApiToken.revoked_at.is_(None))):
         if hmac.compare_digest(row.token_hash, digest):
-            row.last_used_at = utcnow()
-            user = session.get(m.User, row.user_id)
-            return user if user and user.active else None
+            return row
     return None
+
+
+def user_for_token(session: Session, token: str) -> Optional[m.User]:
+    row = _token_row(session, token)
+    if row is None:
+        return None
+    if row.expires_at is not None:
+        expires = row.expires_at if row.expires_at.tzinfo else row.expires_at.replace(tzinfo=timezone.utc)
+        if expires <= utcnow():
+            return None
+    row.last_used_at = utcnow()
+    user = session.get(m.User, row.user_id)
+    return user if user and user.active else None
+
+
+def end_session(session: Session, token: str, label: str) -> bool:
+    """Signs this token out if it carries this label. Returns whether a live token was revoked."""
+    row = _token_row(session, token)
+    if row is None or row.label != label:
+        return False
+    row.revoked_at = utcnow()
+    return True
+
+
+def end_sessions(session: Session, user: m.User, label: str) -> int:
+    """Signs a person out of every browser at once: revokes all their tokens with this label."""
+    rows = session.scalars(select(m.ApiToken).where(m.ApiToken.user_id == user.id, m.ApiToken.label == label,
+                                                    m.ApiToken.revoked_at.is_(None))).all()
+    for r in rows:
+        r.revoked_at = utcnow()
+    if rows:
+        events.record(session, Scope(user.org_id, None, SYSTEM), "token.revoked", user,
+                      f"signed out of {len(rows)} browser session(s)")
+    return len(rows)
 
 
 def revoke_token(session: Session, user: m.User, prefix: str) -> int:

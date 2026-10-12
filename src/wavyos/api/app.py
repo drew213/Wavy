@@ -76,7 +76,8 @@ def create_app(factory: Optional[sessionmaker[Session]] = None, services: Option
 
     @app.get("/healthz", include_in_schema=False)
     def healthz() -> dict:
-        return {"status": "ok"}
+        from .. import dbsize
+        return {"status": "ok", "storage": dbsize.summary(dbsize.cached(app.state.factory))}
 
     app.include_router(routes_org.router)
     app.include_router(routes_client.router)

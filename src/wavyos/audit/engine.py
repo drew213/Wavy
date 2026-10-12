@@ -87,20 +87,26 @@ def run_audit(session: Session, scope: Scope, snapshot_dir: str, track: str = "s
     Each warn/fail becomes an insight (area from CHECK_AREA_MAP; severity from the check, one level
     lower for a warn) deduplicated per client by `check:<id>` while it stays open.
     """
+    return score_snapshot(session, scope, Snapshot(snapshot_dir, context=context), track, create_insights)
+
+
+def score_snapshot(session: Session, scope: Scope, snap: Snapshot, track: str = "snapshot",
+                   create_insights: bool = True, snapshot_ref: Optional[str] = None) -> m.Scorecard:
+    """run_audit for a Snapshot already in hand (a folder or an audit run's stored artifacts)."""
     client_id = scope.require_client()
     auth = authorize(session, scope, "analysis.run")
     if not auth.allowed:
         raise NotPermitted(auth.reason)
     if track not in TRACKS:
         raise ValueError(f"track must be one of {TRACKS}")
-    snap = Snapshot(snapshot_dir, context=context)
     lib = load_library()
     specs = {c["id"]: c for c in lib["checks"]}
     results = evaluate(snap, track, lib)
     summary = _summary(results, specs, snap, track)
 
     sc = m.Scorecard(id=new_id(), org_id=scope.org_id, client_id=client_id, track=track,
-                     library_version=str(lib.get("version", "")), snapshot_ref=snap.ref_label[:500], as_of=snap.as_of,
+                     library_version=str(lib.get("version", "")), snapshot_ref=(snapshot_ref or snap.ref_label)[:500],
+                     as_of=snap.as_of,
                      summary=summary, created_by=scope.actor.ref)
     session.add(sc)
     rows: dict[str, m.CheckResult] = {}

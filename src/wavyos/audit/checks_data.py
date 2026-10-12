@@ -34,13 +34,24 @@ def canonical_order_source(snap: Snapshot, spec: dict):
     if conv is not None:
         evidence.append(ev(ref("perf", "conversionMetric", "id"), "step 34 conversion metric"))
     platform = snap.context.get("store_platform")
+    # Last-90-day events per candidate, when the collector measured them (same-named twins only).
+    counts = {str(o.get("id")): o.get("events_last_90_days") for o in [used, *others] if "events_last_90_days" in o}
+    known = {k: v for k, v in counts.items() if v is not None}
+    share = (known[str(used.get("id"))] / sum(known.values())
+             if str(used.get("id")) in known and sum(known.values()) else None)
+    dormant = [o for o in others if counts.get(str(o.get("id"))) == 0]
     value = as_dict({
         "used": {"id": used.get("id"), "integration": used.get("integration")},
-        "other_candidates": [{"id": o.get("id"), "integration": o.get("integration")} for o in others],
+        "other_candidates": [{"id": o.get("id"), "integration": o.get("integration"),
+                              "events_last_90_days": counts.get(str(o.get("id")))} for o in others],
         "latest_full_month": latest.label, "latest_full_month_events": latest.value,
         "last_3_full_months": {b.label: b.value for b in full[-3:]},
         "step34_metric_id": conv, "steps_agree": agree, "confirmed_platform": platform,
+        "used_share_90d": share, "dormant_candidates": [o.get("id") for o in dormant],
     })
+    if counts:
+        evidence.append(ev(ref("totals", "metricChoices", "placed_order", "candidates"),
+                           "last-90-day events per Placed Order candidate"))
     if latest.value == 0:
         return outcome("fail", f"the selected Placed Order metric had zero events in {latest.label}", value, evidence)
     if agree is False:
@@ -52,7 +63,18 @@ def canonical_order_source(snap: Snapshot, spec: dict):
         # A confirmed mismatch is worse than an unconfirmed platform: revenue is read from the wrong store.
         return outcome("fail", f"the selected metric is from {used.get('integration')}, but the client's store is {platform}",
                        value, evidence)
-    if others:
+    if share is not None and share < 0.80:
+        return outcome("fail", f"the selected Placed Order metric holds only {share:.0%} of the last 90 days' order "
+                               "events; orders are split across sources", value, evidence)
+    if dormant:
+        names = ", ".join(f"{o.get('integration') or 'unknown'} ({o.get('id')})" for o in dormant)
+        return outcome("warn", f"a dormant Placed Order metric is still in the account: {names}, with no events in 90 days. "
+                               f"The audit reads {used.get('integration')}; any flow, segment or report still built on "
+                               "the dormant copy shows zero", value, evidence)
+    if share is not None and share < 0.95:
+        return outcome("warn", f"the selected Placed Order metric holds {share:.0%} of the last 90 days' order events; "
+                               "review the other source", value, evidence)
+    if others and share is None:
         return outcome("warn", f"{len(others)} other Placed Order candidate(s) exist; their recent event share isn't "
                                "collected in the snapshot track, so review them (deep track measures it)", value, evidence)
     if not platform:

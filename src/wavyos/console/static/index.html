@@ -48,7 +48,7 @@ code,pre{font-family:var(--mono)}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 0 0 var(--good);animation:pulse 2s infinite}
 .dot.off{background:var(--bad);animation:none}
 @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 60%,transparent)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
-select,input[type=text],input[type=password],textarea{background:var(--bg2);border:1px solid var(--line2);border-radius:6px;padding:6px 9px}
+select,input[type=text],input[type=password],input[type=date],textarea{background:var(--bg2);border:1px solid var(--line2);border-radius:6px;padding:6px 9px}
 .content{flex:1;overflow:auto;padding:20px 22px 60px;min-width:0}
 .btn{border:1px solid var(--line2);background:var(--bg2);color:var(--text);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px}
 .btn:hover{border-color:var(--muted)} .btn.primary{background:var(--lime);border-color:var(--lime);color:var(--on-accent);font-weight:700}
@@ -122,9 +122,9 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
 <div id="root"></div>
 <script>
 (() => {
-  const VIEWS = [["overview","Overview"],["flow","Flow"],["executions","Executions"],["jobs","Jobs"],["approvals","Approvals"],["events","Events"]];
+  const VIEWS = [["morning","Morning"],["overview","Overview"],["flow","Flow"],["review","Review"],["outcomes","Outcomes"],["learning","Learning"],["scale","Scale"],["executions","Executions"],["jobs","Jobs"],["approvals","Approvals"],["events","Events"]];
   const S = { token: null, me: null, view: "overview", client: "", sel: null, data: {}, live: false, last: null, err: "", after: 0, events: [] };
-  try { S.token = sessionStorage.getItem("wos-token"); S.client = localStorage.getItem("wos-client") || ""; } catch {}
+  try { S.token = localStorage.getItem("wos-token") || sessionStorage.getItem("wos-token"); S.client = localStorage.getItem("wos-client") || ""; } catch {}
   const $ = (q) => document.querySelector(q);
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const ago = (iso) => { if (!iso) return "—"; const d = (Date.now() - new Date(iso.endsWith("Z")||iso.includes("+")?iso:iso+"Z")) / 1000;
@@ -142,7 +142,10 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
     return body;
   }
   function toast(msg) { const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 2600); }
-  function signOut(msg) { S.token = null; try { sessionStorage.removeItem("wos-token"); } catch {} S.err = msg || ""; renderLogin(); }
+  function signOut(msg) {
+    if (S.token) fetch("/v1/ops/logout", { method: "POST", headers: { "Authorization": "Bearer " + S.token }, keepalive: true }).catch(() => {});
+    S.token = null; try { sessionStorage.removeItem("wos-token"); localStorage.removeItem("wos-token"); } catch {} S.err = msg || ""; renderLogin();
+  }
 
   // ------------------------------------------------------------ login
   function renderLogin() {
@@ -159,7 +162,9 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
     const ov = S.data.overview?.clients || [];
     const pendingAp = ov.reduce((a, c) => a + c.approvals_pending, 0);
     const running = ov.reduce((a, c) => a + (c.executions.running || 0), 0);
-    const counts = { approvals: pendingAp, executions: running };
+    const mc = S.data.morning?.counts || {};
+    const counts = { approvals: pendingAp, executions: running, review: (S.data.review?.drafts || []).filter(d => d.status === "draft" || d.status === "needs_rewrite").length,
+      morning: (mc.drafts_ready || 0) + (mc.needs_rewrite || 0) + (mc.blocked || 0) };
     $("#root").innerHTML = `<div class="app"><nav class="rail" aria-label="Sections"><div class="brand"><h1>Wavy <span>OS</span></h1><div class="label">Console</div></div>
       ${VIEWS.map(([k, l]) => `<a href="#${k}" data-v="${k}" aria-current="${S.view === k ? "page" : "false"}">${l}${counts[k] ? `<b class="${k === "approvals" ? "hot" : ""}">${counts[k]}</b>` : ""}</a>`).join("")}
       <a href="/onboard" target="_blank" style="margin-top:12px; border:1px solid var(--lime); color:var(--lime); font-weight:700;">⚡ Onboard Client ↗</a>
@@ -279,6 +284,161 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
       <div class="row" style="margin-top:8px"><button class="btn primary" data-ap="${esc(a.id)}" data-ok="1">Approve</button><button class="btn danger" data-ap="${esc(a.id)}" data-ok="0">Reject</button></div></div>`).join("")}</div>`;
   }
 
+  function vReview() {
+    const ds = S.data.review?.drafts || [];
+    const redraft = S.client ? `<div class="row" style="justify-content:space-between;margin-bottom:12px"><span class="muted">Drafts are written from the fact ledger, held to it by the facts check, and scored by a second model. Nothing reaches the brand until you approve it.</span><button class="btn" data-redraft="${esc(S.client)}">Redraft open sections</button></div>` : "";
+    const list = ds.length ? `<div class="tbl"><table><thead><tr><th>Section</th><th>Status</th><th>Score</th><th>Facts check</th><th>Cost</th><th>Updated</th></tr></thead><tbody>
+      ${ds.map(d => `<tr class="click ${S.selN === d.id ? "sel" : ""}" data-nd="${esc(d.id)}" tabindex="0"><td><div class="t">${esc(d.section.replace(/_/g, " "))}</div><div class="muted">${esc(d.client_name)}</div>${d.headline ? `<div style="font-size:11.5px;max-width:380px">${esc(d.headline)}</div>` : ""}</td>
+      <td>${chip(d.status === "draft" ? "review" : d.status === "needs_rewrite" ? "blocked" : d.status === "edited" ? "approved" : d.status, d.status.replace(/_/g, " "))}${d.reason ? `<div class="muted" style="font-size:11px;max-width:280px">${esc(d.reason)}</div>` : ""}</td>
+      <td class="num">${d.score == null ? "—" : esc(d.score) + "/10"}<div class="muted">${d.rounds} round${d.rounds === 1 ? "" : "s"}${d.independent === false ? " · same provider" : ""}</div></td>
+      <td>${d.facts_ok == null ? "—" : d.facts_ok ? chip("ok", "clean") : chip("failed", d.problems + " problem" + (d.problems === 1 ? "" : "s"))}${d.cut ? `<div class="muted">${d.cut} cut</div>` : ""}</td>
+      <td class="num">${usd(d.cost_usd)}<div class="muted">${esc(d.drafter)}${d.critic_by ? " → " + esc(d.critic_by) : ""}</div></td><td class="muted">${esc(ago(d.updated_at))}</td></tr>`).join("")}</tbody></table></div>`
+      : `<div class="empty"><h3>No drafts${S.client ? " for this client" : ""}</h3><p class="muted">Sections are drafted after each scored audit, for brands whose settings allow a model provider.</p></div>`;
+    const d = S.data.nd;
+    if (!S.selN || !d) return redraft + list;
+    const fact = (id) => (d.evidence || []).find(e => e.id === id);
+    const val = (e) => e ? (e.missing ? "not in the ledger" : e.value == null ? "unavailable" : `${e.value}${e.unit ? " " + e.unit : ""}`) : "—";
+    const p = d.payload || {}, fc = d.facts_check || {}, rounds = d.critic?.rounds || [];
+    const open = d.approval && d.approval.status === "pending";
+    const panel = `<aside class="panel" aria-label="Draft review"><div class="head"><div class="row" style="justify-content:space-between"><span class="label">${esc(d.client_name)} · ${esc(d.section)}</span><button class="btn" id="closeNd">Close</button></div>
+      <h3 style="font-size:18px;margin-top:4px">${esc(p.headline || "(no headline)")}</h3>
+      <div class="kv"><div><span class="label">Status</span><b>${chip(d.status)}</b></div><div><span class="label">Score</span><b>${d.score == null ? "—" : esc(d.score) + "/10"}</b></div>
+      <div><span class="label">Writer → critic</span><b class="exec">${esc(d.drafter)} → ${esc(d.critic_by)}</b></div><div><span class="label">Cost</span><b class="num">${usd(d.cost_usd)}</b></div></div>
+      ${d.reason ? `<p class="err" style="margin:10px 0 0">${esc(d.reason)}</p>` : ""}</div>
+      <div class="art">${(p.insights || []).map((x, i) => `<div style="padding:10px 0;border-top:1px solid var(--line)"><span class="label">Insight ${i + 1}${x.owner ? " · " + esc(x.owner) : ""}${x.when ? " · " + esc(x.when) : ""}</span>
+        <div style="color:var(--text);margin-top:4px">${esc(x.finding)}</div><div><span class="muted">Evidence:</span> ${esc(x.evidence)}</div><div><span class="muted">Action:</span> <span style="color:var(--text)">${esc(x.action)}</span></div>
+        ${(x.facts || []).length ? `<table style="margin-top:6px"><tbody>${x.facts.map(id => { const e = fact(id); return `<tr><td class="muted" style="padding:3px 8px 3px 0">${esc(id)}</td><td style="padding:3px 0">${esc(e?.label || "")}</td><td class="num" style="padding:3px 0 3px 8px;color:var(--text)">${esc(val(e))}</td></tr>`; }).join("")}</tbody></table>` : `<div class="err" style="font-size:11.5px">Cites no facts.</div>`}</div>`).join("")}
+        ${["cards", "journey_copy", "message_rewrites", "calendar_90d", "phases"].filter(k => p[k]).map(k => `<details><summary>${esc(k.replace(/_/g, " "))} (${p[k].length})</summary><pre class="j">${pretty(p[k])}</pre></details>`).join("")}</div>
+      <div class="art"><span class="label">Facts check</span> ${fc.ok ? chip("ok", "every number is in the ledger") : chip("failed", (fc.problems || []).length + " problem(s)")} <span class="muted">${fc.numbers_checked ?? 0} numbers checked</span>
+        ${(fc.problems || []).map(x => `<div class="err" style="font-size:11.5px">${esc(x.path)}: ${esc(x.reason)}${x.token ? ` (${esc(x.token)})` : ""}</div>`).join("")}
+        ${(fc.cut || []).map(x => `<div class="muted" style="font-size:11.5px">Cut ${esc(x.path)}: ${esc(x.reason)}</div>`).join("")}
+        ${(fc.warnings || []).map(x => `<div style="font-size:11.5px;color:var(--warn)">${esc(x.path)}: ${esc(x.reason)}</div>`).join("")}</div>
+      <div class="art"><span class="label">Critic${d.critic?.independent === false ? " (same provider: not independent)" : ""}</span>${rounds.map(r => `<details ${r === rounds[rounds.length - 1] ? "open" : ""}><summary>Round ${r.round}: ${esc(r.total)}/10 · ${r.problems} facts problem(s)</summary>
+        <div class="muted" style="font-size:11.5px">${Object.entries(r.scores || {}).map(([k, v]) => `${esc(k)} ${esc(v)}`).join(" · ")}</div>${(r.notes || []).map(n => `<div style="font-size:12px">• ${esc(n)}</div>`).join("")}</details>`).join("") || '<div class="muted">Not critiqued.</div>'}</div>
+      ${(d.diff || []).length ? `<div class="art"><span class="label">Strategist edits (${d.diff.length})</span><pre class="j">${pretty(d.diff)}</pre></div>` : ""}
+      ${["approved", "edited", "rejected"].includes(d.status) ? `<div class="art muted">${esc(d.status)} by ${esc(d.reviewer || "")} ${esc(ago(d.reviewed_at))}${d.review_note ? ": " + esc(d.review_note) : ""}</div>` : ""}
+      ${d.status === "skipped" || d.status === "drafting" ? "" : `<div class="art" data-k="nd-${esc(d.id)}"><details><summary>Edit the draft (JSON). Saving runs the facts check and publishes it as edited.</summary>
+        <textarea id="nj-${esc(d.id)}" rows="14" style="width:100%;margin-top:6px">${esc(JSON.stringify(p, null, 2))}</textarea></details>
+        <label class="label" for="nn-${esc(d.id)}" style="display:block;margin-top:10px">Note</label><textarea id="nn-${esc(d.id)}" rows="2" style="width:100%"></textarea>
+        <div class="row" style="margin-top:8px">${open ? `<button class="btn primary" data-ndok="1" data-id="${esc(d.id)}">Approve</button>` : ""}<button class="btn" data-ndedit="${esc(d.id)}">Save edit</button>${d.status !== "rejected" ? `<button class="btn danger" data-ndok="0" data-id="${esc(d.id)}">Reject</button>` : ""}</div></div>`}</aside>`;
+    return redraft + `<div class="split"><div>${list}</div>${panel}</div>`;
+  }
+
+
+  const pctS = (v) => v == null ? "—" : (v > 0 ? "+" : "") + (v * 100).toFixed(1) + "%";
+  const staffOnly = () => `<div class="empty"><h3>Staff only</h3><p class="muted">This view is for Wavy strategists.</p></div>`;
+
+  function vMorning() {
+    if (!S.me?.staff) return staffOnly();
+    const m = S.data.morning; if (!m) return `<p class="muted">Loading…</p>`;
+    const mine = (xs) => (xs || []).filter(x => !S.client || x.client === S.client);
+    const c = { changed: mine(m.changed), ready: mine(m.drafts_ready), rewrite: mine(m.needs_rewrite), blocked: mine(m.blocked), decided: mine(m.outcomes_decided), due: mine(m.outcomes_due) };
+    const strip = `<div class="grid" style="grid-template-columns:repeat(6,minmax(0,1fr));margin-bottom:18px">${[["Changed overnight", c.changed.length], ["Ready to approve", c.ready.length], ["Needs a rewrite", c.rewrite.length], ["Blocked", c.blocked.length], ["Read out", c.decided.length], ["Due this week", c.due.length]]
+      .map(([l, n]) => `<div class="card"><div class="label">${l}</div><div class="n num" style="font-size:26px;color:var(--text)">${n}</div></div>`).join("")}</div>`;
+    const drafts = (xs, tone) => xs.length ? `<div class="tbl" style="margin-bottom:22px"><table><thead><tr><th>Client</th><th>Section</th><th>Headline</th><th>Score</th><th>Since</th></tr></thead><tbody>
+      ${xs.map(d => `<tr class="click" data-gonarr="${esc(d.id)}" tabindex="0"><td>${esc(d.client_name)}</td><td>${chip(tone, d.section.replace(/_/g, " "))}</td><td style="max-width:420px">${esc(d.headline || d.reason || "")}</td><td class="num">${d.score == null ? "—" : esc(d.score) + "/10"}</td><td class="muted">${esc(ago(d.since))}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted" style="margin-bottom:22px">Nothing here.</p>`;
+    const sg = S.data.scale?.signals;
+    const move = sg?.move ? `<div class="card" style="margin-bottom:18px;border-color:var(--amber, #c90)"><div class="label">Hosting</div><div class="t" style="margin:4px 0">${esc(sg.action)}</div><div class="muted" style="font-size:12px">${sg.reasons.map(esc).join("<br>")}</div><a class="btn" href="#scale" style="margin-top:8px">Scale and cost guards</a></div>` : "";
+    return `${move}${strip}
+      <div class="label" style="margin-bottom:8px">What changed overnight (last ${esc(m.hours)} hours)</div>
+      ${c.changed.length ? `<div class="tbl" style="margin-bottom:22px"><table><thead><tr><th>Client</th><th>Run</th><th class="num">Score</th><th class="num">Checks worse / better</th><th class="num">Opportunities new / resolved</th><th>Biggest moves</th><th></th></tr></thead><tbody>
+        ${c.changed.map(r => `<tr><td class="t">${esc(r.client_name)}</td><td>${chip(r.first_audit ? "review" : "ok", r.first_audit ? "first audit" : r.refresh)}<div class="muted">v${esc(r.version)} · ${esc(ago(r.published_at))}</div></td>
+          <td class="num">${r.score_delta == null ? "—" : (r.score_delta > 0 ? "+" : "") + esc(r.score_delta)}</td><td class="num">${r.checks_regressed ?? "—"} / ${r.checks_improved ?? "—"}</td><td class="num">${r.opportunities_new ?? "—"} / ${r.opportunities_resolved ?? "—"}</td>
+          <td style="font-size:11.5px">${(r.movers || []).map(x => `${esc(x.label)} <b style="color:var(--text)">${pctS(x.pct_change)}</b>`).join("<br>") || '<span class="muted">—</span>'}</td>
+          <td><a class="btn" href="/audit/${encodeURIComponent(r.client)}" target="_blank">Workspace ↗</a></td></tr>`).join("")}</tbody></table></div>` : `<p class="muted" style="margin-bottom:22px">No audit finished in this window.</p>`}
+      <div class="label" style="margin-bottom:8px">Drafts ready to approve</div>${drafts(c.ready, "review")}
+      <div class="label" style="margin-bottom:8px">Drafts that need a strategist's rewrite</div>${drafts(c.rewrite, "blocked")}
+      <div class="label" style="margin-bottom:8px">Blocked</div>
+      ${c.blocked.length ? `<div class="tbl" style="margin-bottom:22px"><table><thead><tr><th>Client</th><th>What</th><th>Why</th><th>When</th></tr></thead><tbody>
+        ${c.blocked.map(b => `<tr><td>${esc(b.client_name)}</td><td>${chip("failed", b.kind.replace(/_/g, " "))}<div class="muted">${esc(b.job || b.section || "")}</div></td><td style="max-width:520px">${esc(b.reason)}</td><td class="muted">${esc(ago(b.at))}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted" style="margin-bottom:22px">Nothing blocked.</p>`}
+      <div class="label" style="margin-bottom:8px">Approved work: read out, and due this week</div>
+      ${c.decided.length + c.due.length ? `<div class="tbl"><table><thead><tr><th>Client</th><th>Opportunity</th><th>Owner</th><th>Status</th><th>What happened</th></tr></thead><tbody>
+        ${[...c.decided, ...c.due].map(o => `<tr><td>${esc(o.client_name)}</td><td class="t">${esc(o.title)}</td><td>${esc(o.owner)}</td><td>${chip(o.status === "improved" ? "ok" : o.status === "worse" ? "failed" : "review", o.status)}</td><td style="font-size:11.5px">${esc(o.verdict_reason || (o.due_at ? "due " + o.due_at.slice(0, 10) : ""))}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted">No readouts in this window.</p>`}`;
+  }
+
+  function vOutcomes() {
+    if (!S.me?.staff) return staffOnly();
+    if (!S.client) return `<div class="empty"><h3>Pick a client</h3><p class="muted">Approve the latest audit's opportunities with an owner. Each approval records its baseline; later audits read it out, and verdicts move the playbook's rank for every brand.</p></div>`;
+    const o = S.data.outcomes; if (!o) return `<p class="muted">Loading…</p>`;
+    const rec = (r) => r ? `${r.improved || 0}↑ ${r.flat || 0}→ ${r.worse || 0}↓` : "—";
+    return `<div class="tbl" style="margin-bottom:22px"><table><thead><tr><th class="num">Rank</th><th>Opportunity</th><th>Status</th><th>Read out by</th><th>Track record</th><th>Approve</th></tr></thead><tbody>
+      ${o.opportunities.map(c => `<tr data-k="op-${esc(c.id)}"><td class="num">${esc(c.rank)}</td><td><div class="t">${esc(c.title)}</div><div class="muted">${esc((c.category || "").replace(/_/g, " "))} · ${esc(c.severity)}</div></td>
+        <td>${chip(c.outcome_status ? (c.outcome_status === "tracking" ? "approved" : c.outcome_status === "improved" ? "ok" : c.outcome_status === "worse" ? "failed" : "review") : "pending", c.status)}${c.owner && c.owner !== "UNCONFIRMED" ? `<div class="muted">${esc(c.owner)}</div>` : ""}</td>
+        <td style="font-size:11.5px">${esc(c.readout?.metric || "")}${c.readout?.days ? ` · ${esc(c.readout.days)} days` : ""}</td><td class="muted">${rec(c.track_record)}</td>
+        <td>${c.outcome_status === "tracking" ? `<button class="btn danger" data-wd="${esc(c.outcome_id)}">Withdraw</button>` : `<div class="row"><input id="ow-${esc(c.id)}" placeholder="Owner" style="width:120px"><button class="btn primary" data-oppok="${esc(c.id)}">Approve</button></div>`}</td></tr>`).join("")}</tbody></table></div>
+      <div class="label" style="margin-bottom:8px">Every outcome for ${esc(o.client_name)}</div>
+      ${o.outcomes.length ? `<div class="tbl" style="margin-bottom:22px"><table><thead><tr><th>Opportunity</th><th>Owner</th><th>Baseline</th><th>Readouts</th><th>Status</th><th>Live in Klaviyo</th><th class="num">Measured lift</th><th>What happened</th></tr></thead><tbody>
+        ${o.outcomes.map(x => { const f = fixOf(x.id); return `<tr><td class="t">${esc(x.title)}<div class="muted">${esc(x.readout_fact || "no fact maps to this card")} · ${(x.targets || []).length} target${(x.targets || []).length === 1 ? "" : "s"}</div></td><td>${esc(x.owner)}</td><td class="num">${x.baseline?.v == null ? "—" : esc(x.baseline.v)}</td>
+          <td class="num">${(x.readouts || []).map(r => r.v == null ? "—" : esc(r.v)).join(" → ") || "—"}</td><td>${chip(x.status === "improved" ? "ok" : x.status === "worse" ? "failed" : x.status === "tracking" ? "approved" : "review", x.status)}<div class="muted">due ${esc((x.due_at || "").slice(0, 10))}</div></td>
+          <td style="font-size:11.5px">${x.shipped_at ? `${esc(x.shipped_at.slice(0, 10))}<div class="muted">${esc(x.shipped_by || "")}</div>` : x.status === "withdrawn" ? "—" : `<div class="row"><input type="date" id="sh-${esc(x.id)}" max="${new Date().toISOString().slice(0, 10)}" style="width:140px"><button class="btn primary" data-ship="${esc(x.id)}">Mark live</button></div>`}</td>
+          <td class="num">${f?.lift != null ? usd(f.lift) : `<span class="muted" style="font-size:11.5px">${esc(f ? f.state.replace(/_/g, " ") : "—")}</span>`}</td>
+          <td style="font-size:11.5px">${esc(x.verdict_reason || f?.reason || "")}</td></tr>`; }).join("")}</tbody></table></div>` : `<p class="muted" style="margin-bottom:22px">Nothing approved yet.</p>`}
+      ${vMail()}`;
+  }
+
+  const fixOf = id => (S.data.progress?.fixes || []).find(f => f.outcome_id === id);
+
+  function vMail() {
+    const p = S.data.progress, ml = S.data.mail;
+    if (!ml) return "";
+    const head = p ? `<div class="muted" style="margin-bottom:12px">Day ${esc(p.day)} · ${usd(p.measured)} measured of ${usd(p.goal)} · ${usd(p.attributed)} attributed (not counted) · next step: ${esc(p.next_step?.title || "—")}</div>` : "";
+    return `<div class="label" style="margin-bottom:8px">Onboarding email for ${esc(ml.client_name)}</div>${head}
+      <div class="row" style="margin-bottom:12px;gap:10px;flex-wrap:wrap">
+        ${ml.self_serve ? chip(ml.paused ? "blocked" : "ok", ml.paused ? "paused" : "sending") : chip("review", "not self-serve: no brand email")}
+        <button class="btn" data-mailpause="${ml.paused ? "0" : "1"}">${ml.paused ? "Resume email" : "Pause email"}</button>
+        <select id="mail-step">${ml.steps.map(s => `<option value="${esc(s.key)}"${S.mailKey === s.key ? " selected" : ""}>${esc(s.key)}${s.live ? "" : " (off)"} · ${esc(s.kind)}</option>`).join("")}</select>
+        <button class="btn" data-mailprev="1">Preview as it would go now</button></div>
+      ${S.mailPreview ? `<div class="card" style="margin-bottom:14px"><div class="t" style="margin-bottom:6px">${esc(S.mailPreview.subject)}</div><div class="muted" style="margin-bottom:8px">${esc(S.mailPreview.preheader)}</div>
+        <iframe sandbox="" title="Email preview" style="width:100%;height:640px;border:1px solid var(--line);background:#fff" srcdoc="${esc(S.mailPreview.html)}"></iframe></div>` : ""}
+      ${ml.emails.length ? `<div class="tbl"><table><thead><tr><th>When</th><th>Email</th><th>To</th><th>Subject</th><th>Status</th><th>Detail</th></tr></thead><tbody>
+        ${ml.emails.map(e => `<tr><td class="muted" style="white-space:nowrap">${esc(ago(e.sent_at || e.send_after || e.created_at))}</td><td>${esc(e.key.split(":")[0])}<div class="muted">${esc(e.kind)}</div></td><td>${esc(e.to)}</td><td class="t">${esc(e.subject)}</td>
+          <td>${chip(e.status === "sent" ? "ok" : e.status === "failed" ? "failed" : e.status === "queued" ? "pending" : "review", e.status)}</td><td style="font-size:11.5px">${esc(e.error || (e.provider ? e.provider : ""))}${e.attempts > 1 ? ` · ${e.attempts} tries` : ""}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted">No email queued for this brand yet.</p>`}`;
+  }
+
+  function vLearning() {
+    if (!S.me?.staff) return staffOnly();
+    const l = S.data.learning; if (!l) return `<p class="muted">Loading…</p>`;
+    const rate = (v) => v == null ? "—" : (v * 100).toFixed(0) + "%";
+    return `<p class="muted" style="margin-bottom:14px">${l.totals.drafts} drafts and ${l.totals.outcomes} approved opportunities (${l.totals.decided} read out). Use this to tune section prompts and playbooks.json.</p>
+      <div class="label" style="margin-bottom:8px">Per section prompt</div>
+      ${l.sections.length ? `<div class="tbl" style="margin-bottom:22px"><table><thead><tr><th>Section</th><th class="num">Drafts</th><th class="num">As drafted / edited / rejected</th><th class="num">Edit rate</th><th class="num">Reject rate</th><th class="num">Avg score</th><th class="num">Avg rounds</th><th>Most edited</th><th>Facts check blocks</th><th>Weakest criteria</th></tr></thead><tbody>
+        ${l.sections.map(x => `<tr data-k="ls-${esc(x.section)}"><td class="t">${esc(x.section)}</td><td class="num">${x.drafts}</td><td class="num">${x.approved_as_drafted} / ${x.edited} / ${x.rejected}</td><td class="num">${rate(x.edit_rate)}</td><td class="num">${rate(x.reject_rate)}</td>
+          <td class="num">${x.avg_score ?? "—"}</td><td class="num">${x.avg_rounds ?? "—"}</td><td style="font-size:11.5px">${x.edited_paths.map(p => `${esc(p.path)} ×${p.count}`).join("<br>") || "—"}</td>
+          <td style="font-size:11.5px">${x.facts_check_reasons.map(p => `${esc(p.reason)} ×${p.count}`).join("<br>") || "—"}</td><td style="font-size:11.5px">${x.weakest_criteria.map(p => `${esc(p.criterion)} ${esc(p.avg)}`).join("<br>") || "—"}</td></tr>
+          ${x.notes.length ? `<tr><td></td><td colspan="9"><details><summary>Strategist notes (${x.notes.length})</summary>${x.notes.map(n => `<div style="font-size:12px;padding:3px 0">${esc(n.client)} · ${esc(n.status)} · ${esc(ago(n.at))}: <span style="color:var(--text)">${esc(n.note)}</span></div>`).join("")}</details></td></tr>` : ""}`).join("")}</tbody></table></div>` : `<p class="muted" style="margin-bottom:22px">No drafts yet.</p>`}
+      <div class="label" style="margin-bottom:8px">Per playbook</div>
+      ${l.playbooks.length ? `<div class="tbl" style="margin-bottom:22px"><table><thead><tr><th>Playbook</th><th class="num">Approved</th><th class="num">Tracking</th><th class="num">Improved / flat / worse</th><th class="num">Unmeasured</th><th class="num">Card edits</th><th class="num">Brands</th><th class="num">Rank weight</th></tr></thead><tbody>
+        ${l.playbooks.map(p => `<tr><td><div class="t">${esc(p.title)}</div><div class="muted">${esc(p.source_key)}</div></td><td class="num">${p.approved}</td><td class="num">${p.tracking}</td><td class="num">${p.improved} / ${p.flat} / ${p.worse}</td><td class="num">${p.unmeasured}</td><td class="num">${p.card_edits}</td><td class="num">${p.brands}</td><td class="num">×${Number(p.rank_weight).toFixed(2)}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted" style="margin-bottom:22px">No playbook has been approved or edited yet.</p>`}
+      <div class="label" style="margin-bottom:8px">Per writer and critic</div>
+      ${l.models.length ? `<div class="tbl"><table><thead><tr><th>Drafter → critic</th><th class="num">Drafts</th><th class="num">Passed</th><th class="num">Avg score</th><th class="num">Avg rounds</th><th class="num">Cost</th></tr></thead><tbody>
+        ${l.models.map(x => `<tr><td class="exec">${esc(x.drafter)} → ${esc(x.critic || "none")}</td><td class="num">${x.drafts}</td><td class="num">${x.passed}</td><td class="num">${x.avg_score ?? "—"}</td><td class="num">${x.avg_rounds ?? "—"}</td><td class="num">${usd(x.cost_usd)}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted">No model has drafted yet.</p>`}`;
+  }
+
+  function vScale() {
+    if (!S.me?.staff) return staffOnly();
+    const x = S.data.scale; if (!x) return `<p class="muted">Loading…</p>`;
+    const sg = x.signals, st = x.storage, mt = sg.metrics;
+    const pct = (a, b) => b ? Math.round(100 * a / b) + "%" : "—";
+    const card = (l, v, sub) => `<div class="card"><div class="label">${l}</div><div class="n num" style="font-size:24px;color:var(--text)">${v}</div><div class="muted" style="font-size:11.5px">${sub}</div></div>`;
+    return `<div class="card" style="margin-bottom:18px"><div class="label">Hosting</div>${chip(sg.move ? "blocked" : "ok", sg.move ? (sg.step === "step2" ? "move to step 2" : sg.step === "threads" ? "add worker threads" : "move to paid hosting") : "fine for now")}
+        <div class="t" style="margin:6px 0">${esc(sg.action)}</div>${sg.reasons.length ? `<div class="muted" style="font-size:12px">${sg.reasons.map(esc).join("<br>")}</div>` : ""}</div>
+      <div class="grid" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:18px">
+        ${card("Database", st.error ? "—" : esc(st.database_mb) + " MB", st.error ? esc(st.error) : pct(st.database_mb, st.free_plan_mb) + " of the " + esc(st.free_plan_mb) + " MB free plan")}
+        ${card("Model spend today", usd(x.llm.used_usd), "of " + usd(x.llm.cap_usd) + " agency cap (" + pct(x.llm.used_usd, x.llm.cap_usd) + ")")}
+        ${card("Queue lag", esc(mt.queue_lag_minutes) + " min", esc(mt.missed_overnight_runs) + " overnight run(s) missed")}
+        ${card("Brands", esc(mt.brands), esc(mt.active_brands) + " active · " + esc(mt.connected_brands) + " connected to Klaviyo")}</div>
+      <div class="label" style="margin-bottom:8px">Jobs running per family</div>
+      <div class="tbl" style="margin-bottom:22px"><table><thead><tr><th>Family</th><th class="num">Running / limit</th><th>Jobs</th></tr></thead><tbody>
+        ${x.families.map(f => `<tr><td class="t">${esc(f.family)}</td><td class="num">${f.running} / ${f.limit}</td><td class="muted" style="font-size:11.5px">${f.jobs.map(esc).join(", ")}</td></tr>`).join("")}</tbody></table></div>
+      <div class="label" style="margin-bottom:8px">Klaviyo budgets today (reset at midnight UTC)</div>
+      ${x.klaviyo.length ? `<div class="tbl" style="margin-bottom:22px"><table><thead><tr><th>Client</th><th class="num">Reporting calls</th><th class="num">Event pages</th></tr></thead><tbody>
+        ${x.klaviyo.map(k => `<tr><td>${esc(k.client_name)}</td><td class="num">${k.reporting.used} / ${k.reporting.limit}</td><td class="num">${k.events.used} / ${k.events.limit}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted" style="margin-bottom:22px">No brand has an active Klaviyo connection.</p>`}
+      <div class="label" style="margin-bottom:8px">Storage per brand</div>
+      ${(st.brands || []).length ? `<div class="tbl"><table><thead><tr><th>Client</th><th class="num">Size</th><th class="num">Rows</th></tr></thead><tbody>
+        ${st.brands.map(b => `<tr><td>${esc(b.name || b.slug)}</td><td class="num">${b.mb == null ? "—" : esc(b.mb) + " MB"}</td><td class="num">${Number(b.rows).toLocaleString()}</td></tr>`).join("")}</tbody></table></div>
+        ${st.dialect !== "postgresql" ? `<p class="muted" style="margin-top:6px">Sizes per brand are measured on Postgres; this database reports row counts.</p>` : ""}` : `<p class="muted">No brand data stored yet.</p>`}`;
+  }
+
   function vEvents() {
     const ev = S.events.filter(e => !S.client || e.client === S.client).slice(-300).reverse();
     if (!ev.length) return `<div class="empty"><h3>No events yet</h3><p class="muted">Every change in Wavy OS is written here, chained by hash.</p></div>`;
@@ -289,7 +449,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
 
   function render() {
     shell();
-    const v = { overview: vOverview, flow: vFlow, executions: vExecutions, jobs: vJobs, approvals: vApprovals, events: vEvents }[S.view];
+    const v = { morning: vMorning, overview: vOverview, flow: vFlow, review: vReview, outcomes: vOutcomes, learning: vLearning, scale: vScale, executions: vExecutions, jobs: vJobs, approvals: vApprovals, events: vEvents }[S.view];
     $("#content").innerHTML = v();
   }
 
@@ -302,6 +462,14 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
       if (S.view === "executions") { S.data.executions = await api("/v1/ops/executions?" + qc()); if (S.sel) S.data.exec = await api("/v1/ops/executions/" + S.sel); }
       if (S.view === "jobs") S.data.jobs = await api("/v1/ops/jobs");
       if (S.view === "approvals") S.data.approvals = await api("/v1/ops/approvals");
+      if (S.me?.staff && (S.view === "morning" || !S.data.morning || Date.now() - (S.mAt || 0) > 60000)) { S.data.morning = await api("/v1/ops/morning"); S.mAt = Date.now(); }
+      if (S.view === "learning" && S.me?.staff) S.data.learning = await api("/v1/ops/learning");
+      if (S.me?.staff && (S.view === "scale" || (S.view === "morning" && Date.now() - (S.sAt || 0) > 300000))) { S.data.scale = await api("/v1/ops/scale"); S.sAt = Date.now(); }
+      if (S.view === "outcomes" && S.me?.staff) {
+        const base = S.client ? `/v1/ops/clients/${encodeURIComponent(S.client)}` : null;
+        [S.data.outcomes, S.data.progress, S.data.mail] = base ? await Promise.all([api(base + "/outcomes"), api(base + "/progress"), api(base + "/mail")]) : [null, null, null];
+      }
+      if (S.view === "review" && S.me?.staff) { S.data.review = await api("/v1/ops/narrative?" + qc()); S.data.nd = S.selN ? await api("/v1/ops/narrative/" + S.selN) : null; }
       const ev = await api("/v1/ops/events?after=" + S.after);
       if (ev.events.length) { S.events = S.events.concat(ev.events).slice(-1000); S.after = ev.events[ev.events.length - 1].id; }
       S.live = true; S.last = new Date().toISOString();
@@ -310,7 +478,8 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
     // Redraw only when something changed, so open details, scroll and typing survive the live refresh.
     const sig = JSON.stringify([S.view, S.client, S.sel, S.data.overview?.clients, S.view === "flow" && S.data.flow,
       S.view === "executions" && [S.data.executions, S.data.exec], S.view === "jobs" && S.data.jobs,
-      S.view === "approvals" && S.data.approvals, S.view === "events" && S.after, S.live]);
+      S.view === "approvals" && S.data.approvals, S.view === "review" && [S.data.review, S.data.nd], S.view === "events" && S.after, S.live,
+      S.data.morning?.counts, S.view === "morning" && S.data.morning?.changed, S.view === "learning" && S.data.learning, S.view === "outcomes" && [S.data.outcomes, S.data.progress, S.data.mail], (S.view === "scale" || S.view === "morning") && S.data.scale]);
     if (!redraw && sig === S.sig) { const l = document.querySelector(".live"); if (l) l.lastChild.textContent = "Live · " + ago(S.last); return; }
     S.sig = sig;
     const a = document.activeElement; const keep = a && a.id && a.tagName === "TEXTAREA" ? [a.id, a.value] : null;
@@ -324,7 +493,36 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
   }
 
   document.addEventListener("click", async (e) => {
-    const t = e.target.closest("[data-v],[data-open],[data-ex],[data-dispatch],[data-ap],[data-cancel],#closeEx"); if (!t) return;
+    const t = e.target.closest("[data-v],[data-open],[data-ex],[data-dispatch],[data-ap],[data-cancel],#closeEx,[data-nd],[data-ndok],[data-ndedit],[data-redraft],#closeNd,[data-gonarr],[data-oppok],[data-wd],[data-ship],[data-mailpause],[data-mailprev]"); if (!t) return;
+    if (t.dataset.ship) { const at = document.getElementById("sh-" + t.dataset.ship)?.value;
+      try { await api(`/v1/ops/outcomes/${encodeURIComponent(t.dataset.ship)}/shipped`, { method: "POST", body: JSON.stringify(at ? { at } : {}) }); toast("Marked live; measuring from that day"); } catch (err) { toast(err.message); }
+      refresh(true); return; }
+    if (t.dataset.mailpause) {
+      try { await api(`/v1/ops/clients/${encodeURIComponent(S.client)}/mail/pause`, { method: "POST", body: JSON.stringify({ paused: t.dataset.mailpause === "1" }) }); toast(t.dataset.mailpause === "1" ? "Email paused for this brand" : "Email resumed"); } catch (err) { toast(err.message); }
+      refresh(true); return; }
+    if (t.dataset.mailprev) { S.mailKey = document.getElementById("mail-step")?.value;
+      try { S.mailPreview = await api(`/v1/ops/clients/${encodeURIComponent(S.client)}/mail-preview/${encodeURIComponent(S.mailKey)}`); } catch (err) { toast(err.message); }
+      render(); return; }
+    if (t.dataset.gonarr) { S.selN = t.dataset.gonarr; location.hash = "review"; return; }
+    if (t.dataset.oppok) { const id = t.dataset.oppok, owner = (document.getElementById("ow-" + id)?.value || "").trim();
+      if (!owner) { toast("Name an owner first"); return; }
+      try { await api(`/v1/ops/clients/${encodeURIComponent(S.client)}/opportunities/${encodeURIComponent(id)}/approve`, { method: "POST", body: JSON.stringify({ owner }) }); toast("Approved; baseline recorded"); } catch (err) { toast(err.message); }
+      refresh(true); return; }
+    if (t.dataset.wd) { try { await api(`/v1/ops/outcomes/${t.dataset.wd}/withdraw`, { method: "POST", body: "{}" }); toast("Withdrawn"); } catch (err) { toast(err.message); } refresh(true); return; }
+    if (t.id === "closeNd") { S.selN = null; S.data.nd = null; render(); return; }
+    if (t.dataset.nd) { S.selN = t.dataset.nd; refresh(true); return; }
+    if (t.dataset.ndok) { const ok = t.dataset.ndok === "1", id = t.dataset.id, note = document.getElementById("nn-" + id)?.value || "";
+      try { const r = await api(`/v1/ops/narrative/${id}/decide`, { method: "POST", body: JSON.stringify({ approve: ok, note }) }); toast(r.status === "rejected" ? "Rejected" : "Approved and published"); } catch (err) { toast(err.message); }
+      refresh(true); return; }
+    if (t.dataset.ndedit) { const id = t.dataset.ndedit; let payload;
+      try { payload = JSON.parse(document.getElementById("nj-" + id).value); } catch { toast("That isn't valid JSON"); return; }
+      const note = document.getElementById("nn-" + id)?.value || "";
+      const r = await fetch(`/v1/ops/narrative/${id}/edit`, { method: "POST", headers: { "Authorization": "Bearer " + S.token, "Content-Type": "application/json" }, body: JSON.stringify({ payload, note }) });
+      const body = await r.json().catch(() => ({}));
+      if (r.ok) toast("Saved and published as edited");
+      else toast((body.problems || []).slice(0, 3).map(p => `${p.path}: ${p.reason}${p.token ? " (" + p.token + ")" : ""}`).join(" · ") || body.error || "Not saved");
+      refresh(true); return; }
+    if (t.dataset.redraft) { try { await api(`/v1/ops/clients/${encodeURIComponent(t.dataset.redraft)}/narrative`, { method: "POST", body: "{}" }); toast("Drafting queued; reviewed sections are kept"); } catch (err) { toast(err.message); } refresh(); return; }
     if (t.dataset.v) { e.preventDefault(); location.hash = t.dataset.v; return; }
     if (t.dataset.open) { S.client = t.dataset.open; location.hash = "flow"; return; }
     if (t.id === "closeEx") { S.sel = null; S.data.exec = null; render(); return; }
@@ -337,7 +535,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
       try { const r = await api(`/v1/ops/approvals/${t.dataset.ap}/decide`, { method: "POST", body: JSON.stringify({ approve: ok, note }) }); toast(ok ? "Approved" : "Rejected"); } catch (err) { toast(err.message); }
       refresh(); }
   });
-  document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("tr[data-ex]")) e.target.click(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.matches("tr[data-ex],tr[data-nd],tr[data-gonarr]")) e.target.click(); });
   window.addEventListener("hashchange", () => { const v = location.hash.slice(1); if (VIEWS.some(x => x[0] === v)) { S.view = v; refresh(true); } });
 
   let timer;

@@ -5,7 +5,9 @@ Every action is registered in ACTIONS with a default level:
   approved_plan      only inside an approved decision whose scope lists the action
   explicit_approval  each instance needs its own approval, bound to the exact payload
 
-authorize() returns an Authorization and logs the outcome either way. Overrides can move an
+authorize() returns an Authorization and logs the outcome either way, except allowed reads: logging
+every page view would put a write on the brand's event chain for each read. Denied reads are logged,
+and opening a stored key logs its own connection.used event. Overrides can move an
 action's level per org or per client, but never below its floor: LOCKED actions stay at
 explicit_approval forever.
 """
@@ -50,6 +52,7 @@ def _a(*args, **kw) -> Action:
 
 
 LEADS = frozenset({"org_admin", "account_lead"})
+UNLOGGED_ALLOWS = frozenset({"data.read"})
 
 ACTIONS: dict[str, Action] = {a.key: a for a in [
     # ---- autonomous
@@ -80,6 +83,8 @@ ACTIONS: dict[str, Action] = {a.key: a for a in [
     _a("decision.approve", "explicit_approval", "Approve a decision and its plan scope",
        approvers=LEADS | CLIENT_DECIDERS),
     _a("client.message.send", "explicit_approval", "Send a communication to the client", approvers=LEADS),
+    _a("narrative.approve", "explicit_approval", "Publish a written audit section to the brand's workspace",
+       approvers=LEADS | {"strategist"}),
     _a("campaign.publish", "explicit_approval", "Schedule or send a campaign", approvers=LEADS | CLIENT_DECIDERS),
     _a("flow.change_live", "explicit_approval", "Activate, pause or change a live flow", approvers=LEADS | CLIENT_DECIDERS),
     _a("discount.change", "explicit_approval", "Create or change a discount or offer",
@@ -146,7 +151,7 @@ def authorize(session: Session, scope: Scope, action_key: str, *, decision_id: O
     exact payload that was approved. A matched approval is consumed (single use) unless consume=False.
     """
     auth = _decide(session, scope, action_key, decision_id, approval_id, payload, consume)
-    if log:
+    if log and not (auth.allowed and action_key in UNLOGGED_ALLOWS):
         events.record(session, scope, "policy." + ("allow" if auth.allowed else auth.outcome),
                       auth.approval_id or auth.decision_id or action_key, auth.reason,
                       {"action": action_key, "level": auth.level}, object_kind="policy")

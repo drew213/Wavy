@@ -98,7 +98,8 @@ def ok(resp, status=200):
 # ---------------------------------------------------------------- auth and tenancy
 
 def test_auth_required(api):
-    assert api.call("GET", "/healthz").json() == {"status": "ok"}
+    health = api.call("GET", "/healthz").json()
+    assert health["status"] == "ok" and "database_mb" in health["storage"] and "brands" in health["storage"]
     r = api.call("GET", "/v1/me")
     assert r.status_code == 401 and "error" in r.json()
     assert api.call("GET", "/v1/me", headers={"Authorization": "Bearer wos_not-a-real-token"}).status_code == 401

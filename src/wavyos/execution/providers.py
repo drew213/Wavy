@@ -17,7 +17,7 @@ from ..scope import NotPermitted, Scope
 from ..vault import Vault
 from .adapters import AnthropicAdapter, CodexAdapter
 
-PROVIDERS = ("anthropic",)
+PROVIDERS = ("anthropic", "postmark", "resend")  # model providers, and the email providers wavyos.mail sends through
 
 
 def _aad(org_id: str, provider: str) -> bytes:
@@ -26,7 +26,7 @@ def _aad(org_id: str, provider: str) -> bytes:
 
 def store_key(session: Session, scope: Scope, vault: Vault, provider: str, secret: str) -> m.ProviderCredential:
     if not scope.actor.is_human or "org_admin" not in scope.actor.roles:
-        raise NotPermitted("only an org admin can add a model provider key")
+        raise NotPermitted("only an org admin can add a provider key")
     if provider not in PROVIDERS:
         raise ValueError(f"provider must be one of {PROVIDERS}")
     blob, key_ref = vault.seal(secret, _aad(scope.org_id, provider))
@@ -52,6 +52,11 @@ def _key(factory: sessionmaker[Session], vault: Optional[Vault], org_id: str, pr
             return None
         with vault.open(row.secret_ciphertext, row.key_ref, _aad(org_id, provider)) as k:
             return k
+
+
+def stored_key(factory: sessionmaker[Session], vault: Optional[Vault], org_id: str, provider: str) -> Optional[str]:
+    """An org's stored key for one provider, or None. Only the worker calls this, at the moment it needs the key."""
+    return _key(factory, vault, org_id, provider)
 
 
 def adapter_factory(factory: sessionmaker[Session], vault: Optional[Vault], extra: Optional[dict] = None):

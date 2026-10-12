@@ -19,7 +19,7 @@ from typing import Optional
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
-from .. import approvals, events, operations
+from .. import approvals, events, operations, spend
 from .. import models as m
 from ..db import utcnow
 from ..policy import authorize
@@ -80,6 +80,15 @@ def spent_today(session: Session, client_id: str) -> float:
         m.Execution.client_id == client_id, m.Execution.created_at >= start)) or 0.0)
 
 
+def spent_today_by_client(session: Session, client_ids) -> dict[str, float]:
+    """spent_today for many clients in one query; client_ids is a list or a subquery."""
+    start = datetime.combine(utcnow().date(), dtime.min, tzinfo=timezone.utc)
+    return {cid: float(total or 0.0) for cid, total in session.execute(
+        select(m.Execution.client_id, func.sum(m.Execution.cost_usd))
+        .where(m.Execution.client_id.in_(client_ids), m.Execution.created_at >= start)
+        .group_by(m.Execution.client_id))}
+
+
 def _agent_scope(session: Session, scope: Scope, role: str) -> Scope:
     agent = session.scalar(select(m.Agent).where(m.Agent.org_id == scope.org_id, m.Agent.role == role, m.Agent.active.is_(True)))
     if agent is None:
@@ -103,6 +112,8 @@ def dispatch(session: Session, scope: Scope, task_id: str, *, purpose: str = "pr
     budget = float((client.settings or {}).get("daily_budget_usd", DEFAULT_DAILY_BUDGET_USD))
     if spent_today(session, client.id) >= budget:
         raise InvalidState(f"today's model budget for this client (${budget:.2f}) is used up")
+    if spend.left(session, scope.org_id) <= 0:
+        raise InvalidState(spend.cap_reason())
     attempts = session.scalar(select(func.count()).select_from(m.Execution).where(
         m.Execution.task_id == task.id, m.Execution.purpose == purpose)) or 0
     ex_name, model, effort = route(session, task, purpose, prefer=executor)
@@ -157,6 +168,7 @@ def run(factory: sessionmaker[Session], execution_id: str, adapters) -> m.Execut
                 raise ExecutorUnavailable(f"{ex.executor} isn't an allowed provider for this client")
             result: AdapterResult = adapter.run(ex.packet, tools_for(ex.purpose), gw, ex.model, ex.packet["routing"]["effort"])
             ex.input_tokens, ex.output_tokens, ex.cost_usd = result.input_tokens, result.output_tokens, round(result.cost_usd, 6)
+            spend.charge(s, ex.org_id, ex.cost_usd)
             ex.result = {"summary": result.summary, "outputs": gw.outputs, "checks": gw.checks, "turns": result.turns}
             ex.finished_at = utcnow()
             _settle(s, base, ex, task, gw)

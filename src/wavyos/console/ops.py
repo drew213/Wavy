@@ -5,10 +5,10 @@ Staff with org-wide roles see every client; client stakeholders see only their o
 """
 from __future__ import annotations
 
-from collections import Counter
 from typing import Callable, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, SecretStr
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -84,6 +84,34 @@ class IntakeBody(BaseModel):
     answers: dict
 
 
+class NarrativeEditBody(BaseModel):
+    payload: dict
+    note: str = ""
+
+
+class RedraftBody(BaseModel):
+    sections: Optional[list[str]] = None
+
+
+class OutcomeApproveBody(BaseModel):
+    owner: str = "Wavy Studios"
+    fact: Optional[str] = None
+    note: str = ""
+
+
+class OutcomeWithdrawBody(BaseModel):
+    note: str = ""
+
+
+class ShippedBody(BaseModel):
+    at: Optional[str] = None     # ISO date or datetime; default now
+    note: str = ""
+
+
+class MailPauseBody(BaseModel):
+    paused: bool
+
+
 def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
     r = APIRouter(prefix="/v1/ops", tags=["ops"])
 
@@ -109,15 +137,24 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
         return bool(s.scalar(select(func.count()).select_from(m.Membership).where(
             m.Membership.user_id == u.id, m.Membership.client_id.is_(None))))
 
-    def visible_clients(s: Session, u: m.User) -> list[m.Client]:
+    def visible(s: Session, u: m.User):
+        """The clients this user may see, as a query to filter or join on (never loaded wholesale)."""
         q = select(m.Client).where(m.Client.org_id == u.org_id)
         if not org_wide(s, u):
-            ids = s.scalars(select(m.Membership.client_id).where(m.Membership.user_id == u.id)).all()
-            q = q.where(m.Client.id.in_(ids))
-        return list(s.scalars(q.order_by(m.Client.name)))
+            q = q.where(m.Client.id.in_(select(m.Membership.client_id).where(m.Membership.user_id == u.id)))
+        return q
+
+    def visible_clients(s: Session, u: m.User) -> list[m.Client]:
+        return list(s.scalars(visible(s, u).order_by(m.Client.name)))
+
+    def visible_ids(s: Session, u: m.User):
+        return visible(s, u).with_only_columns(m.Client.id).scalar_subquery()
+
+    def visible_client(s: Session, u: m.User, client_id: Optional[str]) -> Optional[m.Client]:
+        return s.scalar(visible(s, u).where(m.Client.id == client_id)) if client_id else None
 
     def client_by_slug(s, u, slug) -> m.Client:
-        c = next((c for c in visible_clients(s, u) if c.slug == slug), None)
+        c = s.scalar(visible(s, u).where(m.Client.slug == slug))
         if c is None:
             raise HTTPException(404, {"error": "client not found"})
         return c
@@ -138,25 +175,35 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
 
     @r.get("/overview")
     def overview(u: m.User = Depends(user), s: Session = Depends(db)):
-        out = []
-        for c in visible_clients(s, u):
-            def count(model, *conds):
-                return s.scalar(select(func.count()).select_from(model).where(model.client_id == c.id, *conds)) or 0
-            tasks = Counter(dict(s.execute(select(m.Task.status, func.count()).where(m.Task.client_id == c.id).group_by(m.Task.status)).all()))
-            decisions = Counter(dict(s.execute(select(m.Decision.status, func.count()).where(m.Decision.client_id == c.id).group_by(m.Decision.status)).all()))
-            out.append({
-                "slug": c.slug, "name": c.name, "status": c.status, "timezone": c.timezone,
-                "providers": engine.allowed_providers(c),
-                "insights_open": count(m.Insight, m.Insight.status == "open"),
-                "decisions": dict(decisions), "tasks": dict(tasks),
-                "results_pending": count(m.Result, m.Result.status == "pending"),
-                "approvals_pending": count(m.Approval, m.Approval.status == "pending"),
-                "executions": dict(Counter(dict(s.execute(select(m.Execution.status, func.count()).where(
-                    m.Execution.client_id == c.id).group_by(m.Execution.status)).all()))),
-                "spend_today_usd": round(engine.spent_today(s, c.id), 4),
-                "budget_usd": float((c.settings or {}).get("daily_budget_usd", engine.DEFAULT_DAILY_BUDGET_USD)),
-            })
-        return {"now": utcnow().isoformat(), "clients": out}
+        # One grouped query per table for all visible clients, so the page costs the same at 5 or 5,000.
+        ids = visible_ids(s, u)
+
+        def count(model, *conds) -> dict[str, int]:
+            return dict(s.execute(select(model.client_id, func.count()).where(model.client_id.in_(ids), *conds)
+                                  .group_by(model.client_id)).all())
+
+        def by_status(model) -> dict[str, dict[str, int]]:
+            out: dict[str, dict[str, int]] = {}
+            for cid, status, n in s.execute(select(model.client_id, model.status, func.count())
+                                            .where(model.client_id.in_(ids)).group_by(model.client_id, model.status)):
+                out.setdefault(cid, {})[status] = n
+            return out
+
+        insights, results = count(m.Insight, m.Insight.status == "open"), count(m.Result, m.Result.status == "pending")
+        approvals = count(m.Approval, m.Approval.status == "pending")
+        tasks, decisions, executions = by_status(m.Task), by_status(m.Decision), by_status(m.Execution)
+        spend = engine.spent_today_by_client(s, ids)
+        return {"now": utcnow().isoformat(), "clients": [{
+            "slug": c.slug, "name": c.name, "status": c.status, "timezone": c.timezone,
+            "providers": engine.allowed_providers(c),
+            "insights_open": insights.get(c.id, 0),
+            "decisions": decisions.get(c.id, {}), "tasks": tasks.get(c.id, {}),
+            "results_pending": results.get(c.id, 0),
+            "approvals_pending": approvals.get(c.id, 0),
+            "executions": executions.get(c.id, {}),
+            "spend_today_usd": round(spend.get(c.id, 0.0), 4),
+            "budget_usd": float((c.settings or {}).get("daily_budget_usd", engine.DEFAULT_DAILY_BUDGET_USD)),
+        } for c in visible_clients(s, u)]}
 
     # ---------------------------------------------------------------- the chain board
 
@@ -209,25 +256,25 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
     @r.get("/executions")
     def executions(client: Optional[str] = None, status: Optional[str] = None, limit: int = Query(50, le=200),
                    u: m.User = Depends(user), s: Session = Depends(db)):
-        cs = {c.id: c for c in visible_clients(s, u)}
+        q = (select(m.Execution, m.Task.title, m.Client).join(m.Task, m.Task.id == m.Execution.task_id)
+             .join(m.Client, m.Client.id == m.Execution.client_id).where(m.Execution.client_id.in_(visible_ids(s, u))))
         if client:
-            cs = {k: v for k, v in cs.items() if v.slug == client}
-        q = select(m.Execution, m.Task.title).join(m.Task, m.Task.id == m.Execution.task_id).where(m.Execution.client_id.in_(list(cs)))
+            q = q.where(m.Client.slug == client)
         if status:
             q = q.where(m.Execution.status == status)
         rows = s.execute(q.order_by(m.Execution.created_at.desc()).limit(limit)).all()
-        return {"executions": [ex_row(ex, cs[ex.client_id], title) for ex, title in rows]}
+        return {"executions": [ex_row(ex, c, title) for ex, title, c in rows]}
 
     @r.get("/executions/{ex_id}")
     def execution(ex_id: str, u: m.User = Depends(user), s: Session = Depends(db)):
-        cs = {c.id: c for c in visible_clients(s, u)}
         ex = s.get(m.Execution, ex_id)
-        if ex is None or ex.client_id not in cs:
+        c = visible_client(s, u, ex.client_id if ex else None)
+        if c is None:
             raise HTTPException(404, {"error": "execution not found"})
         task = s.get(m.Task, ex.task_id)
         steps = s.scalars(select(m.ExecutionStep).where(m.ExecutionStep.execution_id == ex.id).order_by(m.ExecutionStep.seq)).all()
         arts = s.scalars(select(m.Artifact).where(m.Artifact.execution_id == ex.id).order_by(m.Artifact.created_at)).all()
-        return {**ex_row(ex, cs[ex.client_id], task.title), "packet": ex.packet, "packet_hash": ex.packet_hash,
+        return {**ex_row(ex, c, task.title), "packet": ex.packet, "packet_hash": ex.packet_hash,
                 "result": ex.result, "error_full": ex.error, "waiting_on": ex.waiting_on,
                 "steps": [{"seq": st.seq, "kind": st.kind, "name": st.name, "status": st.status, "input": st.input,
                            "output": st.output, "input_tokens": st.input_tokens, "output_tokens": st.output_tokens,
@@ -245,9 +292,8 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
 
     @r.post("/executions/{ex_id}/cancel")
     def cancel(ex_id: str, u: m.User = Depends(user), s: Session = Depends(db)):
-        cs = {c.id: c for c in visible_clients(s, u)}
         ex = s.get(m.Execution, ex_id)
-        if ex is None or ex.client_id not in cs:
+        if visible_client(s, u, ex.client_id if ex else None) is None:
             raise HTTPException(404, {"error": "execution not found"})
         if ex.status not in ("queued", "waiting_approval"):
             raise HTTPException(409, {"error": f"can't cancel a {ex.status} execution"})
@@ -263,31 +309,32 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
 
     @r.get("/jobs")
     def jobs(limit: int = Query(50, le=200), u: m.User = Depends(user), s: Session = Depends(db)):
-        cs = {c.id: c.slug for c in visible_clients(s, u)}
-        runs = s.scalars(select(m.JobRun).where(m.JobRun.client_id.in_(list(cs))).order_by(m.JobRun.created_at.desc()).limit(limit)).all()
+        runs = s.execute(select(m.JobRun, m.Client.slug).join(m.Client, m.Client.id == m.JobRun.client_id)
+                         .where(m.JobRun.client_id.in_(visible_ids(s, u)))
+                         .order_by(m.JobRun.created_at.desc()).limit(limit)).all()
         return {
             "definitions": [{"key": d.key, "title": d.title, "cadence": d.cadence, "owner_role": d.owner_role,
                              "checks": d.checks, "action": d.action, "completion": d.completion,
                              "events": list(d.events), "implemented": d.handler is not None} for d in REGISTRY.values()],
-            "runs": [{"id": j.id, "client": cs[j.client_id], "job": j.job_key, "status": j.status, "summary": j.summary,
+            "runs": [{"id": j.id, "client": slug, "job": j.job_key, "status": j.status, "summary": j.summary,
                       "produced": j.produced, "error": j.error.split("\n")[0][:300], "due_at": j.due_at.isoformat(),
-                      "finished_at": j.finished_at.isoformat() if j.finished_at else None} for j in runs],
+                      "finished_at": j.finished_at.isoformat() if j.finished_at else None} for j, slug in runs],
         }
 
     @r.get("/approvals")
     def approvals(u: m.User = Depends(user), s: Session = Depends(db)):
-        out = []
-        for c in visible_clients(s, u):
-            for a in s.scalars(select(m.Approval).where(m.Approval.client_id == c.id, m.Approval.status == "pending").order_by(m.Approval.created_at)):
-                out.append({"id": a.id, "client": c.slug, "action": a.action, "summary": a.summary, "payload": a.payload,
-                            "subject": f"{a.subject_kind}:{a.subject_id}", "requested_by": a.requested_by,
-                            "created_at": a.created_at.isoformat(), "expires_at": a.expires_at.isoformat() if a.expires_at else None})
-        return {"approvals": out}
+        rows = s.execute(select(m.Approval, m.Client.slug).join(m.Client, m.Client.id == m.Approval.client_id)
+                         .where(m.Approval.client_id.in_(visible_ids(s, u)), m.Approval.status == "pending")
+                         .order_by(m.Client.name, m.Approval.created_at)).all()
+        return {"approvals": [{"id": a.id, "client": slug, "action": a.action, "summary": a.summary, "payload": a.payload,
+                               "subject": f"{a.subject_kind}:{a.subject_id}", "requested_by": a.requested_by,
+                               "created_at": a.created_at.isoformat(),
+                               "expires_at": a.expires_at.isoformat() if a.expires_at else None} for a, slug in rows]}
 
     @r.post("/approvals/{ap_id}/decide")
     def decide(ap_id: str, body: DecideBody, u: m.User = Depends(user), s: Session = Depends(db)):
         ap = s.get(m.Approval, ap_id)
-        if ap is None or ap.client_id not in {c.id for c in visible_clients(s, u)}:
+        if visible_client(s, u, ap.client_id if ap else None) is None:
             raise HTTPException(404, {"error": "approval not found"})
         return guard(lambda: {"status": approvals_svc.decide(s, scope_for_user(s, u, ap.client_id), ap_id, body.approve, body.note).status})
 
@@ -368,15 +415,15 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
     def onboard_status(run_id: str, u: m.User = Depends(user), s: Session = Depends(db)):
         from ..storage import progress_for
         run = s.get(m.JobRun, run_id)
-        visible = {c.id: c for c in visible_clients(s, u)}
-        if run is None or run.client_id not in visible:
+        c = visible_client(s, u, run.client_id if run else None)
+        if c is None:
             raise HTTPException(404, {"error": "onboarding run not found"})
         row = s.scalar(select(m.Dossier).where(m.Dossier.job_run_id == run.id))
         ready = row is not None and run.status == "succeeded"
         return {
             "status": run.status,
             "job_run_id": run.id,
-            "client_slug": visible[run.client_id].slug,
+            "client_slug": c.slug,
             "summary": run.summary,
             "error": run.error.split("\n", 1)[0] if run.error else "",
             "progress": progress_for(s, run.id),
@@ -388,14 +435,14 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
     @r.get("/events")
     def events_tail(after: int = 0, client: Optional[str] = None, limit: int = Query(100, le=500),
                     u: m.User = Depends(user), s: Session = Depends(db)):
-        cs = {c.id: c.slug for c in visible_clients(s, u)}
+        q = (select(m.Event, m.Client.slug).join(m.Client, m.Client.id == m.Event.client_id)
+             .where(m.Event.org_id == u.org_id, m.Event.id > after, m.Event.client_id.in_(visible_ids(s, u))))
         if client:
-            cs = {k: v for k, v in cs.items() if v == client}
-        q = select(m.Event).where(m.Event.org_id == u.org_id, m.Event.id > after, m.Event.client_id.in_(list(cs)))
-        rows = s.scalars(q.order_by(m.Event.id.desc()).limit(limit)).all()
-        return {"events": [{"id": e.id, "client": cs.get(e.client_id), "seq": e.seq, "actor": e.actor, "role": e.actor_role,
+            q = q.where(m.Client.slug == client)
+        rows = s.execute(q.order_by(m.Event.id.desc()).limit(limit)).all()
+        return {"events": [{"id": e.id, "client": slug, "seq": e.seq, "actor": e.actor, "role": e.actor_role,
                             "action": e.action, "object": f"{e.object_kind}:{e.object_id}", "summary": e.summary,
-                            "at": e.created_at.isoformat(), "hash": e.hash[:12]} for e in reversed(rows)]}
+                            "at": e.created_at.isoformat(), "hash": e.hash[:12]} for e, slug in reversed(rows)]}
 
     @r.get("/me")
     def me(u: m.User = Depends(user), s: Session = Depends(db)):
@@ -409,8 +456,8 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
 
     # ---------------------------------------------------------------- brand accounts and saved audits
 
-    signup_limit = Limiter(5, 3600)
-    login_by_ip, login_by_email = Limiter(20, 900), Limiter(10, 900)
+    signup_limit = Limiter("signup", 5, 3600)
+    login_by_ip, login_by_email = Limiter("login-ip", 20, 900), Limiter("login-email", 10, 900)
 
     def too_many() -> HTTPException:
         return HTTPException(429, {"error": "Too many attempts. Wait a few minutes and try again."})
@@ -422,7 +469,7 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
     def signup(body: SignupBody, request: Request, s: Session = Depends(db)):
         from .. import accounts
         from ..api.deps import service
-        if not signup_limit.allow(visitor(request)):
+        if not signup_limit.allow(s, visitor(request)):
             raise too_many()
 
         def _create():
@@ -436,13 +483,26 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
     @r.post("/login")
     def login(body: LoginBody, request: Request, s: Session = Depends(db)):
         from .. import accounts
-        if not (login_by_ip.allow(visitor(request)) and login_by_email.allow(body.email.strip().lower())):
+        if not (login_by_ip.allow(s, visitor(request)) and login_by_email.allow(s, body.email.strip().lower())):
             raise too_many()
         try:
             _, token = accounts.sign_in(s, body.email, body.password.get_secret_value())
         except accounts.SignInFailed as e:
             raise HTTPException(401, {"error": str(e)})
-        return {"token": token}
+        return {"token": token, "expires_in_days": accounts.BROWSER_SESSION_TTL.days}
+
+    @r.post("/logout")
+    def logout(authorization: Optional[str] = Header(default=None), s: Session = Depends(db)):
+        """Signs this browser out. Always succeeds, so a stale token can still clear itself; script tokens are left alone."""
+        from .. import accounts
+        tenancy.end_session(s, (authorization or "").removeprefix("Bearer ").strip(), accounts.BROWSER_SESSION)
+        return {"signed_out": True}
+
+    @r.post("/logout-everywhere")
+    def logout_everywhere(u: m.User = Depends(user), s: Session = Depends(db)):
+        """Signs this person out of every browser. API tokens made for scripts keep working."""
+        from .. import accounts
+        return {"signed_out": tenancy.end_sessions(s, u, accounts.BROWSER_SESSION)}
 
     def intake_row(s: Session, c: m.Client) -> Optional[m.OnboardingIntake]:
         return s.scalar(select(m.OnboardingIntake).where(m.OnboardingIntake.client_id == c.id))
@@ -468,7 +528,7 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
         from .. import intake
 
         def _save():
-            c = next((x for x in visible_clients(s, u) if x.slug == body.client_slug), None)
+            c = s.scalar(visible(s, u).where(m.Client.slug == body.client_slug))
             if c is None:
                 if not org_wide(s, u) or not (body.client_name or "").strip():
                     raise HTTPException(404, {"error": "client not found"})
@@ -486,17 +546,294 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
     @r.get("/clients/{slug}/audit")
     def saved_audit(slug: str, version: Optional[int] = None, u: m.User = Depends(user), s: Session = Depends(db)):
         c = client_by_slug(s, u, slug)
-        rows = s.scalars(select(m.Dossier).where(m.Dossier.client_id == c.id).order_by(m.Dossier.version.desc())).all()
-        if not rows:
+        versions = s.execute(select(m.Dossier.version, m.Dossier.created_at,
+                                    m.Dossier.document["overall_health_score"].as_float())
+                             .where(m.Dossier.client_id == c.id).order_by(m.Dossier.version.desc())).all()
+        if not versions:
             raise HTTPException(404, {"error": "no audit yet for this brand"})
-        row = next((d for d in rows if d.version == version), None) if version else rows[0]
+        row = s.scalar(select(m.Dossier).where(m.Dossier.client_id == c.id,
+                                               m.Dossier.version == (version or versions[0][0])))
         if row is None:
             raise HTTPException(404, {"error": f"there is no version {version}"})
         return {
             "client_slug": c.slug, "client_name": c.name, "version": row.version,
             "created_at": row.created_at.isoformat(), "result": row.document,
-            "versions": [{"version": d.version, "created_at": d.created_at.isoformat(),
-                          "health_score": (d.document or {}).get("overall_health_score")} for d in rows],
+            "versions": [{"version": v, "created_at": at.isoformat(), "health_score": score} for v, at, score in versions],
         }
+
+    @r.get("/clients/{slug}/workspace")
+    def client_workspace(slug: str, version: Optional[int] = None, u: m.User = Depends(user), s: Session = Depends(db)):
+        """The workspace bundle: the latest published version, or live collecting states before the first."""
+        from .. import workspace
+        c = client_by_slug(s, u, slug)
+        if version is None and workspace.latest_run(s, c.id) is None and s.scalar(
+                select(m.Dossier.id).where(m.Dossier.client_id == c.id).limit(1)) is None:
+            raise HTTPException(404, {"error": "no audit yet for this brand"})
+        out = workspace.current(s, c, version)
+        if out is None:
+            raise HTTPException(404, {"error": f"there is no version {version}"})
+        return out
+
+    @r.get("/clients/{slug}/emails/{sha}")
+    def email_preview(slug: str, sha: str, u: m.User = Depends(user), s: Session = Depends(db)):
+        """One live email's HTML, ready for a sandboxed preview frame (template tags shown as their defaults)."""
+        from .. import email_preview as previews
+        c = client_by_slug(s, u, slug)
+        row = previews.get(s, c.id, sha[:64])
+        if row is None:
+            raise HTTPException(404, {"error": "this email's HTML wasn't captured"})
+        return {"sha": row.sha256, "template_id": row.template_id, "bytes": row.bytes,
+                "captured_at": row.captured_at.isoformat() if row.captured_at else None,
+                "html": previews.preview(row.html)}
+
+    # ---------------------------------------------------------------- narrative review (staff only)
+
+    QUEUE_ORDER = {"draft": 0, "needs_rewrite": 1, "drafting": 2, "skipped": 3, "edited": 4, "approved": 5, "rejected": 6}
+
+    def staff(s: Session, u: m.User) -> None:
+        if not org_wide(s, u):  # brands see only approved sections, through their workspace
+            raise HTTPException(404, {"error": "not found"})
+
+    def visible_draft(s: Session, u: m.User, draft_id: str) -> tuple[m.NarrativeDraft, m.Client]:
+        staff(s, u)
+        row = s.get(m.NarrativeDraft, draft_id)
+        c = visible_client(s, u, row.client_id if row else None)
+        if c is None:
+            raise HTTPException(404, {"error": "draft not found"})
+        return row, c
+
+    @r.get("/narrative")
+    def narrative_queue(client: Optional[str] = None, status: Optional[str] = None, limit: int = Query(200, le=500),
+                        u: m.User = Depends(user), s: Session = Depends(db)):
+        staff(s, u)
+        q = (select(m.NarrativeDraft, m.Client).join(m.Client, m.Client.id == m.NarrativeDraft.client_id)
+             .where(m.NarrativeDraft.client_id.in_(visible_ids(s, u))))
+        if client:
+            q = q.where(m.Client.slug == client)
+        if status:
+            q = q.where(m.NarrativeDraft.status.in_(status.split(",")))
+        rows = s.execute(q.order_by(m.NarrativeDraft.created_at.desc()).limit(limit)).all()
+        rows.sort(key=lambda rc: (QUEUE_ORDER.get(rc[0].status, 9), rc[1].name, rc[0].section))
+        return {"drafts": [{
+            "id": d.id, "client": c.slug, "client_name": c.name, "run_id": d.run_id, "section": d.section,
+            "status": d.status, "reason": d.reason, "score": d.score, "rounds": d.rounds, "drafter": d.drafter,
+            "critic_by": d.critic_by, "independent": (d.critic or {}).get("independent"),
+            "facts_ok": (d.facts_check or {}).get("ok"), "problems": len((d.facts_check or {}).get("problems") or []),
+            "cut": len((d.facts_check or {}).get("cut") or []), "cost_usd": d.cost_usd, "approval_id": d.approval_id,
+            "headline": (d.payload or {}).get("headline"),
+            "updated_at": (d.updated_at or d.created_at).isoformat()} for d, c in rows]}
+
+    @r.get("/narrative/{draft_id}")
+    def narrative_draft(draft_id: str, u: m.User = Depends(user), s: Session = Depends(db)):
+        from .. import workspace
+        from ..narrative.review import view
+        row, c = visible_draft(s, u, draft_id)
+        modules = next((mods for sid, _, mods, _ in workspace.SECTIONS if sid == row.section), ())
+        findings = (workspace._artifact(s, row.run_id, "analysis") or {}).get("findings") or []
+        return {**view(s, row), "client": c.slug, "client_name": c.name,
+                "findings": [f for f in findings if row.section in ("opportunities", "plan") or f.get("module") in modules]}
+
+    @r.post("/narrative/{draft_id}/edit")
+    def narrative_edit(draft_id: str, body: NarrativeEditBody, u: m.User = Depends(user), s: Session = Depends(db)):
+        from ..narrative import review
+        row, c = visible_draft(s, u, draft_id)
+
+        def go():
+            try:
+                return {"status": review.edit(s, scope_for_user(s, u, c.id), row.id, body.payload, body.note).status}
+            except review.FactsCheckFailed as e:
+                return JSONResponse({"error": str(e), "problems": e.problems}, status_code=422)
+        return guard(go)
+
+    @r.post("/narrative/{draft_id}/decide")
+    def narrative_decide(draft_id: str, body: DecideBody, u: m.User = Depends(user), s: Session = Depends(db)):
+        from ..narrative import review
+        row, c = visible_draft(s, u, draft_id)
+        return guard(lambda: {"status": review.decide(s, scope_for_user(s, u, c.id), row.id, body.approve, body.note).status})
+
+    @r.post("/clients/{slug}/narrative")
+    def narrative_redraft(slug: str, body: RedraftBody, u: m.User = Depends(user), s: Session = Depends(db)):
+        """Queue drafting for the latest scored run; reviewed sections are kept."""
+        from .. import jobs
+        from ..narrative.prompts import SECTIONS as DRAFTED
+        staff(s, u)
+        c = client_by_slug(s, u, slug)
+        if any(x not in DRAFTED for x in body.sections or []):
+            raise HTTPException(422, {"error": f"sections must be among: {', '.join(DRAFTED)}"})
+        run = s.scalar(select(m.AuditRun).where(m.AuditRun.client_id == c.id, m.AuditRun.scorecard_id.is_not(None))
+                       .order_by(m.AuditRun.created_at.desc()).limit(1))
+        if run is None:
+            raise HTTPException(409, {"error": "this brand has no scored audit to draft from"})
+        sc = guard(lambda: scope_for_user(s, u, c.id))
+        queued = jobs.emit(s, sc, "narrative.draft", {"run_id": run.id, "sections": body.sections},
+                           dedupe=f"{run.id}:{utcnow().isoformat()}")
+        return {"run_id": run.id, "job_run_ids": [j.id for j in queued]}
+
+    # ---------------------------------------------------------------- the loop (staff only)
+
+    @r.get("/morning")
+    def morning(hours: int = Query(24, ge=1, le=24 * 14), u: m.User = Depends(user), s: Session = Depends(db)):
+        """What the overnight batch changed, drafts ready to approve, and anything blocked."""
+        from ..loop import morning as morning_mod
+        staff(s, u)
+        return morning_mod.queue(s, visible_ids(s, u), hours=hours)
+
+    @r.get("/scale")
+    def scale_view(request: Request, fresh: bool = False, u: m.User = Depends(user), s: Session = Depends(db)):
+        """Cost guards and hosting: storage per brand, today's model spend and Klaviyo budgets, jobs per
+        family against their limits, and whether it's time to move hosting up a step."""
+        from .. import dbsize, jobs, scale, spend
+        from ..collector import budget
+        staff(s, u)
+        ids = set(s.scalars(visible(s, u).with_only_columns(m.Client.id)))
+        report = dbsize.cached(request.app.state.factory, force=fresh)
+        services = request.app.state.services
+        conns = s.execute(select(m.Client.slug, m.Client.name, m.Connection.external_account_id)
+                          .join(m.Connection, m.Connection.client_id == m.Client.id)
+                          .where(m.Client.id.in_(ids), m.Connection.provider == "klaviyo",
+                                 m.Connection.status == "active")).all()
+        used = budget.today(s, [a for _, _, a in conns if a])
+        running = dict(s.execute(select(m.JobRun.job_key, func.count()).where(m.JobRun.status == "running")
+                                 .group_by(m.JobRun.job_key)).all())
+        limits = jobs.family_limits()
+        families = [{"family": f, "limit": n,
+                     "running": sum(running.get(k, 0) for k, d in REGISTRY.items() if d.family == f),
+                     "jobs": sorted(k for k, d in REGISTRY.items() if d.family == f)} for f, n in limits.items()]
+        return {"signals": scale.signals(s, report, embedded_worker=services.get("embedded_worker")),
+                "storage": dbsize.for_clients(report, ids),
+                "llm": {"used_usd": round(spend.used(s, u.org_id), 4), "cap_usd": spend.daily_cap()},
+                "klaviyo": [{"client": slug, "client_name": name,
+                             **{f: {"used": used.get(a, {}).get(f, 0), "limit": lim} for f, lim in budget.LIMITS.items()}}
+                            for slug, name, a in conns if a],
+                "families": families}
+
+    @r.get("/learning")
+    def learning(u: m.User = Depends(user), s: Session = Depends(db)):
+        """Strategist edits and rejections per section prompt and playbook, and how playbooks read out."""
+        from ..loop import learning as learning_mod
+        staff(s, u)
+        return learning_mod.report(s, visible_ids(s, u))
+
+    @r.get("/clients/{slug}/outcomes")
+    def client_outcomes(slug: str, u: m.User = Depends(user), s: Session = Depends(db)):
+        """The latest audit's ranked cards with their approval state, and every outcome for the brand."""
+        from .. import workspace
+        from ..loop import outcomes
+        staff(s, u)
+        c = client_by_slug(s, u, slug)
+        run = outcomes.latest_scored(s, c.id)
+        sc = s.get(m.Scorecard, run.scorecard_id) if run is not None else None
+        tracked = outcomes.for_client(s, c.id)
+        cards = workspace._with_outcomes((sc.summary or {}).get("opportunities") or [] if sc else [], tracked)
+        return {"client": c.slug, "client_name": c.name, "run_id": run.id if run else None,
+                "opportunities": [{k: card.get(k) for k in ("id", "rank", "title", "category", "severity", "status",
+                                                            "owner", "readout", "outcome_id", "outcome_status",
+                                                            "due_at", "track_record")} for card in cards],
+                "outcomes": [outcomes.view(o) for o in tracked]}
+
+    @r.post("/clients/{slug}/opportunities/{opportunity_id}/approve")
+    def approve_opportunity(slug: str, opportunity_id: str, body: OutcomeApproveBody, u: m.User = Depends(user),
+                            s: Session = Depends(db)):
+        """Staff, or the brand's own owner or approver, approve a fix (outcomes.approve checks the role)."""
+        from ..loop import outcomes
+        c = client_by_slug(s, u, slug)
+        return guard(lambda: outcomes.view(outcomes.approve(s, scope_for_user(s, u, c.id), opportunity_id,
+                                                            owner=body.owner, fact=body.fact, note=body.note)))
+
+    @r.post("/outcomes/{outcome_id}/shipped")
+    def outcome_shipped(outcome_id: str, body: ShippedBody, u: m.User = Depends(user), s: Session = Depends(db)):
+        """Record that an approved fix went live in Klaviyo; measurement reads from this date."""
+        from datetime import datetime
+        from .. import impact
+        from ..loop import outcomes
+        staff(s, u)
+        row = s.get(m.OpportunityOutcome, outcome_id)
+        c = visible_client(s, u, row.client_id if row else None)
+        if c is None:
+            raise HTTPException(404, {"error": "outcome not found"})
+        try:
+            at = datetime.fromisoformat(body.at) if body.at else None
+        except ValueError:
+            raise HTTPException(422, {"error": "at must be an ISO date, like 2026-10-01"})
+        if at is not None and at.tzinfo is None:
+            from datetime import timezone
+            at = at.replace(tzinfo=timezone.utc)
+        if at is not None and at > utcnow():
+            raise HTTPException(422, {"error": "a fix can't go live in the future"})
+        return guard(lambda: outcomes.view(impact.mark_shipped(s, scope_for_user(s, u, c.id), outcome_id, at=at,
+                                                               by=f"{u.email}: {body.note}".rstrip(": ")[:120])))
+
+    @r.get("/clients/{slug}/progress")
+    def client_progress(slug: str, u: m.User = Depends(user), s: Session = Depends(db)):
+        """The First 30 days card: measured lift toward $10K, attributed beside it, and the one next step."""
+        from ..mail import lifecycle
+        c = client_by_slug(s, u, slug)
+        b = lifecycle.load(s, c, "")
+        return {**b.progress, "next_step": b.next_step}
+
+    # ---------------------------------------------------------------- onboarding email (staff only)
+
+    def mail_row(e: m.OutboundEmail) -> dict:
+        return {"id": e.id, "key": e.key, "kind": e.kind, "to": e.to_email, "subject": e.subject, "status": e.status,
+                "send_after": e.send_after.isoformat() if e.send_after else None,
+                "sent_at": e.sent_at.isoformat() if e.sent_at else None, "provider": e.provider,
+                "attempts": e.attempts, "error": e.error, "created_at": e.created_at.isoformat()}
+
+    @r.get("/clients/{slug}/mail")
+    def client_mail(slug: str, u: m.User = Depends(user), s: Session = Depends(db)):
+        from ..mail import lifecycle, outbox
+        staff(s, u)
+        c = client_by_slug(s, u, slug)
+        rows = s.scalars(select(m.OutboundEmail).where(m.OutboundEmail.client_id == c.id)
+                         .order_by(m.OutboundEmail.created_at.desc()).limit(200))
+        return {"client": c.slug, "client_name": c.name, "paused": outbox.paused(c),
+                "self_serve": lifecycle.self_serve(s, c),
+                "steps": [{"key": st.key, "kind": st.kind, "live": st.live} for st in lifecycle.SEQUENCE],
+                "emails": [mail_row(e) for e in rows]}
+
+    @r.get("/clients/{slug}/mail/{email_id}")
+    def client_mail_one(slug: str, email_id: str, u: m.User = Depends(user), s: Session = Depends(db)):
+        staff(s, u)
+        c = client_by_slug(s, u, slug)
+        e = s.get(m.OutboundEmail, email_id)
+        if e is None or e.client_id != c.id:
+            raise HTTPException(404, {"error": "email not found"})
+        return {**mail_row(e), "html": e.html, "text": e.text}
+
+    @r.get("/clients/{slug}/mail-preview/{key}")
+    def client_mail_preview(slug: str, key: str, request: Request, u: m.User = Depends(user), s: Session = Depends(db)):
+        """One step of the sequence rendered for this brand as it would go out now, due or not."""
+        from ..api.deps import service
+        from ..mail import lifecycle, outbox, render
+        staff(s, u)
+        c = client_by_slug(s, u, slug)
+        app_url = service(request, "settings").app_url
+        try:
+            email = lifecycle.preview(s, c, key, app_url)
+        except KeyError as e:
+            raise HTTPException(404, {"error": str(e.args[0])})
+        footer = outbox.STAFF_FOOTER if lifecycle.STEPS[key].kind == "staff" else outbox.FOOTER
+        unsub = f"{app_url}/email/unsubscribe" if lifecycle.STEPS[key].kind != "staff" else None
+        return {"key": key, "subject": email.subject, "preheader": email.preheader, "live": lifecycle.STEPS[key].live,
+                "html": render.html(email, app_url=app_url, footer=footer, unsubscribe_url=unsub),
+                "text": render.text(email, footer=footer, unsubscribe_url=unsub)}
+
+    @r.post("/clients/{slug}/mail/pause")
+    def client_mail_pause(slug: str, body: MailPauseBody, u: m.User = Depends(user), s: Session = Depends(db)):
+        """Stop (or restart) onboarding email to this brand. Staff alerts keep going."""
+        staff(s, u)
+        c = client_by_slug(s, u, slug)
+        c.settings = {**(c.settings or {}), "emails_paused": body.paused}
+        return {"client": c.slug, "paused": body.paused}
+
+    @r.post("/outcomes/{outcome_id}/withdraw")
+    def withdraw_outcome(outcome_id: str, body: OutcomeWithdrawBody, u: m.User = Depends(user), s: Session = Depends(db)):
+        from ..loop import outcomes
+        staff(s, u)
+        row = s.get(m.OpportunityOutcome, outcome_id)
+        c = visible_client(s, u, row.client_id if row else None)
+        if c is None:
+            raise HTTPException(404, {"error": "outcome not found"})
+        return guard(lambda: outcomes.view(outcomes.withdraw(s, scope_for_user(s, u, c.id), outcome_id, body.note)))
 
     return r

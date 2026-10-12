@@ -25,6 +25,11 @@ class Settings:
     audit_os_root: Path = Path(DEFAULT_AUDIT_OS_ROOT)
     signup_org: Optional[str] = None  # the org self-serve brand sign-ups join; None means "the only org"
     master_key: Optional[str] = None  # when set, used instead of master_key_file
+    # Onboarding email (wavyos.mail). outbox renders and stores every email without sending it.
+    email_provider: str = "outbox"
+    email_from: str = "Wavy Studios <hello@localhost>"
+    email_reply_to: Optional[str] = None
+    app_url: str = "http://127.0.0.1:8000"
 
     def __repr__(self) -> str:  # the URL may carry a database password: show the scheme only
         scheme = self.database_url.split(":", 1)[0]
@@ -41,6 +46,10 @@ def load_settings(env: Optional[Mapping[str, str]] = None) -> Settings:
         audit_os_root=Path(env.get("WAVYOS_AUDIT_OS_ROOT") or DEFAULT_AUDIT_OS_ROOT),
         signup_org=env.get("WAVYOS_SIGNUP_ORG") or None,
         master_key=env.get("WAVYOS_MASTER_KEY") or None,
+        email_provider=(env.get("WAVYOS_EMAIL_PROVIDER") or "outbox").strip().lower(),
+        email_from=env.get("WAVYOS_EMAIL_FROM") or Settings.email_from,
+        email_reply_to=env.get("WAVYOS_EMAIL_REPLY_TO") or None,
+        app_url=(env.get("WAVYOS_APP_URL") or Settings.app_url).rstrip("/"),
     )
 
 
