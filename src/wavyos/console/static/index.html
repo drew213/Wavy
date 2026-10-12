@@ -149,12 +149,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
 
   // ------------------------------------------------------------ login
   function renderLogin() {
-    $("#root").innerHTML = `<div class="login"><h1>Wavy <span>OS</span></h1><p class="muted">The live view of every client's work: what's running, what each model did, and what's waiting on a person.</p>
-      <form id="lf"><label class="label" for="tok">API token</label><div class="row" style="margin-top:6px"><input id="tok" type="password" autocomplete="off" style="flex:1" placeholder="wos_…">
-      <button class="btn primary" type="submit">Open console</button></div>${S.err ? `<p class="err">${esc(S.err)}</p>` : ""}
-      <p class="muted" style="font-size:11.5px">Get one with <code>wavyos token --email you@…</code>. It stays in this tab only.</p></form></div>`;
-    $("#lf").addEventListener("submit", async (e) => { e.preventDefault(); S.token = $("#tok").value.trim(); S.err = "";
-      try { S.me = await api("/v1/ops/me"); try { sessionStorage.setItem("wos-token", S.token); } catch {} boot(); } catch (err) { if (S.token) { S.err = "That token didn't work."; renderLogin(); } } });
+    location.replace("/login?next=" + encodeURIComponent(location.pathname + location.hash));
   }
 
   // ------------------------------------------------------------ shell

@@ -76,7 +76,7 @@ def mount_console(app: FastAPI, get_factory) -> None:
 
     @app.get("/", include_in_schema=False)
     def root() -> RedirectResponse:
-        return RedirectResponse("/console")
+        return RedirectResponse("/login")
 
     # The link works without signing in: it carries the person's id and a signature only the server can make.
     # GET only asks (mail scanners follow links); POST unsubscribes, which is also what one-click
