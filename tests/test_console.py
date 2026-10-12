@@ -51,6 +51,7 @@ def test_console_page_and_auth(env):
     page = c.get("/console")
     assert page.status_code == 200 and "Wavy OS" in page.text and page.headers["x-frame-options"] == "DENY"
     assert TestClient(c.app).get("/v1/ops/overview").status_code == 401
+    assert c.get("/", follow_redirects=False).headers["location"] == "/login"
 
 
 def test_overview_flow_and_trace(env):
