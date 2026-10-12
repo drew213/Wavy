@@ -50,6 +50,7 @@ class User(IdMixin, Base):
     name: Mapped[str] = mapped_column(String(200))
     kind: Mapped[str] = mapped_column(String(10), default="staff")
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    email_opt_out_at: Mapped[Optional[datetime]]  # no more onboarding nudges; transactional emails still send
 
 
 # Staff roles act across the agency; client roles belong to one client's stakeholders.
@@ -590,6 +591,34 @@ class OpportunityOutcome(IdMixin, Base):
     decided_at: Mapped[Optional[datetime]]
     note: Mapped[str] = mapped_column(Text, default="")
     updated_at: Mapped[Optional[datetime]]
+    # What the fix changes ([{flow_id, message_id?, name}]) and when it went live; impact is read from these.
+    targets: Mapped[list] = mapped_column(default=list)
+    shipped_at: Mapped[Optional[datetime]]
+    shipped_by: Mapped[str] = mapped_column(String(120), default="")
+
+
+IMPACT_METHODS = ("before_after", "holdout", "attributed_only")
+IMPACT_STATUSES = ("measured", "too_small", "pending")
+
+
+class ImpactReading(IdMixin, Base):
+    """One measurement of what a live fix earned (wavyos.impact). The latest reading per outcome counts.
+
+    before_after: the targeted flows' revenue per recipient before vs since the change, scaled by the
+    account-wide trend of flows the fix didn't touch. lift = (after rate - before rate x trend) x recipients since.
+    """
+    __tablename__ = "impact_readings"
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    outcome_id: Mapped[str] = mapped_column(ForeignKey("opportunity_outcomes.id"), index=True)
+    method: Mapped[str] = mapped_column(String(20))
+    status: Mapped[str] = mapped_column(String(20))
+    before: Mapped[dict] = mapped_column(default=dict)    # {start, end, recipients, revenue, rate}
+    after: Mapped[dict] = mapped_column(default=dict)
+    trend: Mapped[Optional[float]] = mapped_column(Float)
+    lift: Mapped[Optional[float]] = mapped_column(Float)
+    attributed: Mapped[float] = mapped_column(Float, default=0.0)
+    reason: Mapped[str] = mapped_column(Text, default="")
 
 
 class AuditOrder(IdMixin, Base):
@@ -637,6 +666,34 @@ class EmailHtml(IdMixin, Base):
     html: Mapped[str] = mapped_column(Text)
     bytes: Mapped[int] = mapped_column(Integer, default=0)
     captured_at: Mapped[Optional[datetime]]
+
+
+EMAIL_KINDS = ("transactional", "nudge", "staff")
+EMAIL_STATUSES = ("queued", "sending", "sent", "failed", "skipped", "suppressed")
+
+
+class OutboundEmail(IdMixin, Base):
+    """One email the app sends (wavyos.mail), rendered when queued so the console shows exactly what went out.
+    key is unique per person: each onboarding email reaches someone at most once (repeats carry a suffix)."""
+    __tablename__ = "outbound_emails"
+    __table_args__ = (UniqueConstraint("user_id", "key"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[Optional[str]] = mapped_column(ForeignKey("clients.id"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    key: Mapped[str] = mapped_column(String(120))
+    kind: Mapped[str] = mapped_column(String(20), default="nudge")
+    to_email: Mapped[str] = mapped_column(String(320))
+    subject: Mapped[str] = mapped_column(String(300))
+    html: Mapped[str] = mapped_column(Text, default="")
+    text: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="queued", index=True)
+    send_after: Mapped[datetime]
+    sent_at: Mapped[Optional[datetime]]
+    provider: Mapped[str] = mapped_column(String(20), default="")
+    provider_id: Mapped[str] = mapped_column(String(200), default="")
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str] = mapped_column(Text, default="")
+    data: Mapped[dict] = mapped_column(default=dict)
 
 
 class LlmSpend(IdMixin, Base):

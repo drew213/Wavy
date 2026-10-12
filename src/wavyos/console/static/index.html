@@ -48,7 +48,7 @@ code,pre{font-family:var(--mono)}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 0 0 var(--good);animation:pulse 2s infinite}
 .dot.off{background:var(--bad);animation:none}
 @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 60%,transparent)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
-select,input[type=text],input[type=password],textarea{background:var(--bg2);border:1px solid var(--line2);border-radius:6px;padding:6px 9px}
+select,input[type=text],input[type=password],input[type=date],textarea{background:var(--bg2);border:1px solid var(--line2);border-radius:6px;padding:6px 9px}
 .content{flex:1;overflow:auto;padding:20px 22px 60px;min-width:0}
 .btn{border:1px solid var(--line2);background:var(--bg2);color:var(--text);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px}
 .btn:hover{border-color:var(--muted)} .btn.primary{background:var(--lime);border-color:var(--lime);color:var(--on-accent);font-weight:700}
@@ -367,9 +367,32 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
         <td style="font-size:11.5px">${esc(c.readout?.metric || "")}${c.readout?.days ? ` · ${esc(c.readout.days)} days` : ""}</td><td class="muted">${rec(c.track_record)}</td>
         <td>${c.outcome_status === "tracking" ? `<button class="btn danger" data-wd="${esc(c.outcome_id)}">Withdraw</button>` : `<div class="row"><input id="ow-${esc(c.id)}" placeholder="Owner" style="width:120px"><button class="btn primary" data-oppok="${esc(c.id)}">Approve</button></div>`}</td></tr>`).join("")}</tbody></table></div>
       <div class="label" style="margin-bottom:8px">Every outcome for ${esc(o.client_name)}</div>
-      ${o.outcomes.length ? `<div class="tbl"><table><thead><tr><th>Opportunity</th><th>Owner</th><th>Baseline</th><th>Readouts</th><th>Status</th><th>What happened</th></tr></thead><tbody>
-        ${o.outcomes.map(x => `<tr><td class="t">${esc(x.title)}<div class="muted">${esc(x.readout_fact || "no fact maps to this card")}</div></td><td>${esc(x.owner)}</td><td class="num">${x.baseline?.v == null ? "—" : esc(x.baseline.v)}</td>
-          <td class="num">${(x.readouts || []).map(r => r.v == null ? "—" : esc(r.v)).join(" → ") || "—"}</td><td>${chip(x.status === "improved" ? "ok" : x.status === "worse" ? "failed" : x.status === "tracking" ? "approved" : "review", x.status)}<div class="muted">due ${esc((x.due_at || "").slice(0, 10))}</div></td><td style="font-size:11.5px">${esc(x.verdict_reason)}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted">Nothing approved yet.</p>`}`;
+      ${o.outcomes.length ? `<div class="tbl" style="margin-bottom:22px"><table><thead><tr><th>Opportunity</th><th>Owner</th><th>Baseline</th><th>Readouts</th><th>Status</th><th>Live in Klaviyo</th><th class="num">Measured lift</th><th>What happened</th></tr></thead><tbody>
+        ${o.outcomes.map(x => { const f = fixOf(x.id); return `<tr><td class="t">${esc(x.title)}<div class="muted">${esc(x.readout_fact || "no fact maps to this card")} · ${(x.targets || []).length} target${(x.targets || []).length === 1 ? "" : "s"}</div></td><td>${esc(x.owner)}</td><td class="num">${x.baseline?.v == null ? "—" : esc(x.baseline.v)}</td>
+          <td class="num">${(x.readouts || []).map(r => r.v == null ? "—" : esc(r.v)).join(" → ") || "—"}</td><td>${chip(x.status === "improved" ? "ok" : x.status === "worse" ? "failed" : x.status === "tracking" ? "approved" : "review", x.status)}<div class="muted">due ${esc((x.due_at || "").slice(0, 10))}</div></td>
+          <td style="font-size:11.5px">${x.shipped_at ? `${esc(x.shipped_at.slice(0, 10))}<div class="muted">${esc(x.shipped_by || "")}</div>` : x.status === "withdrawn" ? "—" : `<div class="row"><input type="date" id="sh-${esc(x.id)}" max="${new Date().toISOString().slice(0, 10)}" style="width:140px"><button class="btn primary" data-ship="${esc(x.id)}">Mark live</button></div>`}</td>
+          <td class="num">${f?.lift != null ? usd(f.lift) : `<span class="muted" style="font-size:11.5px">${esc(f ? f.state.replace(/_/g, " ") : "—")}</span>`}</td>
+          <td style="font-size:11.5px">${esc(x.verdict_reason || f?.reason || "")}</td></tr>`; }).join("")}</tbody></table></div>` : `<p class="muted" style="margin-bottom:22px">Nothing approved yet.</p>`}
+      ${vMail()}`;
+  }
+
+  const fixOf = id => (S.data.progress?.fixes || []).find(f => f.outcome_id === id);
+
+  function vMail() {
+    const p = S.data.progress, ml = S.data.mail;
+    if (!ml) return "";
+    const head = p ? `<div class="muted" style="margin-bottom:12px">Day ${esc(p.day)} · ${usd(p.measured)} measured of ${usd(p.goal)} · ${usd(p.attributed)} attributed (not counted) · next step: ${esc(p.next_step?.title || "—")}</div>` : "";
+    return `<div class="label" style="margin-bottom:8px">Onboarding email for ${esc(ml.client_name)}</div>${head}
+      <div class="row" style="margin-bottom:12px;gap:10px;flex-wrap:wrap">
+        ${ml.self_serve ? chip(ml.paused ? "blocked" : "ok", ml.paused ? "paused" : "sending") : chip("review", "not self-serve: no brand email")}
+        <button class="btn" data-mailpause="${ml.paused ? "0" : "1"}">${ml.paused ? "Resume email" : "Pause email"}</button>
+        <select id="mail-step">${ml.steps.map(s => `<option value="${esc(s.key)}"${S.mailKey === s.key ? " selected" : ""}>${esc(s.key)}${s.live ? "" : " (off)"} · ${esc(s.kind)}</option>`).join("")}</select>
+        <button class="btn" data-mailprev="1">Preview as it would go now</button></div>
+      ${S.mailPreview ? `<div class="card" style="margin-bottom:14px"><div class="t" style="margin-bottom:6px">${esc(S.mailPreview.subject)}</div><div class="muted" style="margin-bottom:8px">${esc(S.mailPreview.preheader)}</div>
+        <iframe sandbox="" title="Email preview" style="width:100%;height:640px;border:1px solid var(--line);background:#fff" srcdoc="${esc(S.mailPreview.html)}"></iframe></div>` : ""}
+      ${ml.emails.length ? `<div class="tbl"><table><thead><tr><th>When</th><th>Email</th><th>To</th><th>Subject</th><th>Status</th><th>Detail</th></tr></thead><tbody>
+        ${ml.emails.map(e => `<tr><td class="muted" style="white-space:nowrap">${esc(ago(e.sent_at || e.send_after || e.created_at))}</td><td>${esc(e.key.split(":")[0])}<div class="muted">${esc(e.kind)}</div></td><td>${esc(e.to)}</td><td class="t">${esc(e.subject)}</td>
+          <td>${chip(e.status === "sent" ? "ok" : e.status === "failed" ? "failed" : e.status === "queued" ? "pending" : "review", e.status)}</td><td style="font-size:11.5px">${esc(e.error || (e.provider ? e.provider : ""))}${e.attempts > 1 ? ` · ${e.attempts} tries` : ""}</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted">No email queued for this brand yet.</p>`}`;
   }
 
   function vLearning() {
@@ -442,7 +465,10 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
       if (S.me?.staff && (S.view === "morning" || !S.data.morning || Date.now() - (S.mAt || 0) > 60000)) { S.data.morning = await api("/v1/ops/morning"); S.mAt = Date.now(); }
       if (S.view === "learning" && S.me?.staff) S.data.learning = await api("/v1/ops/learning");
       if (S.me?.staff && (S.view === "scale" || (S.view === "morning" && Date.now() - (S.sAt || 0) > 300000))) { S.data.scale = await api("/v1/ops/scale"); S.sAt = Date.now(); }
-      if (S.view === "outcomes" && S.me?.staff) S.data.outcomes = S.client ? await api(`/v1/ops/clients/${encodeURIComponent(S.client)}/outcomes`) : null;
+      if (S.view === "outcomes" && S.me?.staff) {
+        const base = S.client ? `/v1/ops/clients/${encodeURIComponent(S.client)}` : null;
+        [S.data.outcomes, S.data.progress, S.data.mail] = base ? await Promise.all([api(base + "/outcomes"), api(base + "/progress"), api(base + "/mail")]) : [null, null, null];
+      }
       if (S.view === "review" && S.me?.staff) { S.data.review = await api("/v1/ops/narrative?" + qc()); S.data.nd = S.selN ? await api("/v1/ops/narrative/" + S.selN) : null; }
       const ev = await api("/v1/ops/events?after=" + S.after);
       if (ev.events.length) { S.events = S.events.concat(ev.events).slice(-1000); S.after = ev.events[ev.events.length - 1].id; }
@@ -453,7 +479,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
     const sig = JSON.stringify([S.view, S.client, S.sel, S.data.overview?.clients, S.view === "flow" && S.data.flow,
       S.view === "executions" && [S.data.executions, S.data.exec], S.view === "jobs" && S.data.jobs,
       S.view === "approvals" && S.data.approvals, S.view === "review" && [S.data.review, S.data.nd], S.view === "events" && S.after, S.live,
-      S.data.morning?.counts, S.view === "morning" && S.data.morning?.changed, S.view === "learning" && S.data.learning, S.view === "outcomes" && S.data.outcomes, (S.view === "scale" || S.view === "morning") && S.data.scale]);
+      S.data.morning?.counts, S.view === "morning" && S.data.morning?.changed, S.view === "learning" && S.data.learning, S.view === "outcomes" && [S.data.outcomes, S.data.progress, S.data.mail], (S.view === "scale" || S.view === "morning") && S.data.scale]);
     if (!redraw && sig === S.sig) { const l = document.querySelector(".live"); if (l) l.lastChild.textContent = "Live · " + ago(S.last); return; }
     S.sig = sig;
     const a = document.activeElement; const keep = a && a.id && a.tagName === "TEXTAREA" ? [a.id, a.value] : null;
@@ -467,7 +493,16 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
   }
 
   document.addEventListener("click", async (e) => {
-    const t = e.target.closest("[data-v],[data-open],[data-ex],[data-dispatch],[data-ap],[data-cancel],#closeEx,[data-nd],[data-ndok],[data-ndedit],[data-redraft],#closeNd,[data-gonarr],[data-oppok],[data-wd]"); if (!t) return;
+    const t = e.target.closest("[data-v],[data-open],[data-ex],[data-dispatch],[data-ap],[data-cancel],#closeEx,[data-nd],[data-ndok],[data-ndedit],[data-redraft],#closeNd,[data-gonarr],[data-oppok],[data-wd],[data-ship],[data-mailpause],[data-mailprev]"); if (!t) return;
+    if (t.dataset.ship) { const at = document.getElementById("sh-" + t.dataset.ship)?.value;
+      try { await api(`/v1/ops/outcomes/${encodeURIComponent(t.dataset.ship)}/shipped`, { method: "POST", body: JSON.stringify(at ? { at } : {}) }); toast("Marked live; measuring from that day"); } catch (err) { toast(err.message); }
+      refresh(true); return; }
+    if (t.dataset.mailpause) {
+      try { await api(`/v1/ops/clients/${encodeURIComponent(S.client)}/mail/pause`, { method: "POST", body: JSON.stringify({ paused: t.dataset.mailpause === "1" }) }); toast(t.dataset.mailpause === "1" ? "Email paused for this brand" : "Email resumed"); } catch (err) { toast(err.message); }
+      refresh(true); return; }
+    if (t.dataset.mailprev) { S.mailKey = document.getElementById("mail-step")?.value;
+      try { S.mailPreview = await api(`/v1/ops/clients/${encodeURIComponent(S.client)}/mail-preview/${encodeURIComponent(S.mailKey)}`); } catch (err) { toast(err.message); }
+      render(); return; }
     if (t.dataset.gonarr) { S.selN = t.dataset.gonarr; location.hash = "review"; return; }
     if (t.dataset.oppok) { const id = t.dataset.oppok, owner = (document.getElementById("ow-" + id)?.value || "").trim();
       if (!owner) { toast("Name an owner first"); return; }

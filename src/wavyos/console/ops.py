@@ -94,13 +94,22 @@ class RedraftBody(BaseModel):
 
 
 class OutcomeApproveBody(BaseModel):
-    owner: str
+    owner: str = "Wavy Studios"
     fact: Optional[str] = None
     note: str = ""
 
 
 class OutcomeWithdrawBody(BaseModel):
     note: str = ""
+
+
+class ShippedBody(BaseModel):
+    at: Optional[str] = None     # ISO date or datetime; default now
+    note: str = ""
+
+
+class MailPauseBody(BaseModel):
+    paused: bool
 
 
 def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
@@ -725,11 +734,97 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
     @r.post("/clients/{slug}/opportunities/{opportunity_id}/approve")
     def approve_opportunity(slug: str, opportunity_id: str, body: OutcomeApproveBody, u: m.User = Depends(user),
                             s: Session = Depends(db)):
+        """Staff, or the brand's own owner or approver, approve a fix (outcomes.approve checks the role)."""
         from ..loop import outcomes
-        staff(s, u)
         c = client_by_slug(s, u, slug)
         return guard(lambda: outcomes.view(outcomes.approve(s, scope_for_user(s, u, c.id), opportunity_id,
                                                             owner=body.owner, fact=body.fact, note=body.note)))
+
+    @r.post("/outcomes/{outcome_id}/shipped")
+    def outcome_shipped(outcome_id: str, body: ShippedBody, u: m.User = Depends(user), s: Session = Depends(db)):
+        """Record that an approved fix went live in Klaviyo; measurement reads from this date."""
+        from datetime import datetime
+        from .. import impact
+        from ..loop import outcomes
+        staff(s, u)
+        row = s.get(m.OpportunityOutcome, outcome_id)
+        c = visible_client(s, u, row.client_id if row else None)
+        if c is None:
+            raise HTTPException(404, {"error": "outcome not found"})
+        try:
+            at = datetime.fromisoformat(body.at) if body.at else None
+        except ValueError:
+            raise HTTPException(422, {"error": "at must be an ISO date, like 2026-10-01"})
+        if at is not None and at.tzinfo is None:
+            from datetime import timezone
+            at = at.replace(tzinfo=timezone.utc)
+        if at is not None and at > utcnow():
+            raise HTTPException(422, {"error": "a fix can't go live in the future"})
+        return guard(lambda: outcomes.view(impact.mark_shipped(s, scope_for_user(s, u, c.id), outcome_id, at=at,
+                                                               by=f"{u.email}: {body.note}".rstrip(": ")[:120])))
+
+    @r.get("/clients/{slug}/progress")
+    def client_progress(slug: str, u: m.User = Depends(user), s: Session = Depends(db)):
+        """The First 30 days card: measured lift toward $10K, attributed beside it, and the one next step."""
+        from ..mail import lifecycle
+        c = client_by_slug(s, u, slug)
+        b = lifecycle.load(s, c, "")
+        return {**b.progress, "next_step": b.next_step}
+
+    # ---------------------------------------------------------------- onboarding email (staff only)
+
+    def mail_row(e: m.OutboundEmail) -> dict:
+        return {"id": e.id, "key": e.key, "kind": e.kind, "to": e.to_email, "subject": e.subject, "status": e.status,
+                "send_after": e.send_after.isoformat() if e.send_after else None,
+                "sent_at": e.sent_at.isoformat() if e.sent_at else None, "provider": e.provider,
+                "attempts": e.attempts, "error": e.error, "created_at": e.created_at.isoformat()}
+
+    @r.get("/clients/{slug}/mail")
+    def client_mail(slug: str, u: m.User = Depends(user), s: Session = Depends(db)):
+        from ..mail import lifecycle, outbox
+        staff(s, u)
+        c = client_by_slug(s, u, slug)
+        rows = s.scalars(select(m.OutboundEmail).where(m.OutboundEmail.client_id == c.id)
+                         .order_by(m.OutboundEmail.created_at.desc()).limit(200))
+        return {"client": c.slug, "client_name": c.name, "paused": outbox.paused(c),
+                "self_serve": lifecycle.self_serve(s, c),
+                "steps": [{"key": st.key, "kind": st.kind, "live": st.live} for st in lifecycle.SEQUENCE],
+                "emails": [mail_row(e) for e in rows]}
+
+    @r.get("/clients/{slug}/mail/{email_id}")
+    def client_mail_one(slug: str, email_id: str, u: m.User = Depends(user), s: Session = Depends(db)):
+        staff(s, u)
+        c = client_by_slug(s, u, slug)
+        e = s.get(m.OutboundEmail, email_id)
+        if e is None or e.client_id != c.id:
+            raise HTTPException(404, {"error": "email not found"})
+        return {**mail_row(e), "html": e.html, "text": e.text}
+
+    @r.get("/clients/{slug}/mail-preview/{key}")
+    def client_mail_preview(slug: str, key: str, request: Request, u: m.User = Depends(user), s: Session = Depends(db)):
+        """One step of the sequence rendered for this brand as it would go out now, due or not."""
+        from ..api.deps import service
+        from ..mail import lifecycle, outbox, render
+        staff(s, u)
+        c = client_by_slug(s, u, slug)
+        app_url = service(request, "settings").app_url
+        try:
+            email = lifecycle.preview(s, c, key, app_url)
+        except KeyError as e:
+            raise HTTPException(404, {"error": str(e.args[0])})
+        footer = outbox.STAFF_FOOTER if lifecycle.STEPS[key].kind == "staff" else outbox.FOOTER
+        unsub = f"{app_url}/email/unsubscribe" if lifecycle.STEPS[key].kind != "staff" else None
+        return {"key": key, "subject": email.subject, "preheader": email.preheader, "live": lifecycle.STEPS[key].live,
+                "html": render.html(email, app_url=app_url, footer=footer, unsubscribe_url=unsub),
+                "text": render.text(email, footer=footer, unsubscribe_url=unsub)}
+
+    @r.post("/clients/{slug}/mail/pause")
+    def client_mail_pause(slug: str, body: MailPauseBody, u: m.User = Depends(user), s: Session = Depends(db)):
+        """Stop (or restart) onboarding email to this brand. Staff alerts keep going."""
+        staff(s, u)
+        c = client_by_slug(s, u, slug)
+        c.settings = {**(c.settings or {}), "emails_paused": body.paused}
+        return {"client": c.slug, "paused": body.paused}
 
     @r.post("/outcomes/{outcome_id}/withdraw")
     def withdraw_outcome(outcome_id: str, body: OutcomeWithdrawBody, u: m.User = Depends(user), s: Session = Depends(db)):

@@ -133,6 +133,31 @@ details.basis dt { color: #7f898d; } details.basis dd { margin: 0; overflow-wrap
 .btn { background: var(--muted); border: 1px solid var(--input); color: #e9ecec; font-size: 13px; padding: 7px 12px; white-space: nowrap; }
 .btn:hover { border-color: var(--primary); color: var(--primary); }
 .btn.small { font-size: 12px; padding: 4px 9px; }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: #0b0c0d; font-weight: 600; padding: 9px 16px; }
+.btn.primary:hover { color: #0b0c0d; filter: brightness(1.08); }
+.btn:disabled { opacity: .6; cursor: progress; }
+
+/* First 30 days */
+.first30 { border: 1px solid var(--border); background: var(--card); padding: 24px 27px; margin-bottom: 24px; }
+.first30-head { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: baseline; margin-bottom: 14px; }
+.first30-head p { font-size: 13px; }
+.first30-total { display: flex; gap: 32px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 12px; }
+.first30-total strong { display: block; font-size: 34px; line-height: 1.1; font-weight: 600; letter-spacing: -1.2px; color: var(--primary); }
+.first30-total .side strong { font-size: 20px; color: #d9dddd; letter-spacing: 0; }
+.first30-total span { font-size: 13px; color: var(--muted-foreground); }
+.goal-bar { height: 8px; background: var(--muted); border: 1px solid var(--border); margin-bottom: 18px; }
+.goal-bar > i { display: block; height: 100%; background: var(--primary); }
+.next-step { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding: 16px 18px; background: var(--accent); border: 1px solid #3d4a24; }
+.next-step p { font-size: 14px; margin-top: 3px; }
+.next-step .op-label { color: var(--accent-foreground); }
+.fixes { list-style: none; margin: 16px 0 0; padding: 0; }
+.fixes li { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: center; padding: 11px 0; border-top: 1px solid var(--border); font-size: 14px; }
+.fixes small { display: block; color: var(--muted-foreground); font-size: 12px; margin-top: 2px; }
+.fixes b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.approve-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 18px; }
+.approve-row p { font-size: 13px; }
+.approve-row .err { color: var(--destructive); flex-basis: 100%; }
+.approve-row .err:empty { display: none; }
 
 /* Findings */
 .findings { display: grid; gap: 12px; margin-bottom: 24px; }
@@ -791,6 +816,62 @@ function render() {
   wire();
 }
 
+/* ---------------------------------------------------------------- first 30 days and approvals */
+const FIX_STATE = {
+  approved: x => ["Approved", "Waiting to go live"],
+  waiting: x => ["Live", `First reading from ${day(x.readable_from)}`],
+  live: x => ["Live", "Reading daily"],
+  no_targets: x => ["Live", "No flow to read it from yet"],
+  measured: x => [money(x.lift), `Measured lift, ${x.method === "before_after" ? "before vs after" : "holdout"}`],
+  too_small: x => ["Too few sends", x.reason],
+  pending: x => ["New flow", "Measured with a holdout once it can be"],
+};
+function first30() {
+  const p = S.progress;
+  if (!p || S.version) return "";
+  const share = Math.max(0, Math.min(1, (p.measured || 0) / p.goal));
+  const n = p.next_step;
+  const span = p.day <= p.window_days ? `Day ${p.day} of ${p.window_days} · ${p.days_left} day${p.days_left === 1 ? "" : "s"} left` : `Day ${p.day} · past the first ${p.window_days} days`;
+  const fixes = (p.fixes || []).map(x => {
+    const [big, small] = (FIX_STATE[x.state] || (() => [x.state, ""]))(x);
+    return `<li><span>${esc(x.title)}<small>${x.shipped_at ? `Live since ${esc(day(x.shipped_at))}` : `Approved ${esc(day(x.approved_at))}`}</small></span>
+      <span class="tag ${x.state === "measured" ? "live" : x.state === "approved" ? "off" : ""}">${esc(small)}</span><b>${esc(big)}</b></li>`;
+  }).join("");
+  return `<section class="first30" aria-label="First 30 days">
+    <div class="first30-head"><div><span class="op-label">FIRST 30 DAYS</span><h2 style="margin-top:4px">$10K in measured lift</h2></div><p>${esc(span)}</p></div>
+    <div class="first30-total"><div><strong>${money(p.measured)}</strong><span>measured of ${money(p.goal)}</span></div>
+      <div class="side"><strong>${money(p.attributed)}</strong><span>attributed by Klaviyo to approved fixes (not counted toward the goal)</span></div></div>
+    <div class="goal-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${p.goal}" aria-valuenow="${p.measured || 0}"><i style="width:${(share * 100).toFixed(1)}%"></i></div>
+    ${n ? `<div class="next-step"><div><span class="op-label">NEXT STEP · ${n.owner === "you" ? "YOU" : "WAVY"}</span><h3 style="margin-top:4px">${esc(n.title)}</h3><p>${esc(n.detail)}</p></div>
+      ${n.owner === "you" && n.url ? `<a class="btn primary" href="${esc(n.url)}">${esc(n.cta)}</a>` : ""}</div>` : ""}
+    ${fixes ? `<ul class="fixes">${fixes}</ul>` : ""}
+    <p class="empty" style="margin-top:14px;font-size:12px">Measured lift is revenue per recipient in the messages or flows a fix changed, after it went live, against the 28 days before, adjusted for the trend in flows the fix didn't touch. It needs 7 days live and 500 recipients on each side.</p>
+  </section>`;
+}
+function approveRow(c) {
+  if (S.version) return "";
+  if (c.outcome_status === "tracking")
+    return `<div class="approve-row"><span class="tag live">Approved</span><p>Owner ${esc(c.owner)}. It's measured from the day it goes live.</p></div>`;
+  return `<div class="approve-row"><button class="btn primary" type="button" data-approve="${esc(c.id)}">Approve this fix</button>
+    <p>Wavy takes it from here, then measures what it adds once it's live.</p><p class="err" id="approve-err" role="alert"></p></div>`;
+}
+async function approve(id, b) {
+  b.disabled = true;
+  const auth = { headers: { Authorization: "Bearer " + token() } };
+  const r = await fetch(`/v1/ops/clients/${encodeURIComponent(S.slug)}/opportunities/${encodeURIComponent(id)}/approve`,
+    { method: "POST", headers: { ...auth.headers, "Content-Type": "application/json" }, body: "{}" }).catch(() => null);
+  if (!r || !r.ok) {
+    const e = r ? await r.json().catch(() => ({})) : {};
+    b.disabled = false;
+    $("approve-err").textContent = r?.status === 403 ? "Only the brand's owner or approver can approve fixes." : e.error || "That didn't go through. Try again.";
+    return;
+  }
+  const [bR, pR] = await Promise.all([load(auth), fetch(`/v1/ops/clients/${encodeURIComponent(S.slug)}/progress`, auth)]);
+  if (bR.ok) S.b = await bR.json();
+  if (pR.ok) S.progress = await pR.json();
+  render();
+}
+
 /* ---------------------------------------------------------------- views */
 const VIEWS = {
   opportunities(s) {
@@ -826,10 +907,11 @@ const VIEWS = {
           <div><h4>Work</h4><strong>${esc(sel.effort_days)} day${sel.effort_days === 1 ? "" : "s"}</strong><p>Estimated build and QA time.</p></div>
           <div><h4>Evidence</h4><strong style="text-transform:capitalize">${esc(sel.evidence_class)}</strong><p>${sel.check_id ? "From the check library." : "From the " + esc(label(sel.module)) + " analysis."}</p></div>
         </div>
-        <h4 style="margin-top:20px">Steps</h4><ol class="op-steps">${(sel.steps || []).map(x => `<li>${esc(x)}</li>`).join("")}</ol>`;
+        <h4 style="margin-top:20px">Steps</h4><ol class="op-steps">${(sel.steps || []).map(x => `<li>${esc(x)}</li>`).join("")}</ol>
+        ${approveRow(sel)}`;
     }
     const gaps = d.gaps || [];
-    return `${head(s)}${kpis}
+    return `${head(s)}${first30()}${kpis}
       ${top.length ? `<h2 style="margin:0 0 14px">Fix first</h2><div class="top3">${top.map(c => `<a href="#opportunities/${esc(c.id)}"><span class="op-label">${String(c.rank).padStart(2, "0")} · ${esc(c.severity).toUpperCase()}</span><h3>${esc(c.title)}</h3><p>${esc(c.observation)}</p></a>`).join("")}</div>` : ""}
       <section class="board" aria-labelledby="board-title">
         <div class="board-heading"><p class="eyebrow">DECIDE / DO / LEARN</p><h2 id="board-title">Every opportunity, ranked</h2>
@@ -1089,6 +1171,7 @@ function wire() {
   document.querySelectorAll("[data-jtab]").forEach(b => b.addEventListener("click", () => { S.jtab = b.dataset.jtab; render(); }));
   document.querySelectorAll("[data-jall]").forEach(b => b.addEventListener("click", () => { S.jall = !S.jall; render(); }));
   document.querySelectorAll("[data-email]").forEach(b => b.addEventListener("click", () => openEmail(b.dataset.email)));
+  document.querySelectorAll("[data-approve]").forEach(b => b.addEventListener("click", () => approve(b.dataset.approve, b)));
   if (document.querySelector("[data-thumb]")) wireThumbs();
 }
 
@@ -1108,8 +1191,11 @@ async function init() {
   const version = new URLSearchParams(location.search).get("version");
   if (!token()) return signIn();
   const auth = { headers: { Authorization: "Bearer " + token() } };
-  const [meR, bR] = await Promise.all([fetch("/v1/ops/me", auth), load(auth, version)]);
+  S.version = version;
+  const [meR, bR, pR] = await Promise.all([fetch("/v1/ops/me", auth), load(auth, version),
+    version ? null : fetch(`/v1/ops/clients/${encodeURIComponent(S.slug)}/progress`, auth).catch(() => null)]);
   if (meR.status === 401 || bR.status === 401) { forget(); return signIn(); }
+  if (pR?.ok) S.progress = await pR.json();
   S.me = await meR.json();
   $("avatar").textContent = (S.me.name || S.me.email || "?").slice(0, 1).toUpperCase();
   $("avatar").title = S.me.name || "";

@@ -13,7 +13,7 @@ from typing import Optional, Sequence
 
 from sqlalchemy import select
 
-from . import events, housekeeping, jobs, monitoring, tenancy
+from . import events, housekeeping, jobs, mail, monitoring, tenancy
 from . import models as m
 from .config import Settings, ensure_sqlite_dir, load_settings
 from .db import make_engine, make_sessionmaker, transaction
@@ -270,6 +270,10 @@ def cmd_work(args, settings: Settings) -> int:
                     print(f"scheduler  queued {len(queued)} job run(s), requeued {requeued} stuck")
                 if cleared:
                     print(f"cleanup    {cleared}")
+                with transaction(factory) as s:
+                    mailed = mail.tick(factory, s, settings, services["vault"])
+                if mailed:
+                    print(f"email      {mailed}")
                 next_schedule = time.monotonic() + args.schedule_every
             if not args.executions_only and not background:
                 for r in jobs.run_pending(factory, services, limit=args.limit, threads=threads):
@@ -306,6 +310,41 @@ def cmd_provider_add(args, settings: Settings) -> int:
         store_key(s, scope_for_user(s, actor, None), Vault(key_provider(settings)), args.provider, secret)
     del secret
     print(f"{args.provider} key stored in the vault")
+    return 0
+
+
+def cmd_emails_preview(args, settings: Settings) -> int:
+    """Render onboarding emails for one brand as they'd go out now, to files. Nothing is queued or sent."""
+    from pathlib import Path
+
+    from .mail import lifecycle, outbox, render
+    keys = [args.key] if args.key else list(lifecycle.STEPS)
+    if args.key and args.key not in lifecycle.STEPS:
+        raise CliError(f"no onboarding email {args.key!r}; one of: {', '.join(lifecycle.STEPS)}")
+    out = Path(args.out or f"var/email-previews/{args.client}")
+    out.mkdir(parents=True, exist_ok=True)
+    with transaction(_factory(settings)) as s:
+        q = select(m.Client).where(m.Client.slug == args.client)
+        org = _org(s, args.org)
+        if org:
+            q = q.where(m.Client.org_id == org.id)
+        clients = s.scalars(q).all()
+        if len(clients) != 1:
+            raise CliError(f"no client {args.client}" if not clients else f"{args.client} is in several organizations; pass --org")
+        b = lifecycle.load(s, clients[0], settings.app_url)
+        print(f"{args.client}: day {b.day}, next step: {b.next_step['title']}")
+        for key in keys:
+            step = lifecycle.STEPS[key]
+            email = lifecycle.preview(s, clients[0], key, settings.app_url)
+            footer = outbox.STAFF_FOOTER if step.kind == "staff" else outbox.FOOTER
+            unsub = None if step.kind == "staff" else f"{settings.app_url}/email/unsubscribe"
+            (out / f"{key}.html").write_text(render.html(email, app_url=settings.app_url, footer=footer, unsubscribe_url=unsub))
+            (out / f"{key}.txt").write_text(f"Subject: {email.subject}\n\n" + render.text(email, footer=footer, unsubscribe_url=unsub))
+            due = step.when(b)
+            state = "off" if not step.live else f"due {due:%Y-%m-%d %H:%M} UTC" if due else "not due"
+            print(f"  {key:22} {state:28} {email.subject}")
+        s.rollback()
+    print(f"wrote {len(keys)} email(s) to {out}/")
     return 0
 
 
@@ -474,10 +513,10 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--executions-only", action="store_true")
     w.set_defaults(fn=cmd_work)
 
-    pv = sub.add_parser("provider", help="model provider keys (stored in the vault)")
+    pv = sub.add_parser("provider", help="model and email provider keys (stored in the vault)")
     pvs = pv.add_subparsers(dest="provider_command", required=True)
     pa = pvs.add_parser("add", help="store a provider API key; prompts with hidden input")
-    pa.add_argument("provider", choices=["anthropic"])
+    pa.add_argument("provider", choices=["anthropic", "postmark", "resend"])
     pa.add_argument("--as", dest="actor", required=True, help="email of an org admin")
     pa.add_argument("--org")
     pa.set_defaults(fn=cmd_provider_add)
@@ -489,6 +528,15 @@ def build_parser() -> argparse.ArgumentParser:
     ca.add_argument("--as", dest="actor", required=True)
     ca.add_argument("--org")
     ca.set_defaults(fn=cmd_client_allow)
+
+    em = sub.add_parser("emails", help="onboarding email")
+    ems = em.add_subparsers(dest="emails_command", required=True)
+    ep = ems.add_parser("preview", help="render a brand's onboarding emails to files as they'd go out now (sends nothing)")
+    ep.add_argument("--client", required=True, help="client slug")
+    ep.add_argument("--key", help="one email (default: every step)")
+    ep.add_argument("--out", help="folder (default: var/email-previews/<client>)")
+    ep.add_argument("--org")
+    ep.set_defaults(fn=cmd_emails_preview)
 
     sub.add_parser("demo", help="create the fictional demo workspace and run its work").set_defaults(fn=cmd_demo)
 

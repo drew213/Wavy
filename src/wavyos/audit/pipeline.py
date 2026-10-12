@@ -10,6 +10,7 @@ from typing import Any, Callable, Optional
 
 from sqlalchemy.orm import Session
 
+from .. import events, impact
 from .. import models as m
 from ..loop import changes, outcomes
 from ..scope import InvalidState, Scope, get_scoped
@@ -90,6 +91,8 @@ def run_audit_for_run(session: Session, scope: Scope, run_id: str, context: Opti
     result = analysis.run_all(snap, fetch=link_fetcher)
     ch = changes.compare(session, run, sc, rows, result["facts"])
     analysis.journey_map.attach_history(result, analysis.stored(session, getattr(ch, "prev", None)))
+    for o in impact.detect_shipped(session, run.client_id, result, run):
+        events.record(session, scope, "opportunity.shipped", o, f"{o.title} went live (detected by this audit)")
     record = outcomes.track_record(session, run.org_id)
     built = opportunities.build(snap, rows, library_specs(), findings=result["findings"] + [f.as_dict() for f in ch.findings],
                                 unavailable=result["unavailable"], record=record)

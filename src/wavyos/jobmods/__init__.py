@@ -9,8 +9,8 @@ Handlers take their dependencies from ctx.services:
 """
 from ..jobs import REGISTRY
 from . import (audit_analyze, audit_collect, audit_refresh, client_onboard, contracts, daily_health,  # noqa: F401
-               knowledge_staleness, narrative_draft, outcomes_readout, results_due)  # (registration side effects)
+               impact_measure, knowledge_staleness, narrative_draft, outcomes_readout, results_due)  # (registration side effects)
 
 IMPLEMENTED = (knowledge_staleness.KEY, results_due.KEY, daily_health.KEY, audit_refresh.WEEKLY_KEY,
-               audit_refresh.MONTHLY_KEY)
+               audit_refresh.MONTHLY_KEY, impact_measure.KEY)
 CONTRACT_ONLY = tuple(d.key for d in contracts.CONTRACTS if REGISTRY[d.key].handler is None)

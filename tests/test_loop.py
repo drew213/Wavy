@@ -76,10 +76,9 @@ def test_refresh_compares_reads_out_and_feeds_the_morning_queue(env):
     assert [r["category"] for r in cats][:6] == ["welcome", "checkout", "cart", "browse", "cross_sell", "replenishment"]
     assert all(f"flow_categories.{r['category']}.live_flows" in first["facts"] for r in cats)
 
-    # a strategist approves the top card; the brand can't, and it can't be approved twice
+    # a strategist approves the top card, and it can't be approved twice
     cards = staff.get(f"/v1/ops/clients/{slug}/outcomes").json()["opportunities"]
     card = cards[0]
-    assert brand.post(f"/v1/ops/clients/{slug}/opportunities/{card['id']}/approve", json={"owner": "Brand"}).status_code == 404
     res = staff.post(f"/v1/ops/clients/{slug}/opportunities/{card['id']}/approve", json={"owner": "Wavy Studios"})
     assert res.status_code == 200, res.text
     outcome = res.json()

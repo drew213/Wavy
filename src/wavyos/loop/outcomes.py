@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from .. import events, workspace
 from .. import models as m
 from ..audit.engine import VERDICT_RANK, results_of
-from ..policy import LEADS
+from ..policy import CLIENT_DECIDERS, LEADS
 from ..scope import InvalidState, NotFound, NotPermitted, Scope
 from .changes import lower_is_better
 
@@ -73,7 +73,7 @@ def view(o: m.OpportunityOutcome) -> dict:
             "readout_metric": o.readout_metric, "readout_fact": o.readout_fact, "direction": o.direction,
             "baseline": o.baseline, "readout_days": o.readout_days, "due_at": iso(o.due_at), "status": o.status,
             "readouts": o.readouts or [], "verdict_reason": o.verdict_reason, "decided_at": iso(o.decided_at),
-            "note": o.note}
+            "note": o.note, "targets": o.targets or [], "shipped_at": iso(o.shipped_at), "shipped_by": o.shipped_by}
 
 
 def for_client(session: Session, client_id: str) -> list[m.OpportunityOutcome]:
@@ -83,9 +83,9 @@ def for_client(session: Session, client_id: str) -> list[m.OpportunityOutcome]:
 
 def approve(session: Session, scope: Scope, opportunity_id: str, *, owner: str, fact: Optional[str] = None,
             note: str = "", now: Optional[datetime] = None) -> m.OpportunityOutcome:
-    """A strategist approves one card of the brand's latest scored audit, with an owner."""
-    if not scope.actor.is_human or not (scope.actor.roles & APPROVERS):
-        raise NotPermitted("approving an opportunity needs one of: " + ", ".join(sorted(APPROVERS)))
+    """A strategist, or the brand's own decider, approves one card of the brand's latest scored audit, with an owner."""
+    if not scope.actor.is_human or not (scope.actor.roles & (APPROVERS | CLIENT_DECIDERS)):
+        raise NotPermitted("approving an opportunity needs one of: " + ", ".join(sorted(APPROVERS | CLIENT_DECIDERS)))
     if not owner.strip():
         raise InvalidState("an approved opportunity needs an owner")
     client_id = scope.require_client()
@@ -112,6 +112,9 @@ def approve(session: Session, scope: Scope, opportunity_id: str, *, owner: str, 
     now = now or datetime.now(timezone.utc)
     readout = card.get("readout") or {}
     days = int(readout.get("days") or 45)
+    from .. import impact
+    from ..analysis import stored
+    tables = {k: v.get("tables") or {} for k, v in ((stored(session, run) or {}).get("modules") or {}).items()}
     row = m.OpportunityOutcome(
         org_id=run.org_id, client_id=client_id, run_id=run.id, opportunity_id=opportunity_id,
         source_key=source_key(card)[:160], title=(card.get("title") or "")[:300], owner=owner.strip()[:120],
@@ -119,7 +122,7 @@ def approve(session: Session, scope: Scope, opportunity_id: str, *, owner: str, 
         readout_metric=str(readout.get("metric") or card.get("title") or "")[:200], readout_fact=fid,
         direction="down" if fid and lower_is_better(fid, base.get("label", "")) else "up", baseline=base,
         readout_days=days, due_at=now + timedelta(days=days), status="tracking", readouts=[], note=note or "",
-        updated_at=now)
+        updated_at=now, targets=impact.targets_for(card, tables))
     session.add(row)
     session.flush()
     events.record(session, scope, "opportunity.approved", row,

@@ -16,6 +16,7 @@ from __future__ import annotations
 import base64
 import binascii
 import hashlib
+import hmac
 import os
 import stat
 import struct
@@ -31,6 +32,7 @@ FORMAT_VERSION = 1
 class KeyProvider(Protocol):
     def wrap(self, data_key: bytes, aad: bytes) -> tuple[bytes, str]: ...
     def unwrap(self, wrapped: bytes, key_ref: str, aad: bytes) -> bytes: ...
+    def derive(self, label: str) -> bytes: ...
 
 
 class VaultError(Exception):
@@ -44,6 +46,10 @@ class _MasterKey:
     def wrap(self, data_key: bytes, aad: bytes) -> tuple[bytes, str]:
         nonce = os.urandom(12)
         return nonce + AESGCM(self._key).encrypt(nonce, data_key, aad), self.key_ref
+
+    def derive(self, label: str) -> bytes:
+        """A 32-byte key for one purpose (signing links, say), derived from the master key and never stored."""
+        return hmac.new(self._key, b"wavyos/derive|" + label.encode(), hashlib.sha256).digest()
 
     def unwrap(self, wrapped: bytes, key_ref: str, aad: bytes) -> bytes:
         if key_ref != self.key_ref:
@@ -100,6 +106,9 @@ def binding(org_id: str, client_id: str, provider: str, external_account_id: str
 class Vault:
     def __init__(self, provider: KeyProvider):
         self.provider = provider
+
+    def derive(self, label: str) -> bytes:
+        return self.provider.derive(label)
 
     def seal(self, secret: str, aad: bytes) -> tuple[bytes, str]:
         """Encrypt a secret. Returns (ciphertext, key_ref)."""

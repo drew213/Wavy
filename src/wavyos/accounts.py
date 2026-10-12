@@ -73,7 +73,7 @@ def signup_brand(session: Session, org: m.Organization, *, brand_name: str, pers
     if session.scalar(select(m.User.id).where(m.User.org_id == org.id, func.lower(m.User.email) == email)):
         raise InvalidState("an account with this email already exists. Sign in instead")
     client = m.Client(org_id=org.id, name=brand_name, slug=_free_slug(session, org.id, brand_name),
-                      timezone="America/New_York", website=website or None)
+                      timezone="America/New_York", website=website or None, settings={"self_serve": True})
     session.add(client)
     session.flush()
     user = m.User(org_id=org.id, email=email, name=person_name, kind="client")

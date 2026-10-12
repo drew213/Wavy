@@ -85,7 +85,7 @@ form .sub { color: var(--muted); font-size: 12px; margin-top: -8px; }
       <li><span class="n">1</span><div><b>Create your account</b><span>Thirty seconds. Your audit is saved to it.</span></div></li>
       <li><span class="n">2</span><div><b>Connect Klaviyo</b><span>A read-only key. Nothing in your account can change.</span></div></li>
       <li><span class="n">3</span><div><b>Answer a few questions</b><span>Voice, margins and guardrails, so the plan fits the brand.</span></div></li>
-      <li><span class="n">4</span><div><b>Get your audit</b><span>Twelve months of orders, every flow, and what email is leaving on the table.</span></div></li>
+      <li><span class="n">4</span><div><b>Get your audit</b><span>24 months of orders, every flow, and what email is leaving on the table.</span></div></li>
     </ol>
   </div>
 
@@ -128,7 +128,7 @@ const COPY = isLogin
   ? { title: "Wavy — Sign in", headline: 'Welcome <em>back.</em>',
       lede: "Sign in to reopen your retention audit, see every version of it, and run a fresh one whenever your numbers move." }
   : { title: "Wavy — Get your retention audit", headline: 'Your retention audit, from one <em>Klaviyo</em> key.',
-      lede: "We read twelve months of orders and every flow, score your retention, and show what email is leaving on the table, with a 30-day plan to fix it." };
+      lede: "We read 24 months of orders and every flow, score your retention, and show what email is leaving on the table, with a 30-day plan to fix it." };
 document.title = COPY.title;
 $("headline").innerHTML = COPY.headline;
 $("lede").textContent = COPY.lede;
