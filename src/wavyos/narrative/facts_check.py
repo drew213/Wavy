@@ -18,7 +18,7 @@ from .prompts import SECTIONS
 
 CLAIM_KEYS = frozenset({"headline", "finding", "evidence", "observation", "summary"})
 STRUCTURAL_KEYS = frozenset({"id", "facts", "baseline_fact", "week", "weeks", "when", "owner", "stage", "status",
-                             "channel"})
+                             "channel", "moment", "message_id", "step"})
 REQUIRED = ("finding", "evidence", "action")
 PLAN_COUNTS = re.compile(
     r"\b\d{1,2}\s?%\s?off\b|\b\d{1,3}[- ](?:emails?|messages?|sms|texts?|touch(?:es)?|steps?|variants?|segments?|"

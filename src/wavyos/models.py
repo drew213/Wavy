@@ -624,6 +624,20 @@ class KlaviyoReportCall(IdMixin, Base):
     count: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class EmailHtml(IdMixin, Base):
+    """A live email template's HTML as collected, stored once per brand per version (sha256 of the HTML).
+    Runs point at versions through the templates artifact's htmlHash; the workspace renders previews from it."""
+    __tablename__ = "email_html"
+    __table_args__ = (UniqueConstraint("client_id", "sha256"),)
+    org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id"), index=True)
+    template_id: Mapped[str] = mapped_column(String(64), index=True)
+    sha256: Mapped[str] = mapped_column(String(64))
+    html: Mapped[str] = mapped_column(Text)
+    bytes: Mapped[int] = mapped_column(Integer, default=0)
+    captured_at: Mapped[Optional[datetime]]
+
+
 class LlmSpend(IdMixin, Base):
     """Model spend per organization per UTC day, across narrative drafting and task executions."""
     __tablename__ = "llm_spend"

@@ -17,14 +17,14 @@ from sqlalchemy.orm import Session
 
 from .. import models as m
 from ..audit.snapshot import MissingData, Snapshot
-from . import (capture_reach, cohorts, complaints, flow_categories, flow_history, journey_graph, kpi_scorecard, messages,
-               performance, program, promotions, subscriptions)
+from . import (capture_reach, cohorts, complaints, flow_categories, flow_history, journey_graph, journey_map, kpi_scorecard,
+               messages, performance, program, promotions, subscriptions)
 from .base import Analysis
 
 log = logging.getLogger(__name__)
 
 MODULES = (kpi_scorecard, performance, cohorts, flow_history, flow_categories, complaints, journey_graph, program,
-           promotions, capture_reach, subscriptions, messages)
+           promotions, capture_reach, subscriptions, messages, journey_map)
 ARTIFACT = "analysis"
 LABEL_MAX = 300
 
@@ -83,6 +83,14 @@ def store(session: Session, run: m.AuditRun, result: dict[str, Any]) -> None:
     art.payload = result
     art.captured_at = datetime.now(timezone.utc)
     session.flush()
+
+
+def stored(session: Session, run: Optional[m.AuditRun]) -> Optional[dict[str, Any]]:
+    """A run's saved analysis result, or None."""
+    if run is None:
+        return None
+    art = session.scalar(select(m.AuditArtifact).where(m.AuditArtifact.run_id == run.id, m.AuditArtifact.name == ARTIFACT))
+    return art.payload if art is not None else None
 
 
 def facts_for(session: Session, run_id: str) -> dict[str, Any]:

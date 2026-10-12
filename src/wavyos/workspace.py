@@ -32,7 +32,7 @@ SECTIONS: tuple[tuple[str, str, tuple[str, ...], bool], ...] = (
     ("foundational", "Foundational report", (), True),
     ("performance", "Performance", ("performance", "kpi_scorecard", "flow_history"), True),
     ("cohorts", "Customer cohorts", ("cohorts",), True),
-    ("journeys", "Customer journeys", ("journey_graph", "flow_categories", "flow_history"), True),
+    ("journeys", "Customer journeys", ("journey_map", "journey_graph", "flow_categories", "flow_history"), True),
     ("calendar", "Send history", ("program", "promotions"), True),
     ("capture", "Capture & reach", ("capture_reach", "subscriptions"), True),
     ("deliverability", "Deliverability & messages", ("complaints", "messages"), True),

@@ -75,7 +75,7 @@ def test_cited_facts_and_cards_must_exist_and_unavailable_facts_are_called_out()
     opp = {**_draft(), "cards": [{"id": "opp-made-up", "observation": "x", "outcome": "y", "steps": [], "effort_days": 1,
                                   "readout": {"metric": "m", "days": 45}}]}
     assert not facts_check.check("opportunities", opp, LEDGER, card_ids={"opp-dat-01"})["ok"]
-    assert not facts_check.check("journeys", _draft(), LEDGER)["ok"]  # missing ultimate_journey
+    assert not facts_check.check("journeys", _draft(), LEDGER)["ok"]  # missing journey_copy
 
 
 def test_the_packet_carries_no_personal_data():
@@ -107,8 +107,9 @@ def drafter(*, invent_first: bool = True):
                            "steps": ["Build a 3-email series"], "effort_days": 2,
                            "readout": {"metric": "repeat rate", "days": 45}} for c in pk["opportunities"][:2]]
         elif section == "journeys":
-            d["ultimate_journey"] = [{"stage": "capture", "node": "Welcome", "trigger": "Signed up", "status": "fix",
-                                      "detail": "Add a second message after 2 days"}]
+            d["journey_copy"] = [{"moment": "welcome_series", "step": 1, "channel": "email", "subject": "Welcome in",
+                                  "preview": "Your offer is inside", "body": "Thanks for joining. Shop now", "why": "deliver the offer"}]
+            d["message_rewrites"] = []
         elif section == "calendar":
             d["calendar_90d"] = [{"week": 1, "theme": "Warm-up", "sends": [{"channel": "email", "segment": "Engaged 90 days",
                                                                            "idea": "Best sellers", "offer": "none"}]}]

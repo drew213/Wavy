@@ -552,6 +552,18 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
             raise HTTPException(404, {"error": f"there is no version {version}"})
         return out
 
+    @r.get("/clients/{slug}/emails/{sha}")
+    def email_preview(slug: str, sha: str, u: m.User = Depends(user), s: Session = Depends(db)):
+        """One live email's HTML, ready for a sandboxed preview frame (template tags shown as their defaults)."""
+        from .. import email_preview as previews
+        c = client_by_slug(s, u, slug)
+        row = previews.get(s, c.id, sha[:64])
+        if row is None:
+            raise HTTPException(404, {"error": "this email's HTML wasn't captured"})
+        return {"sha": row.sha256, "template_id": row.template_id, "bytes": row.bytes,
+                "captured_at": row.captured_at.isoformat() if row.captured_at else None,
+                "html": previews.preview(row.html)}
+
     # ---------------------------------------------------------------- narrative review (staff only)
 
     QUEUE_ORDER = {"draft": 0, "needs_rewrite": 1, "drafting": 2, "skipped": 3, "edited": 4, "approved": 5, "rejected": 6}

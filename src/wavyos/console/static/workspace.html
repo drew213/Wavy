@@ -239,6 +239,67 @@ td.heat { text-align: right; font-variant-numeric: tabular-nums; }
 .plan-list small { color: #93a0a7; }
 .email { background: #f6f6f3; color: #1b1e20; padding: 28px; font: 15px/1.7 Georgia, serif; white-space: pre-wrap; max-height: 560px; overflow: auto; }
 
+/* journey map */
+.jtabs { display: flex; gap: 0; border: 1px solid var(--border); width: fit-content; margin-bottom: 24px; flex-wrap: wrap; }
+.jtabs button { background: var(--card); border: 0; border-right: 1px solid var(--border); padding: 9px 16px; font-size: 14px; color: #c9cecf; }
+.jtabs button:last-child { border-right: 0; }
+.jtabs button[aria-pressed="true"] { background: var(--primary); color: #0a0a0a; }
+.stage-track.jm { grid-template-columns: repeat(var(--n, 8), minmax(0, 1fr)); }
+.stage .rev { font: 12px var(--mono); color: #c0c8ca; }
+.principles { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; color: #b1b6b8; }
+.jstage { margin-bottom: 26px; }
+.jstage-head { display: flex; gap: 14px; align-items: baseline; margin-bottom: 12px; flex-wrap: wrap; }
+.jstage-head p { font-size: 14px; }
+.moments { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
+.moment { border: 1px solid var(--border); border-top: 3px solid var(--input); background: var(--card); padding: 20px; display: grid; gap: 12px; align-content: start; min-width: 0; }
+.moment.keep { border-top-color: #6f9a34; } .moment.fix { border-top-color: var(--warn); } .moment.build { border-top-color: var(--destructive); }
+.moment header { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
+.moment > p { font-size: 14px; }
+.moment .kv { grid-template-columns: 76px 1fr; font-size: 13px; margin: 0; }
+.msteps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.mstep { display: grid; grid-template-columns: 82px 1fr; gap: 10px; padding-top: 8px; border-top: 1px solid #222628; font-size: 14px; }
+.mstep b { font: 11px var(--mono); letter-spacing: .6px; color: #9da7aa; font-weight: 400; display: block; }
+.mstep small { display: block; color: #93a0a7; }
+.linkish { background: none; border: 0; padding: 0; color: var(--accent-foreground); text-align: left; text-decoration: underline; text-underline-offset: 3px; font-size: 13px; }
+.draft { margin-top: 8px; padding: 10px 12px; background: #171d0f; border: 1px solid #3a4a17; display: grid; gap: 3px; }
+.draft p { font-size: 13px; white-space: pre-wrap; color: #d9dddd; }
+.next { font-size: 14px; color: #d9dddd; }
+.next .op-label, .op-label { font: 11px var(--mono); letter-spacing: .6px; color: #8f9a9e; margin-right: 6px; }
+.jflow { border: 1px solid var(--border); background: var(--card); margin-bottom: 12px; }
+.jflow > summary { list-style: none; cursor: pointer; padding: 18px 22px; display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; }
+.jflow > summary::-webkit-details-marker { display: none; }
+.jflow > summary h3 { font-size: 16px; }
+.jflow > summary .sub { grid-column: 1 / -1; font-size: 13px; color: #93a0a7; }
+.jflow-body { padding: 4px 22px 22px; border-top: 1px solid var(--border); overflow-x: auto; }
+.jflow-rules { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0; }
+.jseq { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; min-width: 0; }
+.jn.delay, .jn.util { font: 12px var(--mono); color: #93a0a7; padding-left: 14px; border-left: 2px dotted var(--input); }
+.jn.split > .split-q { font-size: 13px; color: var(--warn); padding: 6px 10px; border: 1px dashed #5c4a2c; width: fit-content; max-width: 100%; }
+.split-cols { display: grid; grid-template-columns: repeat(2, minmax(300px, 1fr)); gap: 14px; margin-top: 8px; }
+.split-cols > div > b { font: 11px var(--mono); color: #8f9a9e; display: block; margin-bottom: 6px; font-weight: 400; }
+.msg-card { width: 100%; display: grid; grid-template-columns: 150px 1fr; gap: 14px; text-align: left; background: #0f1112; border: 1px solid var(--border); padding: 10px; color: inherit; }
+.msg-card:hover { border-color: var(--primary); }
+.jn.off .msg-card { opacity: .55; border-style: dashed; }
+.thumb { width: 150px; height: 200px; overflow: hidden; background: #f6f6f3; position: relative; display: block; }
+.thumb iframe { width: 600px; height: 800px; border: 0; transform: scale(.25); transform-origin: 0 0; pointer-events: none; background: #fff; }
+.nothumb { position: absolute; inset: 0; display: grid; place-items: center; font: 11px var(--mono); color: #5c666a; background: #1b1e20; text-align: center; padding: 8px; }
+.msg-body { display: grid; gap: 4px; align-content: start; min-width: 0; }
+.msg-meta { font: 11px var(--mono); letter-spacing: .6px; color: #9da7aa; }
+.msg-body strong { font-weight: 500; overflow-wrap: anywhere; }
+.msg-body small { color: #93a0a7; overflow-wrap: anywhere; }
+.msg-stats { font-size: 12px; color: #c0c8ca; font-variant-numeric: tabular-nums; }
+dialog.email-dlg { width: min(1180px, 96vw); height: min(900px, 94vh); padding: 0; border: 1px solid var(--input); background: var(--background); color: var(--foreground); }
+dialog.email-dlg::backdrop { background: rgba(0,0,0,.7); }
+.dlg-grid { display: grid; grid-template-columns: 640px 1fr; height: 100%; }
+.dlg-frame { background: #e9e9e6; overflow: auto; display: grid; justify-items: center; }
+.dlg-frame iframe { width: 620px; height: 100%; min-height: 860px; border: 0; background: #fff; }
+.dlg-side { padding: 24px; overflow: auto; display: flex; flex-direction: column; gap: 16px; border-left: 1px solid var(--border); }
+.dlg-side > * { flex-shrink: 0; }
+.dlg-side h2 { overflow-wrap: anywhere; }
+.sugg { border-left: 3px solid var(--warn); padding: 4px 0 4px 12px; display: grid; gap: 3px; font-size: 14px; }
+.sugg.high, .sugg.critical { border-left-color: var(--destructive); } .sugg.low { border-left-color: var(--input); }
+.sugg p { font-size: 13px; }
+.sugg .fix { color: #d9dddd; }
 .state { min-height: 60vh; display: grid; place-content: center; text-align: center; gap: 14px; }
 .state p { max-width: 46ch; }
 .state a { color: var(--primary); }
@@ -264,6 +325,13 @@ td.heat { text-align: right; font-variant-numeric: tabular-nums; }
   .op-layout { grid-template-columns: 1fr; }
   .op-list { border-right: 0; max-height: 420px; }
   .op-detail { border-top: 1px solid var(--border); }
+  .stage-track.jm { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .moments { grid-template-columns: 1fr; }
+  .split-cols { grid-template-columns: 1fr; }
+  .msg-card { grid-template-columns: 100px 1fr; }
+  .thumb { width: 100px; height: 140px; } .thumb iframe { transform: scale(.1667); }
+  .dlg-grid { grid-template-columns: 1fr; grid-template-rows: 60vh auto; }
+  .dlg-frame iframe { width: 100%; }
 }
 @media (max-width: 800px) {
   .topbar { height: 64px; padding: 0 17px; gap: 10px; }
@@ -309,6 +377,8 @@ td.heat { text-align: right; font-variant-numeric: tabular-nums; }
   th, dt, .metric-label, h4 { color: #444 !important; }
   .panel, .metric, .finding, .board, .notice { break-inside: avoid; background: #fff !important; }
   .op-list { max-height: none; }
+  .jtabs, dialog { display: none !important; }
+  .moment, .jflow { break-inside: avoid; }
   .bar i, .bars.weeks .bar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   a { text-decoration: none; }
 }
@@ -531,6 +601,162 @@ const head = s => stateBar(s) + reviewBar(s) + story(s);
 const readCard = id => (sec("opportunities").narrative_state === "approved" ? sec("opportunities").narrative?.cards || [] : []).find(c => c.id === id);
 const waiting = s => s.state === "queued" || s.state === "collecting" || (s.state === "unavailable" && !Object.keys(s.tables || {}).length && !s.findings?.length);
 
+function journeysLegacy(s) {
+  const stages = T(s, "journey_graph.stages");
+  return `${head(s)}
+    ${metrics("three", [metric("journey_graph.stages_covered", "Lifecycle stages with a live flow", "Of 8: capture, browse, cart, checkout, post-purchase, replenishment, winback, sunset."),
+      metric("journey_graph.live_flows", "Live flows sending"), metric("journey_graph.core_types_missing", "Core flows with nothing live")])}
+    ${stages.length ? `<div class="stage-track">${stages.map((st, i) => `<div class="stage"><span class="n">${String(i + 1).padStart(2, "0")}</span><strong>${esc(label(st.stage))}</strong>
+      <span>${st.live.length ? `<span class="tag live">${st.live.length} live</span>` : st.not_live.length ? `<span class="tag off">Built, not live</span>` : `<span class="tag missing">Missing</span>`}</span>
+      <small>${esc([...st.live, ...st.not_live.map(n => n + " (off)")].join(", "))}</small></div>`).join("")}</div>` : ""}
+    ${findingCards(s.findings)}
+    ${table("journey_graph.nodes", T(s, "journey_graph.nodes"), [["name", "Flow", "text"], ["stage", "Stage", "text"], ["status", "Status", "text"], ["trigger", "Trigger", "text"], ["emails", "Emails", "num"], ["sms", "SMS", "num"], ["first_send_days", "First send (days)", "dec"], ["recipients_90d", "Recipients, 90d", "num"]], { title: "Every flow", limit: 60 })}`;
+}
+
+/* ---------------------------------------------------------------- journey map */
+const JSTATUS = { keep: ["live", "Keep"], fix: ["off", "Fix"], build: ["missing", "Build"], validate: ["low", "Validate"],
+  live: ["live", "Live"], silent: ["off", "Live, silent"], draft: ["off", "Built, not live"], gap: ["missing", "Missing"] };
+const jtag = st => `<span class="tag ${(JSTATUS[st] || ["", st])[0]}">${esc((JSTATUS[st] || ["", st])[1])}</span>`;
+const sevTag = sv => sv === "critical" || sv === "high" ? "high" : sv;
+const when = d => d == null ? "—" : d === 0 ? "On entry" : d < 1 / 24 ? `${Math.round(d * 1440)} min` : d < 1 ? `${+(d * 24).toFixed(d * 24 < 10 ? 1 : 0)} h` : `Day ${+d.toFixed(d < 10 ? 1 : 0)}`;
+function jIndex(s) {
+  const idx = {};
+  const walk = (seq, fl) => (seq || []).forEach(x => { if (x.kind === "split") { walk(x.yes, fl); walk(x.no, fl); } else if (x.message_id) idx[x.message_id] = { x, fl }; });
+  T(s, "journey_map.flows").forEach(fl => walk(fl.tree, fl));
+  return (S.jidx = idx);
+}
+function sevChips(list) {
+  const c = {}; (list || []).forEach(g => (c[g.severity] = (c[g.severity] || 0) + 1));
+  return ["critical", "high", "medium", "low"].filter(k => c[k]).map(k => `<span class="tag ${sevTag(k)}">${c[k]} ${k}</span>`).join("");
+}
+function jMap(s, n) {
+  const stages = T(s, "journey_map.stages"), optimal = T(s, "journey_map.optimal");
+  const goals = Object.fromEntries(T(s, "journey_map.stage_goals").map(g => [g.id, g.goal]));
+  const copy = {}; (n?.journey_copy || []).forEach(c => (copy[`${c.moment}:${c.step}`] = c));
+  jIndex(s);
+  const strip = `<div class="stage-track jm" style="--n:${stages.length}">${stages.map((st, i) => `<div class="stage"><span class="n">${String(i + 1).padStart(2, "0")}</span>
+      <strong>${esc(st.label)}</strong><small>${esc(st.note)}</small><span>${jtag(st.status)}</span>
+      ${st.revenue_365d != null ? `<span class="rev">${compact(st.revenue_365d)} · 365d</span>` : ""}
+      <small>${esc(st.flows.map(f => f.name + (f.live ? "" : " (off)")).join(", ") || "No flow")}</small>
+      ${st.top_issue ? `<small>Top issue: ${esc(st.top_issue)}</small>` : ""}</div>`).join("")}</div>`;
+  const order = [...new Set(optimal.map(m => m.stage))];
+  const card = m => `<article class="moment ${esc(m.status)}" id="moment-${esc(m.id)}">
+      <header><h3>${esc(m.title)}</h3><span class="chips">${jtag(m.status)}<span class="tag">Priority ${esc(m.rank)}</span></span></header>
+      <p>${esc(m.why)}</p>
+      <dl class="kv"><dt>Trigger</dt><dd>${esc(m.trigger)}</dd><dt>Who</dt><dd>${esc(m.eligibility)}</dd><dt>Exits</dt><dd>${esc(m.exits)}</dd><dt>Measure</dt><dd>${esc(m.success_metric)}</dd></dl>
+      <ol class="msteps">${(m.steps || []).map((st, i) => { const c = copy[`${m.id}:${i + 1}`];
+        return `<li class="mstep"><span>${jtag(st.status)}</span><div><b>${esc(st.channel.toUpperCase())} · ${esc(when(st.day))}</b>${esc(st.job)}
+          ${st.message ? `<br><button type="button" class="linkish" data-email="${esc(st.message.message_id)}">Live: ${esc(st.message.subject || st.message.name || "open message")}</button>` : ""}
+          ${st.reason ? `<small>${esc(st.reason)}</small>` : ""}
+          ${c ? `<div class="draft"><span class="op-label">PROPOSED COPY</span><strong>${esc(c.subject)}</strong>${c.preview ? `<small>${esc(c.preview)}</small>` : ""}${c.body ? `<p>${esc(c.body)}</p>` : ""}</div>` : ""}</div></li>`; }).join("")}</ol>
+      <p class="next"><span class="op-label">NEXT</span>${esc(m.next_action)}</p>
+      ${m.value_base != null ? `<small>Linked opportunity: ${compact(m.value_base)} a year, base case (modeled, gross, not incremental)${m.confidence !== 1 ? ` · ranked ×${esc(m.confidence)} on the agency's track record` : ""}.</small>` : ""}
+      ${(m.drafts || []).length ? `<small>Drafts in the account: ${esc(m.drafts.map(d => `${d.name} (${d.status})`).join(", "))}</small>` : ""}
+      <span class="chips">${(m.guardrails || []).map(g => `<span class="chip">${esc(g)}</span>`).join("")}</span></article>`;
+  return `${strip}
+    <div class="panel"><div class="panel-head"><div><h2>The optimal journey</h2><p>The lifecycle every brand is measured against, laid over this account's live flows. Keep: live and healthy. Fix: live with problems or missing steps. Build: nothing live. Validate: needs tracking, consent or a category check first. Proposed until you approve it.</p></div></div>
+      <ul class="principles">${T(s, "journey_map.principles").map(p => `<li>${esc(p.text)}</li>`).join("")}</ul></div>
+    ${order.map(st => `<div class="jstage"><div class="jstage-head"><span class="eyebrow">${esc((stages.find(x => x.stage === st) || {}).label || label(st)).toUpperCase()}</span><p>${esc(goals[st] || "")}</p></div>
+      <div class="moments">${optimal.filter(m => m.stage === st).map(card).join("")}</div></div>`).join("")}
+    ${findingCards(s.findings)}`;
+}
+function jNode(x) {
+  if (x.kind === "delay") return `<li class="jn delay">${esc(x.text)}</li>`;
+  if (x.kind === "util") return `<li class="jn util">${esc(x.text)}</li>`;
+  if (x.kind === "join") return `<li class="jn util">Continues on an earlier path</li>`;
+  if (x.kind === "split") return `<li class="jn split"><div class="split-q">${x.sample ? "Split: " : "If: "}${esc(x.text)}</div><div class="split-cols">
+      <div><b>${x.sample ? "GROUP A" : "YES"}</b><ol class="jseq">${(x.yes || []).map(jNode).join("") || `<li class="jn util">Exits</li>`}</ol></div>
+      <div><b>${x.sample ? "GROUP B" : "NO"}</b><ol class="jseq">${(x.no || []).map(jNode).join("") || `<li class="jn util">Exits</li>`}</ol></div></div></li>`;
+  const y = x.p365;
+  return `<li class="jn msg${x.live ? "" : " off"}"><button type="button" class="msg-card" data-email="${esc(x.message_id)}">
+      <span class="thumb"${x.html_hash ? ` data-thumb="${esc(x.html_hash)}"` : ""}>${x.html_hash ? "" : `<span class="nothumb">${x.kind === "sms" ? "SMS" : "No preview captured"}</span>`}</span>
+      <span class="msg-body"><span class="msg-meta">${esc(x.kind.toUpperCase())} ${esc(x.n)} · ${esc(when(x.day))}${x.live ? "" : " · " + esc((x.status || "off").toUpperCase())}${x.ab_test ? " · A/B TEST" : ""}</span>
+        <strong>${esc(x.subject || x.name || "Untitled")}</strong>${x.preview ? `<small>${esc(x.preview)}</small>` : ""}
+        <span class="msg-stats">${y && y.recipients ? `${num(y.recipients)} recipients · ${money(y.rpr, true)} per recipient · ${pct(y.click_rate)} click · ${pct(y.unsubscribe_rate, 2)} unsub · 12 months` : "No sends in the last 12 months"}</span>
+        <span class="chips">${x.best_in_flow ? `<span class="tag live">Best in flow</span>` : ""}${x.offer ? `<span class="tag">${esc(x.offer)}</span>` : ""}${sevChips(x.suggestions)}</span></span></button></li>`;
+}
+function jFlows(s) {
+  const all = T(s, "journey_map.flows"), showAll = S.jall;
+  const flows = showAll ? all : all.filter(f => f.live);
+  jIndex(s);
+  return `<div class="panel"><div class="panel-head"><div><h2>${showAll ? "Every flow" : "Live flows"}, as the customer moves through them</h2><p>Trigger, filters, every wait and split, and every message with its rendered email and 12-month results. Previews show template tags as their default values. Open any message for the full email and what to change.</p></div>
+      <button class="btn small" type="button" data-jall="1">${showAll ? "Live flows only" : `Show all ${all.length} flows`}</button></div>
+    ${flows.map((fl, i) => `<details class="jflow" id="flow-${esc(fl.id)}"${i < 2 ? " open" : ""}><summary>
+        <h3>${esc(fl.name)}</h3><span class="chips">${jtag(fl.live ? "live" : "draft")}<span class="tag">${esc(label(fl.stage))}</span></span>
+        <span class="sub">${esc(fl.trigger)} · ${num(fl.emails)} email${fl.emails === 1 ? "" : "s"}${fl.sms ? ` · ${num(fl.sms)} SMS` : ""}${fl.revenue_365d != null ? ` · ${compact(fl.revenue_365d)} attributed, 365d` : ""}${fl.updated ? ` · updated ${esc(day(fl.updated))}` : ""}</span></summary>
+      <div class="jflow-body"><div class="jflow-rules">${[...(fl.trigger_filters || []).map(t => "Trigger filter: " + t), ...(fl.filters || []).map(t => "Flow filter: " + t),
+          fl.exits_on_purchase ? "Exits when they order" : "Doesn't exit on purchase", fl.reentry].filter(Boolean).map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>
+        <ol class="jseq">${(fl.tree || []).map(jNode).join("") || `<li class="jn util">No actions</li>`}</ol></div></details>`).join("") || `<p class="empty">No live flows.</p>`}</div>
+    ${table("flow_categories.categories", T(s, "flow_categories.categories"), [["label", "Category", "text"], ["live_flows", "Live flows", "num"], [r => (r.flows || []).map(f => f.name + (f.third_party ? " (third-party)" : "") + (f.live ? "" : " (off)")).join(", "), "Flows", "text"], ["revenue", "Attributed, 365d", "money"], ["rpr", "Per recipient", "cents"]], { title: "Flows by category", note: "Third-party twins counted inside the category they serve." })}`;
+}
+function jMessages(s, n) {
+  const rows = T(s, "journey_map.messages").filter(r => (r.suggestions || []).length);
+  const rewrites = Object.fromEntries((n?.message_rewrites || []).map(r => [r.message_id, r]));
+  S.csv["journey_map.messages"] = { rows, cols: [["flow", "Flow"], ["n", "Step"], [r => when(r.day), "When"], ["subject", "Subject"], ["preview", "Preview"],
+    [r => r.p365?.recipients, "Recipients 365d"], [r => r.p365?.rpr, "Revenue per recipient 365d"], [r => (r.suggestions || []).map(g => `${g.severity}: ${g.title}. ${g.fix}`).join(" | "), "Suggestions"],
+    [r => rewrites[r.message_id]?.subject || "", "Proposed subject"]] };
+  const since = r => { const c = r.since_last; if (!c) return "—"; if (c.new) return "New since last audit";
+    const parts = []; if (c.subject_changed) parts.push("subject changed"); if (c.html_changed) parts.push("email changed"); if ((c.resolved || []).length) parts.push(`${c.resolved.length} fixed`);
+    if (c.rpr_365d_before != null && r.p365?.rpr != null) parts.push(`${money(c.rpr_365d_before, true)} → ${money(r.p365.rpr, true)} per recipient`); return parts.join(" · ") || "Unchanged"; };
+  return `<div class="panel"><div class="panel-head"><div><h2>What to change in the live messages</h2><p>Every live flow message with something to improve, most serious first. Each suggestion comes from this account's numbers, the email's HTML or its copy. Proposed rewrites appear once your strategist approves them.</p></div>
+      <button class="btn small" type="button" data-csv="journey_map.messages">Export CSV</button></div>
+    ${rows.length ? `<div class="table-wrap"><table><thead><tr><th>Message</th><th>Flow</th><th class="num">Recipients, 365d</th><th class="num">Per recipient</th><th>Suggestions</th><th>Since last audit</th></tr></thead><tbody>
+      ${rows.slice(0, S.expanded?.jmsg ? rows.length : 40).map(r => `<tr><td><button type="button" class="linkish" data-email="${esc(r.message_id)}">${esc(r.subject || r.name || "Untitled")}</button><br><small>${esc(r.kind.toUpperCase())} ${esc(r.n)} · ${esc(when(r.day))}</small>
+          ${rewrites[r.message_id] ? `<div class="draft"><span class="op-label">PROPOSED</span><strong>${esc(rewrites[r.message_id].subject)}</strong><small>${esc(rewrites[r.message_id].change || "")}</small></div>` : ""}</td>
+        <td>${esc(r.flow)}</td><td class="num">${num(r.p365?.recipients)}</td><td class="num">${money(r.p365?.rpr, true)}</td>
+        <td><span class="chips">${(r.suggestions || []).map(g => `<span class="tag ${sevTag(g.severity)}" title="${esc(g.why)}">${esc(g.title)}</span>`).join("")}</span></td><td>${esc(since(r))}</td></tr>`).join("")}</tbody></table></div>
+      ${rows.length > 40 && !S.expanded?.jmsg ? `<button class="btn small" type="button" data-more="jmsg" style="margin-top:14px">Show all ${rows.length}</button>` : ""}` : `<p class="empty">No live message has a suggested change.</p>`}</div>
+    ${table("journey_map.coverage", T(s, "journey_map.coverage"), [["program", "Program", "text"], ["live", "Live", "list"], ["drafts", "Built, not live", "list"], ["note", "Note", "text"]], { title: "Program coverage", note: "Which lifecycle programs run today, and which exist only as drafts." })}`;
+}
+async function emailHtml(hash) {
+  S.previews = S.previews || {};
+  if (!S.previews[hash]) S.previews[hash] = fetch(`/v1/ops/clients/${encodeURIComponent(S.slug)}/emails/${encodeURIComponent(hash)}`, { headers: { Authorization: "Bearer " + token() } })
+    .then(r => r.ok ? r.json() : null).then(j => j?.html ?? null).catch(() => null);
+  return S.previews[hash];
+}
+function frame(html, interactive) {
+  const f = document.createElement("iframe");
+  f.setAttribute("sandbox", interactive ? "allow-popups allow-popups-to-escape-sandbox" : "");
+  f.setAttribute("referrerpolicy", "no-referrer");
+  f.title = interactive ? "Email preview" : "";
+  if (!interactive) { f.setAttribute("tabindex", "-1"); f.setAttribute("aria-hidden", "true"); }
+  f.srcdoc = html;
+  return f;
+}
+function wireThumbs() {
+  S.thumbObs?.disconnect();
+  const fill = async el => {
+    const html = await emailHtml(el.dataset.thumb);
+    if (html) el.appendChild(frame(html, false)); else el.innerHTML = `<span class="nothumb">Preview unavailable</span>`;
+  };
+  S.thumbObs = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { S.thumbObs.unobserve(e.target); fill(e.target); } }), { rootMargin: "300px" });
+  document.querySelectorAll("[data-thumb]").forEach(el => S.thumbObs.observe(el));
+}
+async function openEmail(id) {
+  const hit = (S.jidx || jIndex(sec("journeys")))[id];
+  if (!hit) return;
+  const { x, fl } = hit, s = sec("journeys"), n = s.narrative_state === "approved" ? s.narrative : null;
+  const rw = (n?.message_rewrites || []).find(r => r.message_id === id);
+  const stat = (label, p) => p ? `<tr><td>${label}</td><td class="num">${num(p.recipients)}</td><td class="num">${money(p.revenue)}</td><td class="num">${money(p.rpr, true)}</td><td class="num">${pct(p.open_rate)}</td><td class="num">${pct(p.click_rate)}</td><td class="num">${pct(p.unsubscribe_rate, 2)}</td><td class="num">${pct(p.spam_rate, 3)}</td></tr>` : "";
+  let dlg = $("email-dlg");
+  if (!dlg) { dlg = document.createElement("dialog"); dlg.id = "email-dlg"; dlg.className = "email-dlg"; document.body.appendChild(dlg);
+    dlg.addEventListener("click", e => { if (e.target === dlg || e.target.closest("[data-close]")) dlg.close(); }); }
+  dlg.innerHTML = `<div class="dlg-grid"><div class="dlg-frame" id="dlg-frame">${x.html_hash ? `<p class="empty" style="padding:30px">Loading the email…</p>` : `<p class="empty" style="padding:30px">${x.kind === "sms" ? esc(x.subject) : "This email's HTML wasn't captured on this audit."}</p>`}</div>
+    <div class="dlg-side"><div class="panel-head" style="margin:0"><div><span class="eyebrow">${esc(fl.name.toUpperCase())} · ${esc(x.kind.toUpperCase())} ${esc(x.n)} · ${esc(when(x.day).toUpperCase())}</span><h2 style="margin-top:8px">${esc(x.subject || x.name)}</h2>${x.preview ? `<p>${esc(x.preview)}</p>` : ""}</div>
+      <button class="btn small" type="button" data-close="1">Close</button></div>
+      <span class="chips">${jtag(x.live ? "live" : "draft")}${x.offer ? `<span class="tag">${esc(x.offer)}</span>` : ""}${x.ab_test ? `<span class="tag">A/B test${x.variants ? ` · ${esc(x.variants)} variants` : ""}</span>` : ""}${x.smart_sending === false ? `<span class="tag">Smart Sending off</span>` : ""}${x.kb ? `<span class="tag ${x.kb > 102 ? "high" : ""}">${esc(x.kb)} KB</span>` : ""}</span>
+      ${x.p365 || x.p90 ? `<div class="table-wrap"><table><thead><tr><th></th><th class="num">Recipients</th><th class="num">Attributed</th><th class="num">Per recipient</th><th class="num">Open</th><th class="num">Click</th><th class="num">Unsub</th><th class="num">Spam</th></tr></thead><tbody>${stat("365 days", x.p365)}${stat("90 days", x.p90)}</tbody></table></div><small>Klaviyo-attributed, not incremental. Opens are inflated by Apple Mail privacy.</small>` : `<p class="empty">No sends in the last 12 months.</p>`}
+      ${rw ? `<div class="draft"><span class="op-label">PROPOSED REWRITE · APPROVED BY YOUR STRATEGIST</span><strong>${esc(rw.subject)}</strong><small>${esc(rw.preview || "")}</small><p>${esc(rw.change || "")}</p><small>${esc(rw.why || "")}</small></div>` : ""}
+      <div><h4 style="margin-bottom:10px">What to change</h4>${(x.suggestions || []).length ? x.suggestions.map(g => `<div class="sugg ${esc(g.severity)}"><strong>${esc(g.title)}</strong><p>${esc(g.why)}</p><p class="fix">${esc(g.fix)}</p></div>`).join("") : `<p class="empty">Nothing flagged on this message.</p>`}</div>
+      ${x.since_last && !x.since_last.new ? `<small>Since the last audit: ${esc([x.since_last.subject_changed && "subject changed", x.since_last.html_changed && "email changed", (x.since_last.resolved || []).length && `resolved ${x.since_last.resolved.join(", ").replace(/_/g, " ")}`].filter(Boolean).join(" · ") || "unchanged")}.</small>` : ""}
+    </div></div>`;
+  dlg.showModal();
+  if (x.html_hash) {
+    const html = await emailHtml(x.html_hash), box = $("dlg-frame");
+    if (box) { box.innerHTML = ""; if (html) box.appendChild(frame(html, true)); else box.innerHTML = `<p class="empty" style="padding:30px">The preview couldn't be loaded.</p>`; }
+  }
+}
+
 /* ---------------------------------------------------------------- shell */
 function renderNav() {
   $("nav").innerHTML = NAV.map(n => { const st = S.b ? sec(n.id).state : "";
@@ -592,7 +818,7 @@ const VIEWS = {
         <div class="op-outcome"><span class="op-label">OUTCOME TO AIM FOR</span><p>${esc(sel.outcome)}</p>
           <small>Read out: ${esc(sel.readout?.metric || "")}${sel.readout?.days ? `, after ${esc(sel.readout.days)} days` : ""}.${sel.outcome_status === "tracking" && sel.due_at ? ` Approved; read out by ${esc(day(sel.due_at))}.` : sel.verdict_reason ? ` ${esc(sel.status)}: ${esc(sel.verdict_reason)}.` : ""}</small></div>
         <div class="op-reasons">
-          <div><h4>Annual value</h4>${sized(sel) ? `<strong>${money(z.annual.low)}–${money(z.annual.high)}</strong><p>Modeled, gross, not incremental. Base ${money(z.annual.base)}: ${esc(num(z.pool.value))} ${esc(z.pool.unit)} × ${pct(z.rate.base)} (${esc(z.rate.basis)}) × ${money(z.value_per_order.value)} × ${esc(z.months)} months.</p>`
+          <div><h4>Annual value</h4>${sized(sel) ? `<strong>${money(z.annual.low)}–${money(z.annual.high)}</strong><p>Modeled, gross, not incremental. Base ${money(z.annual.base)}: ${!z.pool ? `${esc(z.basis || "")}.</p>` : `${esc(num(z.pool.value))} ${esc(z.pool.unit)} × ${pct(z.rate.base)} (${esc(z.rate.basis)}) × ${money(z.value_per_order.value)} × ${esc(z.months)} months.</p>`}`
             : z ? `<strong>Not sized</strong><p>${esc(z.reason)}</p>` : `<strong>—</strong><p>${sel.category === "fix_first" ? "A fix that protects every other number." : "Not a revenue lever on its own."}</p>`}</div>
           <div><h4>Work</h4><strong>${esc(sel.effort_days)} day${sel.effort_days === 1 ? "" : "s"}</strong><p>Estimated build and QA time.</p></div>
           <div><h4>Evidence</h4><strong style="text-transform:capitalize">${esc(sel.evidence_class)}</strong><p>${sel.check_id ? "From the check library." : "From the " + esc(label(sel.module)) + " analysis."}</p></div>
@@ -716,16 +942,16 @@ const VIEWS = {
 
   journeys(s) {
     if (waiting(s)) return head(s);
-    const stages = T(s, "journey_graph.stages");
+    if (!T(s, "journey_map.flows").length) return journeysLegacy(s);
+    const tab = S.jtab || "map", n = s.narrative_state === "approved" ? s.narrative : null;
+    const tabs = [["map", "Lifecycle map"], ["flows", "Current flows"], ["messages", "Message improvements"]];
     return `${head(s)}
-      ${metrics("three", [metric("journey_graph.stages_covered", "Lifecycle stages with a live flow", "Of 8: capture, browse, cart, checkout, post-purchase, replenishment, winback, sunset."),
-        metric("journey_graph.live_flows", "Live flows sending"), metric("journey_graph.core_types_missing", "Core flows with nothing live")])}
-      ${stages.length ? `<div class="stage-track">${stages.map((st, i) => `<div class="stage"><span class="n">${String(i + 1).padStart(2, "0")}</span><strong>${esc(label(st.stage))}</strong>
-        <span>${st.live.length ? `<span class="tag live">${st.live.length} live</span>` : st.not_live.length ? `<span class="tag off">Built, not live</span>` : `<span class="tag missing">Missing</span>`}</span>
-        <small>${esc([...st.live, ...st.not_live.map(n => n + " (off)")].join(", "))}</small></div>`).join("")}</div>` : ""}
-      ${findingCards(s.findings)}
-      ${table("flow_categories.categories", T(s, "flow_categories.categories"), [["label", "Category", "text"], ["live_flows", "Live flows", "num"], [r => (r.flows || []).map(f => f.name + (f.third_party ? " (third-party)" : "") + (f.live ? "" : " (off)")).join(", "), "Flows", "text"], ["revenue", "Attributed, 365d", "money"], ["rpr", "Per recipient", "cents"]], { title: "Flows by category", note: "Third-party twins counted inside the category they serve." })}
-      ${table("journey_graph.nodes", T(s, "journey_graph.nodes"), [["name", "Flow", "text"], ["stage", "Stage", "text"], ["status", "Status", "text"], ["trigger", "Trigger", "text"], ["emails", "Emails", "num"], ["sms", "SMS", "num"], ["first_send_days", "First send (days)", "dec"], ["recipients_90d", "Recipients, 90d", "num"]], { title: "Every flow", limit: 60 })}`;
+      ${metrics("", [metric("journey_graph.stages_covered", "Lifecycle stages with a live flow", "Of 8: capture, browse, cart, checkout, post-purchase, replenishment, winback, sunset."),
+        metric("journey_map.live_emails", "Live emails mapped", F("journey_map.live_sms")?.value ? `Plus ${num(F("journey_map.live_sms").value)} SMS.` : ""),
+        metric("journey_map.previews_captured", "Emails with a rendered preview"),
+        metric("journey_map.messages_with_suggestions", "Live messages with a suggested improvement")])}
+      <div class="jtabs" role="group" aria-label="Journey views">${tabs.map(([id, t]) => `<button type="button" data-jtab="${id}" aria-pressed="${tab === id}">${esc(t)}</button>`).join("")}</div>
+      ${tab === "flows" ? jFlows(s) : tab === "messages" ? jMessages(s, n) : jMap(s, n)}`;
   },
 
   calendar(s) {
@@ -857,6 +1083,10 @@ function wire() {
   $("plan-md")?.addEventListener("click", () => download(`${S.slug}-30-day-plan.md`, S.md, "text/markdown"));
   $("print")?.addEventListener("click", () => window.print());
   $("download")?.addEventListener("click", () => download(`${S.slug}-workspace-v${S.b.version || "live"}.json`, JSON.stringify(S.b, null, 2), "application/json"));
+  document.querySelectorAll("[data-jtab]").forEach(b => b.addEventListener("click", () => { S.jtab = b.dataset.jtab; render(); }));
+  document.querySelectorAll("[data-jall]").forEach(b => b.addEventListener("click", () => { S.jall = !S.jall; render(); }));
+  document.querySelectorAll("[data-email]").forEach(b => b.addEventListener("click", () => openEmail(b.dataset.email)));
+  if (document.querySelector("[data-thumb]")) wireThumbs();
 }
 
 /* ---------------------------------------------------------------- load */

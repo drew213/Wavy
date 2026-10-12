@@ -74,11 +74,20 @@ SECTIONS: dict[str, tuple[str, dict]] = {
     "performance": ("Store vs attributed revenue, flows vs campaigns, the brand's own KPIs, and what moved.", {}),
     "cohorts": ("Repeat behaviour from first-observed cohorts at mature horizons only, with what to do about the "
                 "second order.", {}),
-    "journeys": ("The lifecycle as it runs today, stage by stage, and the ultimate journey to build.",
-                 {"ultimate_journey": [{"stage": "capture | browse | cart | checkout | post_purchase | replenishment | "
-                                                 "winback | sunset", "node": "flow or message name",
-                                        "trigger": "what starts it", "status": "live | fix | build",
-                                        "detail": "what changes"}]}),
+    "journeys": ("The lifecycle as it runs today and the optimal journey to build. The packet's journey.optimal lists each "
+                 "moment of the playbook marked keep, fix, build or validate, with its steps and the live message that "
+                 "fills each step. Write exact, ready-to-build copy for every fix or build step of the top-ranked moments "
+                 "(the brand's voice, its discount stance and guardrails, never its avoid_claims words), then rewrites "
+                 "for the live messages in journey.messages with the most serious suggestions. journey.learning holds "
+                 "what strategists changed in earlier drafts for this brand and how rewritten messages did since: follow "
+                 "those edits and build on rewrites that worked. Copy carries no measured numbers.",
+                 {"journey_copy": [{"moment": "a moment id from journey.optimal", "step": 1, "channel": "email | sms",
+                                    "subject": "subject line (or the SMS text)", "preview": "preview text",
+                                    "body": "the email's copy, short lines, ending with the button label",
+                                    "why": "what this step does for the moment"}],
+                  "message_rewrites": [{"message_id": "a message id from journey.messages", "subject": "new subject",
+                                        "preview": "new preview text", "change": "what to change in the body or design",
+                                        "why": "the suggestion it answers"}]}),
     "calendar": ("Send history and promotions: cadence, what won, empty windows, fatigue. Then a 90-day calendar.",
                  {"calendar_90d": [{"week": 1, "theme": "what the week is for",
                                     "sends": [{"channel": "email | sms", "segment": "who", "idea": "what",

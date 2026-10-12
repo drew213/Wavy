@@ -1,0 +1,157 @@
+{
+  "version": "2026-10-11",
+  "notes": "The lifecycle every brand is measured against. Each moment is a flow (or a branch of one) with its trigger, timing, who is eligible, what takes them out, the message steps and what success means. optimal_journey.py marks each moment and step keep / fix / build / validate against the brand's live flows. day is days after entry (after the flow's first send when anchor is first_send, for flows whose trigger fires before the moment starts, like a winback timed from the last order); window is how far a live message's timing may sit from it and still count as that step. kinds are audit.flows flow kinds; name matches a live flow (or one of its messages) by name; with neither, live flows at the moment's stage that no other moment claims by name.",
+  "principles": [
+    "Every moment a customer can be in has one clear next message, and only one flow speaks at a time.",
+    "Intent flows go out fast: the first reminder within an hour, before intent fades.",
+    "Lead with help and proof; hold discounts for later steps and for people who need them.",
+    "Every flow exits on purchase, and every send respects the account's suppression rules.",
+    "Each step is measured on revenue per recipient and unsubscribes; weak steps are rewritten or cut."
+  ],
+  "stages": [
+    {"id": "capture", "goal": "Turn a new subscriber into a first-time buyer."},
+    {"id": "browse", "goal": "Bring product viewers back to the product."},
+    {"id": "cart", "goal": "Recover carts before intent fades."},
+    {"id": "checkout", "goal": "Recover checkouts, the highest-intent moment in the journey."},
+    {"id": "post_purchase", "goal": "Make the first order go well and earn the second."},
+    {"id": "replenishment", "goal": "Be there when they're about to run out."},
+    {"id": "winback", "goal": "Bring lapsed buyers back before they're gone."},
+    {"id": "sunset", "goal": "Protect deliverability by letting the unengaged go."}
+  ],
+  "moments": [
+    {
+      "id": "welcome_series", "stage": "capture", "title": "Welcome series", "kinds": ["welcome"], "lever": "welcome",
+      "finding_ids": ["flow_history.weak_flows", "flow_history.declining_flows"], "min_emails": 4,
+      "trigger": "Joins the newsletter list or submits a sign-up form",
+      "eligibility": "New email subscribers who haven't bought", "exits": "Places an order",
+      "success_metric": "First-order rate of new subscribers within 14 days",
+      "guardrails": ["Deliver the promised offer in the first email", "Smart Sending can be off for email 1 only"],
+      "steps": [
+        {"channel": "email", "day": 0, "window": 0.25, "job": "Deliver what the sign-up promised and set expectations"},
+        {"channel": "sms", "day": 0, "window": 0.25, "job": "Confirm the offer by text for SMS subscribers", "needs": "sms"},
+        {"channel": "email", "day": 1, "window": 1, "job": "Why the brand exists and what makes the product different"},
+        {"channel": "email", "day": 3, "window": 1.5, "job": "Best sellers with reviews and proof"},
+        {"channel": "email", "day": 5, "window": 2, "job": "Offer reminder before it expires, answering the top objection"}
+      ]
+    },
+    {
+      "id": "welcome_nonbuyer", "stage": "capture", "title": "Non-buyer nurture", "kinds": ["welcome"], "lever": null,
+      "name": "nurture|education|non[\\s-]?buyer", "min_emails": 6, "branch_of": "welcome_series",
+      "trigger": "Finished the welcome series without buying",
+      "eligibility": "Subscribers 7+ days in, no order", "exits": "Places an order",
+      "success_metric": "First orders from subscribers older than 7 days",
+      "guardrails": ["No new discount: reuse the welcome offer or none"],
+      "steps": [
+        {"channel": "email", "day": 8, "window": 3, "job": "Education: how to choose the right product"},
+        {"channel": "email", "day": 12, "window": 3, "job": "Customer stories and social proof"},
+        {"channel": "email", "day": 16, "window": 4, "job": "Last nudge with the guarantee and shipping promise"}
+      ]
+    },
+    {
+      "id": "browse_abandon", "stage": "browse", "title": "Browse abandonment", "kinds": ["browse"], "lever": "browse_abandonment",
+      "requires_metric": "viewed product", "min_emails": 2,
+      "trigger": "Viewed Product", "eligibility": "Known profiles who viewed and didn't add to cart",
+      "exits": "Adds to cart, starts checkout or places an order",
+      "success_metric": "Revenue per recipient of the browse flow",
+      "guardrails": ["No discount in browse emails", "Skip people who got a browse email in the last 7 days"],
+      "steps": [
+        {"channel": "email", "day": 0.08, "window": 0.25, "job": "The product they viewed, with its best review"},
+        {"channel": "email", "day": 1, "window": 1, "job": "Similar products and best sellers in the category"}
+      ]
+    },
+    {
+      "id": "cart_abandon", "stage": "cart", "title": "Abandoned cart", "kinds": ["abandoned_cart"], "lever": "abandoned_cart",
+      "requires_metric": "added to cart", "min_emails": 3, "finding_ids": ["journey_map.slow_first_touch", "journey_map.discount_first_touch"],
+      "trigger": "Added to Cart", "eligibility": "Profiles who added to cart and didn't start checkout",
+      "exits": "Starts checkout or places an order",
+      "success_metric": "Recovered orders per 100 carts",
+      "guardrails": ["First email within an hour", "Discount only from email 3, and only if margin allows"],
+      "steps": [
+        {"channel": "email", "day": 0.04, "window": 0.2, "job": "Plain reminder of the cart, with the product image"},
+        {"channel": "email", "day": 1, "window": 1, "job": "Answer the top objection: shipping, returns, reviews"},
+        {"channel": "email", "day": 2, "window": 1.5, "job": "Last chance, with an incentive if the brand allows one"}
+      ]
+    },
+    {
+      "id": "checkout_abandon", "stage": "checkout", "title": "Abandoned checkout", "kinds": ["abandoned_checkout"],
+      "lever": "abandoned_checkout", "min_emails": 3, "finding_ids": ["journey_map.slow_first_touch", "journey_map.discount_first_touch"],
+      "trigger": "Started Checkout", "eligibility": "Profiles who started checkout and didn't order",
+      "exits": "Places an order", "success_metric": "Recovered orders per 100 checkouts",
+      "guardrails": ["First email within an hour", "Exit on purchase at every step"],
+      "steps": [
+        {"channel": "email", "day": 0.04, "window": 0.2, "job": "Reminder with the cart, one button back to checkout"},
+        {"channel": "sms", "day": 0.1, "window": 0.25, "job": "Short text with a link back to checkout", "needs": "sms"},
+        {"channel": "email", "day": 1, "window": 1, "job": "Reassurance: reviews, guarantee, shipping times"},
+        {"channel": "email", "day": 3, "window": 1.5, "job": "Final reminder, with an incentive if the brand allows one"}
+      ]
+    },
+    {
+      "id": "order_onboarding", "stage": "post_purchase", "title": "Post-purchase onboarding", "kinds": ["post_purchase"],
+      "lever": "post_purchase", "min_emails": 2,
+      "trigger": "Placed Order (first order)", "eligibility": "First-time buyers", "exits": "None (service messages)",
+      "success_metric": "Second-order rate at 60 days",
+      "guardrails": ["No hard sell before the order arrives"],
+      "steps": [
+        {"channel": "email", "day": 0, "window": 0.5, "job": "Thank you, what happens next and when it ships"},
+        {"channel": "email", "day": 5, "window": 3, "job": "How to get the most from the product"}
+      ]
+    },
+    {
+      "id": "review_request", "stage": "post_purchase", "title": "Review request", "kinds": [], "lever": null,
+      "name": "review|feedback|rate us|ugc", "min_emails": 1,
+      "trigger": "Fulfilled or delivered order", "eligibility": "Buyers whose order has arrived",
+      "exits": "Leaves a review", "success_metric": "Reviews collected per 100 orders",
+      "guardrails": ["Ask once, then one reminder"],
+      "steps": [
+        {"channel": "email", "day": 10, "window": 5, "job": "Ask for a review while the product is fresh"}
+      ]
+    },
+    {
+      "id": "second_order", "stage": "post_purchase", "title": "First-to-second order", "kinds": ["post_purchase"],
+      "lever": null, "name": "cross[\\s-]?sell|upsell|second order|next order|repeat purchase", "min_emails": 3,
+      "finding_ids": ["cohorts.low_early_repeat"],
+      "trigger": "Placed Order (first order)", "eligibility": "First-time buyers with no second order",
+      "exits": "Places a second order", "success_metric": "Second-order rate at 60 days",
+      "guardrails": ["Recommend from what they bought", "Offer only if repeat rate needs it"],
+      "steps": [
+        {"channel": "email", "day": 14, "window": 6, "job": "What pairs with what they bought"},
+        {"channel": "email", "day": 30, "window": 10, "job": "Best sellers they haven't tried, with proof"}
+      ]
+    },
+    {
+      "id": "replenishment", "stage": "replenishment", "title": "Replenishment", "kinds": ["replenishment"], "lever": "replenishment",
+      "min_emails": 2,
+      "trigger": "Placed Order, timed to the product's usage cycle", "eligibility": "Buyers of consumable products",
+      "exits": "Reorders", "success_metric": "Reorder rate inside the usage window",
+      "guardrails": ["Time from the product's real reorder interval, not a guess"],
+      "steps": [
+        {"channel": "email", "day": 25, "window": 10, "job": "Running low? One click to reorder the same thing"},
+        {"channel": "email", "day": 32, "window": 10, "job": "Reminder, with a subscribe-and-save option if offered"}
+      ]
+    },
+    {
+      "id": "winback", "stage": "winback", "title": "Winback", "kinds": ["winback"], "lever": "winback", "min_emails": 3,
+      "anchor": "first_send",
+      "trigger": "No order in about 1.5x the typical time between orders", "eligibility": "Past buyers, still subscribed",
+      "exits": "Places an order", "success_metric": "Reactivated buyers per 100 lapsed",
+      "guardrails": ["Escalate the offer gradually; never open with the deepest discount"],
+      "steps": [
+        {"channel": "email", "day": 0, "window": 2, "job": "We miss you: what's new since their last order"},
+        {"channel": "email", "day": 7, "window": 4, "job": "Their past favourite, with proof it's still loved"},
+        {"channel": "email", "day": 14, "window": 6, "job": "Best offer, with a clear end date"}
+      ]
+    },
+    {
+      "id": "sunset", "stage": "sunset", "title": "Sunset", "kinds": ["sunset"], "lever": null, "min_emails": 1,
+      "anchor": "first_send",
+      "finding_ids": ["complaints.complaint_concentration", "complaints.unsubscribe_concentration"],
+      "trigger": "No opens, clicks or site visits in 90+ days", "eligibility": "Unengaged subscribers",
+      "exits": "Engages", "success_metric": "Share of sends to engaged profiles; spam complaint rate",
+      "guardrails": ["Suppress anyone who doesn't engage after the last step"],
+      "steps": [
+        {"channel": "email", "day": 0, "window": 3, "job": "Still want to hear from us? One click to stay"},
+        {"channel": "email", "day": 7, "window": 4, "job": "Last email before we stop sending, then suppress"}
+      ]
+    }
+  ]
+}

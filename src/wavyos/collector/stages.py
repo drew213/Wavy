@@ -23,7 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
-from .. import models as m
+from .. import email_preview, models as m
 from ..connectors.klaviyo import REVISION, KlaviyoError
 from ..scope import Scope
 from . import budget
@@ -465,7 +465,7 @@ def discover_templates(api: dict) -> list[dict]:
                 return
             entry = found.setdefault(str(tid), {"templateId": str(tid), "messages": []})
             msg = {"flowId": fid, "flowName": fname, "messageId": node.get("id"), "messageName": node.get("name"),
-                   "messageStatus": node.get("status"), "subject": node.get("subject"),
+                   "messageStatus": node.get("status"), "subject": node.get("subject_line") or node.get("subject"),
                    "previewText": node.get("preview_text")}
             if msg not in entry["messages"]:
                 entry["messages"].append(msg)
@@ -513,7 +513,12 @@ def templates(c: Collect) -> dict:
             continue
         try:
             page = c.client.get(f"/api/templates/{_id(entry['templateId'])}/")
-            measured[entry["templateId"]] = measure_template(entry, page.get("data") or {})
+            resource = page.get("data") or {}
+            measured[entry["templateId"]] = measure_template(entry, resource)
+            attrs = resource.get("attributes") or {}
+            html = str(attrs.get("html") or attrs.get("content") or attrs.get("body") or attrs.get("editor_html") or "")
+            measured[entry["templateId"]]["htmlHash"] = email_preview.store(
+                c.session, c.run.org_id, c.run.client_id, entry["templateId"], html)
         except KlaviyoError as e:
             measured[entry["templateId"]] = {**entry, "error": failure(f"template {entry['templateId']}", e)}
         if (i + 1) % CHECKPOINT_EVERY == 0:

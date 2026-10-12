@@ -69,7 +69,46 @@ def context(session: Session, run: m.AuditRun) -> dict:
     tracked = [{"title": o.title, "status": o.status, "owner": o.owner, "readout_metric": o.readout_metric,
                 "readout_fact": o.readout_fact} for o in for_client(session, client.id)[:12]]
     return {"client": client, "summary": summary, "analysis": analysis, "ledger": ledger, "answers": answers,
-            "checks": workspace._checks(session, sc) if sc is not None else [], "outcomes": tracked}
+            "checks": workspace._checks(session, sc) if sc is not None else [], "outcomes": tracked,
+            "journey_learning": learning(session, client.id)}
+
+
+def learning(session: Session, client_id: str, limit: int = 3) -> list[dict]:
+    """What strategists changed in this brand's earlier journeys drafts (copy and rewrites they edited or rejected)."""
+    rows = session.scalars(select(m.NarrativeDraft).where(
+        m.NarrativeDraft.client_id == client_id, m.NarrativeDraft.section == "journeys",
+        m.NarrativeDraft.status.in_(("edited", "rejected"))).order_by(m.NarrativeDraft.created_at.desc()).limit(limit))
+    out = []
+    for r in rows:
+        if r.status == "rejected":
+            out.append({"draft": r.created_at.date().isoformat(), "rejected": True, "reason": (r.reason or "")[:300]})
+            continue
+        edits = [d for d in r.diff or [] if str(d.get("path", "")).startswith(("journey_copy", "message_rewrites", "headline"))]
+        if edits:
+            out.append({"draft": r.created_at.date().isoformat(), "edits": [
+                {"path": d["path"], "before": str(d.get("before") or "")[:240], "after": str(d.get("after") or "")[:240]}
+                for d in edits[:12]]})
+    return out
+
+
+def journey(mods: dict, past_edits: list[dict]) -> dict:
+    tables = (mods.get("journey_map") or {}).get("tables") or {}
+    optimal = [{**{k: x.get(k) for k in ("id", "stage", "title", "status", "why", "trigger", "eligibility", "exits",
+                                         "guardrails", "rank", "next_action")},
+                "steps": [{"step": i + 1, "channel": s["channel"], "day": s["day"], "job": s["job"], "status": s["status"],
+                           "reason": s["reason"], "live": {k: (s["message"] or {}).get(k) for k in
+                                                           ("message_id", "flow", "subject", "preview")} if s["message"] else None}
+                          for i, s in enumerate(x.get("steps") or [])]}
+               for x in sorted(tables.get("optimal") or [], key=lambda x: x.get("rank") or 99) if x.get("status") != "keep"][:6]
+    messages = [{"message_id": r["message_id"], "flow": r["flow"], "name": r["name"], "subject": r["subject"],
+                 "preview": r["preview"], "day": r["day"],
+                 "suggestions": [{"title": s["title"], "why": s["why"], "fix": s["fix"]} for s in r["suggestions"]]}
+                for r in tables.get("messages") or [] if r.get("suggestions") and r.get("live")][:TABLE_ROWS]
+    history = [{"message_id": r["message_id"], "flow": r["flow"], "subject": r["subject"], **(r.get("since_last") or {})}
+               for r in tables.get("messages") or [] if (r.get("since_last") or {}).get("subject_changed")
+               or (r.get("since_last") or {}).get("html_changed") or (r.get("since_last") or {}).get("resolved")][:TABLE_ROWS]
+    return {"optimal": optimal, "messages": messages, "principles": [p["text"] for p in tables.get("principles") or []],
+            "learning": {"strategist_edits": past_edits, "messages_changed_since_last_audit": history}}
 
 
 def build(ctx: dict, section: str, today: Optional[date] = None) -> tuple[dict, str]:
@@ -117,6 +156,9 @@ def build(ctx: dict, section: str, today: Optional[date] = None) -> tuple[dict, 
                                         "observation": c.get("observation"), "status": c.get("status")}
                                        for c in (summary.get("opportunities") or [])[:5]]
         packet["outcomes"] = ctx.get("outcomes") or []
+    if section == "journeys":
+        packet["tables"] = {k: v for k, v in packet["tables"].items() if not k.startswith("journey_map.")}
+        packet["journey"] = journey(mods, ctx.get("journey_learning") or [])
     if section == "foundational":
         packet["checks"] = [{k: c.get(k) for k in ("id", "title", "area", "severity", "verdict", "message")}
                             for c in ctx["checks"] if c.get("verdict") not in ("pass",)]

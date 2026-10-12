@@ -203,6 +203,11 @@ def test_full_run_produces_every_snapshot_file_and_the_engine_scores_it(session,
     assert len(snap.order_history().by_profile) == 12 and snap.order_history().orders == 30
     assert snap.at("templates", "overGmailClipThreshold") == 1  # T2 is over 102,400 bytes; T4 is in a draft flow
     assert {t["templateId"] for t in snap.at("templates", "templates")} == {"T1", "T2", "T3"}
+    from wavyos import email_preview
+    hashes = {t["templateId"]: t["htmlHash"] for t in snap.at("templates", "templates")}
+    assert all(hashes.values()) and hashes["T1"] == hashes["T3"]  # identical HTML is stored once
+    assert session.query(m.EmailHtml).filter_by(client_id=run.client_id).count() == 2
+    assert "{{" not in email_preview.preview(email_preview.get(session, run.client_id, hashes["T1"]).html)
 
     results = evaluate(snap, "snapshot")
     assert not [k for k, r in results.items() if r.verdict == "error"], {k: r.message for k, r in results.items() if r.verdict == "error"}
