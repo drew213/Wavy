@@ -398,6 +398,7 @@ dialog.email-dlg::backdrop { background: rgba(0,0,0,.7); }
       </button>
       <span class="private"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Private client workspace</span>
       <a class="exit" id="exit" href="/login">Sign out</a>
+      <a class="exit" id="exit-all" href="/login" hidden>Sign out on every device</a>
       <small>WAVY STUDIOS · 2026</small>
     </div>
   </aside>
@@ -434,7 +435,9 @@ const num = n => n == null ? "—" : Math.round(n).toLocaleString("en-US");
 const dec = (n, d = 1) => n == null ? "—" : Number(n).toFixed(d);
 const day = iso => iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
 const label = s => String(s ?? "").replace(/_/g, " ");
-const token = () => sessionStorage.getItem("wos-token") || "";
+const token = () => { try { return localStorage.getItem("wos-token") || sessionStorage.getItem("wos-token") || ""; } catch { return ""; } };
+const forget = () => { try { localStorage.removeItem("wos-token"); sessionStorage.removeItem("wos-token"); } catch {} };
+const signOut = () => { fetch("/v1/ops/logout", { method: "POST", headers: { Authorization: "Bearer " + token() }, keepalive: true }).catch(() => {}); forget(); };
 const signIn = () => location.replace("/login?next=" + encodeURIComponent(location.pathname + location.search));
 const icon = paths => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
 const INFO = icon('<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>');
@@ -1106,12 +1109,21 @@ async function init() {
   if (!token()) return signIn();
   const auth = { headers: { Authorization: "Bearer " + token() } };
   const [meR, bR] = await Promise.all([fetch("/v1/ops/me", auth), load(auth, version)]);
-  if (meR.status === 401 || bR.status === 401) { sessionStorage.removeItem("wos-token"); return signIn(); }
+  if (meR.status === 401 || bR.status === 401) { forget(); return signIn(); }
   S.me = await meR.json();
   $("avatar").textContent = (S.me.name || S.me.email || "?").slice(0, 1).toUpperCase();
   $("avatar").title = S.me.name || "";
   if (S.me.staff) { $("exit").textContent = "Ops console"; $("exit").href = "/console"; }
-  else $("exit").addEventListener("click", () => sessionStorage.removeItem("wos-token"));
+  else {
+    $("exit").addEventListener("click", signOut);
+    $("exit-all").hidden = false;
+    $("exit-all").addEventListener("click", async e => {
+      e.preventDefault();
+      await fetch("/v1/ops/logout-everywhere", { method: "POST", headers: { Authorization: "Bearer " + token() } }).catch(() => {});
+      forget();
+      location.assign("/login");
+    });
+  }
   $("fresh").addEventListener("click", () => location.assign("/onboard?client=" + encodeURIComponent(S.slug)));
   $("print").addEventListener("click", () => window.print());
 

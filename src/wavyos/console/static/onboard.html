@@ -296,7 +296,8 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": 
 const money = n => n == null ? "—" : "$" + Math.round(n).toLocaleString();
 const pct = n => n == null ? "—" : (n * 100).toFixed(1) + "%";
 const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const token = () => sessionStorage.getItem("wos-token") || "";
+const token = () => { try { return localStorage.getItem("wos-token") || sessionStorage.getItem("wos-token") || ""; } catch { return ""; } };
+const forget = () => { try { localStorage.removeItem("wos-token"); sessionStorage.removeItem("wos-token"); } catch {} };
 const headers = () => ({ "Content-Type": "application/json", ...(token() ? { Authorization: "Bearer " + token() } : {}) });
 const slugify = s => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
 
@@ -689,13 +690,16 @@ function lockTo(client) {
 async function init() {
   if (!token()) return signIn();
   const r = await fetch("/v1/ops/me", { headers: headers() });
-  if (r.status === 401) { sessionStorage.removeItem("wos-token"); return signIn(); }
+  if (r.status === 401) { forget(); return signIn(); }
   const me = await r.json();
   Me.staff = !!me.staff;
   if (!Me.staff) {
     const nav = $("nav-link");
     nav.textContent = "Sign out"; nav.href = "/login";
-    nav.addEventListener("click", () => sessionStorage.removeItem("wos-token"));
+    nav.addEventListener("click", () => {
+      fetch("/v1/ops/logout", { method: "POST", headers: headers(), keepalive: true }).catch(() => {});
+      forget();
+    });
   }
   const want = new URLSearchParams(location.search).get("client");
   if (!Me.staff) {

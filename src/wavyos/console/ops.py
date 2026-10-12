@@ -480,7 +480,20 @@ def make_ops_router(get_factory: Callable[[], sessionmaker]) -> APIRouter:
             _, token = accounts.sign_in(s, body.email, body.password.get_secret_value())
         except accounts.SignInFailed as e:
             raise HTTPException(401, {"error": str(e)})
-        return {"token": token}
+        return {"token": token, "expires_in_days": accounts.BROWSER_SESSION_TTL.days}
+
+    @r.post("/logout")
+    def logout(authorization: Optional[str] = Header(default=None), s: Session = Depends(db)):
+        """Signs this browser out. Always succeeds, so a stale token can still clear itself; script tokens are left alone."""
+        from .. import accounts
+        tenancy.end_session(s, (authorization or "").removeprefix("Bearer ").strip(), accounts.BROWSER_SESSION)
+        return {"signed_out": True}
+
+    @r.post("/logout-everywhere")
+    def logout_everywhere(u: m.User = Depends(user), s: Session = Depends(db)):
+        """Signs this person out of every browser. API tokens made for scripts keep working."""
+        from .. import accounts
+        return {"signed_out": tenancy.end_sessions(s, u, accounts.BROWSER_SESSION)}
 
     def intake_row(s: Session, c: m.Client) -> Optional[m.OnboardingIntake]:
         return s.scalar(select(m.OnboardingIntake).where(m.OnboardingIntake.client_id == c.id))

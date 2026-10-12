@@ -124,7 +124,7 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
 (() => {
   const VIEWS = [["morning","Morning"],["overview","Overview"],["flow","Flow"],["review","Review"],["outcomes","Outcomes"],["learning","Learning"],["scale","Scale"],["executions","Executions"],["jobs","Jobs"],["approvals","Approvals"],["events","Events"]];
   const S = { token: null, me: null, view: "overview", client: "", sel: null, data: {}, live: false, last: null, err: "", after: 0, events: [] };
-  try { S.token = sessionStorage.getItem("wos-token"); S.client = localStorage.getItem("wos-client") || ""; } catch {}
+  try { S.token = localStorage.getItem("wos-token") || sessionStorage.getItem("wos-token"); S.client = localStorage.getItem("wos-client") || ""; } catch {}
   const $ = (q) => document.querySelector(q);
   const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const ago = (iso) => { if (!iso) return "—"; const d = (Date.now() - new Date(iso.endsWith("Z")||iso.includes("+")?iso:iso+"Z")) / 1000;
@@ -142,7 +142,10 @@ pre.j{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg2);border:1
     return body;
   }
   function toast(msg) { const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 2600); }
-  function signOut(msg) { S.token = null; try { sessionStorage.removeItem("wos-token"); } catch {} S.err = msg || ""; renderLogin(); }
+  function signOut(msg) {
+    if (S.token) fetch("/v1/ops/logout", { method: "POST", headers: { "Authorization": "Bearer " + S.token }, keepalive: true }).catch(() => {});
+    S.token = null; try { sessionStorage.removeItem("wos-token"); localStorage.removeItem("wos-token"); } catch {} S.err = msg || ""; renderLogin();
+  }
 
   // ------------------------------------------------------------ login
   function renderLogin() {

@@ -75,6 +75,7 @@ class ApiToken(IdMixin, Base):
     label: Mapped[str] = mapped_column(String(100), default="")
     last_used_at: Mapped[Optional[datetime]]
     revoked_at: Mapped[Optional[datetime]]
+    expires_at: Mapped[Optional[datetime]]
 
 
 class OnboardingIntake(IdMixin, Base):

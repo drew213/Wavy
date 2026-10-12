@@ -97,7 +97,7 @@ form .sub { color: var(--muted); font-size: 12px; margin-top: -8px; }
       <div class="field"><label for="s-name">Your name</label><input id="s-name" autocomplete="name" required></div>
       <div class="field"><label for="s-site">Website</label><input id="s-site" type="url" placeholder="https://" autocomplete="url"></div>
     </div>
-    <div class="field"><label for="s-email">Work email</label><input id="s-email" type="email" autocomplete="email" required></div>
+    <div class="field"><label for="s-email">Work email</label><input id="s-email" type="email" autocomplete="username" required></div>
     <div class="field"><label for="s-pass">Password</label><input id="s-pass" type="password" autocomplete="new-password" minlength="10" required>
       <small>At least 10 characters.</small></div>
     <p class="err" id="s-err" role="alert"></p>
@@ -109,7 +109,7 @@ form .sub { color: var(--muted); font-size: 12px; margin-top: -8px; }
   <form id="login" autocomplete="on" hidden>
     <h2>Sign in</h2>
     <p class="sub">Your saved audit is waiting.</p>
-    <div class="field"><label for="l-email">Email</label><input id="l-email" type="email" autocomplete="email" required></div>
+    <div class="field"><label for="l-email">Email</label><input id="l-email" type="email" autocomplete="username" required></div>
     <div class="field"><label for="l-pass">Password</label><input id="l-pass" type="password" autocomplete="current-password" required></div>
     <p class="err" id="l-err" role="alert"></p>
     <button class="cta" type="submit" id="l-btn">Sign in</button>
@@ -145,10 +145,15 @@ async function post(path, body) {
   return data;
 }
 
-async function land(token) {
-  sessionStorage.setItem("wos-token", token);
+function keep(token) {
+  try { localStorage.setItem("wos-token", token); sessionStorage.removeItem("wos-token"); }
+  catch { sessionStorage.setItem("wos-token", token); }
+}
+
+async function land(token, me) {
+  keep(token);
   if (safeNext) return location.assign(safeNext);
-  const me = await fetch("/v1/ops/me", { headers: { Authorization: "Bearer " + token } }).then(r => r.json());
+  me = me || await fetch("/v1/ops/me", { headers: { Authorization: "Bearer " + token } }).then(r => r.json());
   if (me.staff) return location.assign("/console");
   const c = (me.clients || [])[0];
   if (!c) return location.assign("/onboard");
@@ -163,7 +168,7 @@ $("signup").addEventListener("submit", async e => {
   try {
     const made = await post("/v1/ops/signup", { brand_name: $("s-brand").value.trim(), name: $("s-name").value.trim(),
       email: $("s-email").value.trim(), password: $("s-pass").value, website: $("s-site").value.trim() || null });
-    sessionStorage.setItem("wos-token", made.token);
+    keep(made.token);
     location.assign("/onboard?client=" + encodeURIComponent(made.client_slug));
   } catch (err) {
     $("s-err").textContent = err.message;
@@ -185,6 +190,15 @@ $("login").addEventListener("submit", async e => {
 });
 
 $(isLogin ? "l-email" : "s-brand").focus();
+
+(async () => {
+  let saved = "";
+  try { saved = localStorage.getItem("wos-token") || sessionStorage.getItem("wos-token") || ""; } catch {}
+  if (!saved) return;
+  const r = await fetch("/v1/ops/me", { headers: { Authorization: "Bearer " + saved } }).catch(() => null);
+  if (r && r.ok) return land(saved, await r.json());
+  if (r && r.status === 401) try { localStorage.removeItem("wos-token"); sessionStorage.removeItem("wos-token"); } catch {}
+})();
 </script>
 </body>
 </html>

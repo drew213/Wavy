@@ -57,6 +57,39 @@ def test_signup_creates_a_brand_workspace_and_sign_in_works(env):
     assert not db_file.exists() or b"correct horse battery" not in db_file.read_bytes()  # no file on Postgres runs
 
 
+def test_browser_sign_ins_last_30_days_and_sign_out_revokes_them(env):
+    from datetime import timedelta
+
+    from wavyos import tenancy
+    from wavyos.db import utcnow
+    factory, staff, _, _ = env
+    anon = TestClient(staff.app)
+    first = _signup(anon)["token"]
+    second = anon.post("/v1/ops/login", json={"email": "maya@glowlab.co", "password": "correct horse battery"}).json()
+    assert second["expires_in_days"] == 30
+    with factory() as s:
+        row = s.scalar(select(m.ApiToken).where(m.ApiToken.prefix == second["token"][:12]))
+        expires = row.expires_at if row.expires_at.tzinfo else row.expires_at.replace(tzinfo=utcnow().tzinfo)
+        assert timedelta(days=29) < expires - utcnow() <= timedelta(days=30)
+        user = s.get(m.User, row.user_id)
+        script = tenancy.issue_token(s, user, "reporting script")
+        row.expires_at = utcnow() - timedelta(minutes=1)
+        s.commit()
+    assert _as(staff, second["token"]).get("/v1/ops/me").status_code == 401  # expired
+
+    assert anon.post("/v1/ops/logout", headers={"Authorization": "Bearer " + script}).json() == {"signed_out": True}
+    assert _as(staff, script).get("/v1/ops/me").status_code == 200  # sign-out never touches script tokens
+    assert anon.post("/v1/ops/logout", headers={"Authorization": "Bearer " + first}).status_code == 200
+    assert _as(staff, first).get("/v1/ops/me").status_code == 401
+
+    a, b = (anon.post("/v1/ops/login", json={"email": "maya@glowlab.co", "password": "correct horse battery"}).json()["token"]
+            for _ in range(2))
+    assert _as(staff, a).post("/v1/ops/logout-everywhere").json() == {"signed_out": 3}  # a, b and the expired one
+    assert _as(staff, b).get("/v1/ops/me").status_code == 401
+    assert _as(staff, script).get("/v1/ops/me").status_code == 200
+    assert anon.post("/v1/ops/logout").status_code == 200  # no token: nothing to do, still fine
+
+
 def test_a_signed_up_brand_runs_its_own_audit_and_the_plan_waits_for_the_agency(env):
     factory, staff, vault, _ = env
     made = _signup(TestClient(staff.app))

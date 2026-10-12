@@ -10,6 +10,7 @@ import hashlib
 import hmac
 import re
 import secrets
+from datetime import timedelta
 from typing import Optional
 
 from sqlalchemy import func, select
@@ -20,6 +21,8 @@ from . import models as m
 from .scope import SYSTEM, InvalidState, Scope
 
 MIN_PASSWORD = 10
+BROWSER_SESSION = "browser sign-in"
+BROWSER_SESSION_TTL = timedelta(days=30)
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _N, _R, _P = 2 ** 14, 8, 1
 
@@ -81,7 +84,7 @@ def signup_brand(session: Session, org: m.Organization, *, brand_name: str, pers
     scope = Scope(org.id, client.id, SYSTEM)
     events.record(session, scope, "client.created", client, f"{brand_name} (self-serve sign-up)")
     events.record(session, scope, "user.added", user, f"{email} as client_owner (self-serve sign-up)")
-    return client, user, tenancy.issue_token(session, user, "browser sign-in")
+    return client, user, tenancy.issue_token(session, user, BROWSER_SESSION, ttl=BROWSER_SESSION_TTL)
 
 
 def sign_in(session: Session, email: str, password: str) -> tuple[m.User, str]:
@@ -89,7 +92,7 @@ def sign_in(session: Session, email: str, password: str) -> tuple[m.User, str]:
     for user in session.scalars(select(m.User).where(func.lower(m.User.email) == email, m.User.active.is_(True))):
         cred = session.scalar(select(m.PasswordCredential).where(m.PasswordCredential.user_id == user.id))
         if cred is not None and check_password(password, cred.password_hash):
-            return user, tenancy.issue_token(session, user, "browser sign-in")
+            return user, tenancy.issue_token(session, user, BROWSER_SESSION, ttl=BROWSER_SESSION_TTL)
     hash_password(password)  # same cost whether or not the email exists
     raise SignInFailed("that email and password don't match an account")
 
